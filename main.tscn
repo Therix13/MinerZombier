@@ -1,0 +1,14 @@
+[gd_scene load_steps=2 format=3 uid="uid://k0oxvcmblc4o"]
+
+[ext_resource type="Script" path="res://Scripts/main.gd" id="1_main"]
+
+[node name="main" type="Node2D" unique_id=121424299]
+script = ExtResource("1_main")
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=1854041154]
+
+[node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=1850007052]
+
+[node name="MoneyLabel" type="Label" parent="CanvasLayer" unique_id=1995870150]
+offset_right = 40.0
+offset_bottom = 23.0
