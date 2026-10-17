@@ -47,8 +47,6 @@ var progression: RefCounted
 var progression_panel: PanelContainer
 var level_label: Label
 var experience_bar: ProgressBar
-var research_label: Label
-var progression_hint: Label
 var research_button: Button
 var research_summary: Label
 var research_buttons: Dictionary = {}
@@ -100,51 +98,67 @@ func set_progression(player_progression: RefCounted) -> void:
 	progression = player_progression
 	build_progression_panel()
 	progression.changed.connect(update_progression)
-	progression.level_up.connect(show_level_up)
 	update_progression()
 
 func build_progression_panel() -> void:
 	progression_panel = PanelContainer.new()
-	progression_panel.position = Vector2(20, 260)
-	progression_panel.size = Vector2(302, 0)
-	progression_panel.add_theme_stylebox_override("panel", create_style("#24352e", "#81a979", 3, 9))
+	progression_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	progression_panel.offset_left = -180.0
+	progression_panel.offset_right = 180.0
+	progression_panel.offset_top = -58.0
+	progression_panel.offset_bottom = -20.0
+	progression_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	progression_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	add_child(progression_panel)
-	var margin := MarginContainer.new()
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 10)
-	progression_panel.add_child(margin)
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 6)
-	margin.add_child(column)
-	level_label = create_label("", 18, Color("#d6edb4"))
-	column.add_child(level_label)
-	experience_bar = ProgressBar.new()
-	experience_bar.custom_minimum_size.y = 12
-	experience_bar.show_percentage = false
-	experience_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	experience_bar.add_theme_stylebox_override("background", create_style("#15221c", "#405c45", 1, 4))
-	experience_bar.add_theme_stylebox_override("fill", create_style("#86ba69", "#b2d98a", 1, 4))
-	column.add_child(experience_bar)
-	research_label = create_label("", 15, Color("#f3ca85"))
-	column.add_child(research_label)
-	progression_hint = create_label("Gana EXP vendiendo minerales y derrotando zombis.", 13)
-	column.add_child(progression_hint)
-	research_button = create_button("TECNOLOGÍAS")
-	research_button.custom_minimum_size.y = 38
-	research_button.add_theme_font_size_override("font_size", 15)
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_theme_constant_override("separation", 5)
+	progression_panel.add_child(column)
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 12)
+	column.add_child(row)
+	level_label = create_label("", 14, Color("#d6edb4"))
+	level_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	level_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	level_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	level_label.add_theme_color_override("font_outline_color", Color("#152019"))
+	level_label.add_theme_constant_override("outline_size", 3)
+	row.add_child(level_label)
+	research_button = Button.new()
+	research_button.flat = true
+	research_button.custom_minimum_size.y = 24
+	research_button.add_theme_font_size_override("font_size", 14)
+	research_button.add_theme_color_override("font_color", Color("#c4cebd"))
+	research_button.add_theme_color_override("font_hover_color", Color("#ffe0a0"))
+	research_button.add_theme_color_override("font_pressed_color", Color("#f3ca85"))
+	research_button.add_theme_color_override("font_disabled_color", Color("#899082"))
+	research_button.add_theme_color_override("font_outline_color", Color("#152019"))
+	research_button.add_theme_constant_override("outline_size", 3)
+	for state in ["normal", "hover", "pressed", "disabled"]:
+		research_button.add_theme_stylebox_override(state, StyleBoxEmpty.new())
 	research_button.pressed.connect(open_research)
-	column.add_child(research_button)
-
-func show_level_up(new_level: int) -> void:
-	progression_hint.text = "¡Nivel %d! +1 punto de investigación." % new_level
+	row.add_child(research_button)
+	experience_bar = ProgressBar.new()
+	experience_bar.custom_minimum_size.y = 6
+	experience_bar.show_percentage = false
+	experience_bar.mouse_filter = Control.MOUSE_FILTER_STOP
+	experience_bar.add_theme_stylebox_override("background", create_style("#18241d", "#18241d", 0, 3))
+	experience_bar.add_theme_stylebox_override("fill", create_style("#8db574", "#8db574", 0, 3))
+	column.add_child(experience_bar)
 
 func update_progression() -> void:
 	if progression == null:
 		return
-	level_label.text = "NIVEL %d · EXP %d / %d" % [progression.level, progression.experience, progression.experience_to_next_level()]
+	level_label.text = "NIVEL %d" % progression.level
 	experience_bar.max_value = progression.experience_to_next_level()
 	experience_bar.value = progression.experience
-	research_label.text = "Investigación: %d puntos disponibles" % progression.research_points
+	experience_bar.tooltip_text = "EXP %d / %d\nGana EXP vendiendo minerales y derrotando zombis." % [progression.experience, progression.experience_to_next_level()]
+	var points: int = progression.research_points
+	research_button.text = "TECNOLOGÍAS%s" % (" · %d PI" % points if points > 0 else "")
+	research_button.tooltip_text = "%d puntos de investigación disponibles. Cada nivel otorga 1 punto." % points
+	research_button.add_theme_color_override("font_color", Color("#f3ca85") if points > 0 else Color("#c4cebd"))
 	progression_panel.visible = not shop_open and not shop_animating
 	research_button.disabled = cycle != null and (cycle.is_night or cycle.defeated)
 	refresh_research_buttons()

@@ -16,7 +16,6 @@ var previously_paused: bool = false
 var previous_focus: WeakRef
 var menu_root: Control
 var overlay: Control
-var pause_button: Button
 var pause_page: VBoxContainer
 var settings_page: VBoxContainer
 var continue_button: Button
@@ -136,12 +135,6 @@ func build_interface() -> void:
 	menu_root = Control.new()
 	menu_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(menu_root)
-	pause_button = make_button("PAUSA · ESC")
-	pause_button.tooltip_text = "Continuar, ajustes y salir del juego"
-	pause_button.position = Vector2(214, 20)
-	pause_button.size = Vector2(150, 58)
-	pause_button.pressed.connect(open_menu)
-	menu_root.add_child(pause_button)
 	overlay = Control.new()
 	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
