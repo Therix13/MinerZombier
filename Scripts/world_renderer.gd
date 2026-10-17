@@ -5,6 +5,7 @@ var mining: RefCounted
 var conveyors: RefCounted
 var drills: RefCounted
 var launchers: RefCounted
+var tutorial: RefCounted
 var placing_launcher: bool = false
 var hovered_cell := Vector2i(-999, -999)
 var sale_hovered := false
@@ -88,14 +89,14 @@ func _draw() -> void:
 	for shot in launchers.shots:
 		draw_line(shot["from"], shot["to"], Color("#d9b46a") if shot["kind"] == "brass" else Color("#444444"), 3.0)
 	draw_sale_cell()
-	if placing_coal and grid.owned_tiles.has(hovered_cell) and mining.can_place_vein(hovered_cell) and not conveyors.belts.has(hovered_cell) and not drills.drills.has(hovered_cell) and not launchers.launchers.has(hovered_cell):
+	if placing_coal and preview_allowed("coal") and grid.owned_tiles.has(hovered_cell) and mining.can_place_vein(hovered_cell) and not conveyors.belts.has(hovered_cell) and not drills.drills.has(hovered_cell) and not launchers.launchers.has(hovered_cell):
 		draw_coal_vein(grid.get_cell_rect(hovered_cell).get_center(), placement_direction, 0, true)
 	if placing_brass and grid.owned_tiles.has(hovered_cell) and mining.can_place_vein(hovered_cell) and not conveyors.belts.has(hovered_cell) and not drills.drills.has(hovered_cell) and not launchers.launchers.has(hovered_cell):
 		draw_brass_vein(grid.get_cell_rect(hovered_cell).get_center(), placement_direction, 0, true)
-	if placing_belt and grid.owned_tiles.has(hovered_cell) and conveyors.can_place(hovered_cell):
+	if placing_belt and preview_allowed("belt") and grid.owned_tiles.has(hovered_cell) and conveyors.can_place(hovered_cell):
 		draw_conveyor(grid.get_cell_rect(hovered_cell).get_center(), placement_direction, true, placement_belt_shape)
 	if placing_launcher and (grid.is_valid_cell(hovered_cell) or grid.is_defense_position(hovered_cell)):
-		var launcher_valid: bool = grid.defense_tiles.has(hovered_cell) and launchers.can_place(hovered_cell)
+		var launcher_valid: bool = preview_allowed("launcher") and grid.defense_tiles.has(hovered_cell) and launchers.can_place(hovered_cell)
 		if launcher_valid:
 			draw_rect(grid.get_cell_rect(hovered_cell).grow(-1.0), Color("#ffe084"), false, 3.0)
 		else:
@@ -115,9 +116,11 @@ func _draw() -> void:
 		elif held_object_type == "launcher":
 			valid = destination == held_object_cell or (grid.defense_tiles.has(destination) and launchers.can_place(destination))
 		elif held_object_type == "nugget":
-			valid = mining.can_move_nugget(destination) or destination == grid.sale_cell
-		if valid and destination != grid.sale_cell:
-			draw_rect(grid.get_cell_rect(destination).grow(-2.0), Color("#ffe18a"), false, 3.0)
+			valid = mining.can_move_nugget(destination) or destination == grid.sale_cell or launchers.can_receive(destination)
+		if tutorial != null:
+			valid = valid and tutorial.allows_interaction(held_object_type, held_object_cell, destination, true)
+		if destination != grid.sale_cell or not valid:
+			draw_rect(grid.get_cell_rect(destination).grow(-2.0), Color("#ffe18a") if valid else Color("#df7770"), false, 3.0)
 		if held_object_type == "vein" and mining.vein_at(held_object_cell) != "":
 			var kind: String = mining.vein_at(held_object_cell)
 			var vein: Dictionary = mining.brass_veins[held_object_cell] if kind == "brass" else mining.coal_veins[held_object_cell]
@@ -136,6 +139,9 @@ func _draw() -> void:
 				draw_brass_nugget(drag_world_position, 1)
 			else:
 				draw_coal_nugget(drag_world_position, 1)
+
+func preview_allowed(kind: String) -> bool:
+	return tutorial == null or tutorial.allows_world_press(hovered_cell, kind)
 
 func draw_coal_vein(
 	center: Vector2,

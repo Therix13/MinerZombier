@@ -60,6 +60,9 @@ func run_checks() -> void:
 	var launchers: RefCounted = game.get("launchers")
 	var player: RefCounted = game.get("progression")
 	var cycle: RefCounted = game.get("cycle")
+	# This suite exercises free play; the guided first day is covered separately.
+	cycle.set("day", 2)
+	cycle.emit_signal("changed")
 	var grid: RefCounted = game.get("grid")
 	var manager: Node = game.get("zombie_manager")
 	var shop: Control = game.get("shop")

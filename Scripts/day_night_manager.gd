@@ -4,6 +4,24 @@ signal changed
 
 const NIGHT_REWARD: int = 50
 const TUTORIAL_EXPANSION_BONUS: int = 500
+const TUTORIAL_COAL_CELL := Vector2i(14, 0)
+const TUTORIAL_ORE_CELL := Vector2i(15, 0)
+const TUTORIAL_BELT_CELL := Vector2i(14, 1)
+const TUTORIAL_ACTIONS := [
+	["buy_coal", "place_coal"],
+	["mine_coal", "sell_coal"],
+	["expand"],
+	["buy_conveyor", "place_conveyor"],
+	["unlock_defense"],
+	["buy_launcher", "place_launcher"],
+	["mine_coal", "load_ammo"],
+	["start_night"],
+]
+const TUTORIAL_TITLES := [
+	"Tu primera veta", "Del carbón a las monedas", "Haz sitio para crecer",
+	"Tu primera cinta", "Prepara las defensas", "Tu primer lanzapapas",
+	"Carga la munición", "¡Todo listo!",
+]
 
 var day: int = 1
 var is_night: bool = false
@@ -50,6 +68,39 @@ func _on_sale(kind: String) -> void:
 	if kind == "coal":
 		coal_sold += 1
 	refresh_tutorial()
+
+func is_tutorial_active() -> bool:
+	return day == 1 and not is_night and not defeated
+
+func allows_action(action: String) -> bool:
+	if not is_tutorial_active():
+		return true
+	return action in TUTORIAL_ACTIONS[clampi(tutorial_step, 0, 7)]
+
+func tutorial_title() -> String:
+	return TUTORIAL_TITLES[clampi(tutorial_step, 0, 7)]
+
+func allows_world_press(cell: Vector2i, placing: String = "") -> bool:
+	if not is_tutorial_active():
+		return true
+	if placing == "coal":
+		return allows_action("place_coal") and cell == TUTORIAL_COAL_CELL
+	if placing == "belt":
+		return allows_action("place_conveyor") and cell == TUTORIAL_BELT_CELL
+	if placing == "launcher":
+		return allows_action("place_launcher") and cell == grid.defense_cell("left")
+	if not placing.is_empty():
+		return false
+	return (allows_action("mine_coal") and cell == TUTORIAL_COAL_CELL and mining.nuggets_at(TUTORIAL_ORE_CELL) == 0) or ((allows_action("sell_coal") or allows_action("load_ammo")) and cell == TUTORIAL_ORE_CELL)
+
+func allows_interaction(kind: String, source: Vector2i, destination: Vector2i, dragged: bool) -> bool:
+	if not is_tutorial_active():
+		return true
+	if kind == "vein":
+		return allows_action("mine_coal") and source == TUTORIAL_COAL_CELL and source == destination and not dragged
+	if kind == "nugget" and source == TUTORIAL_ORE_CELL and dragged:
+		return (allows_action("sell_coal") and destination == grid.sale_cell) or (allows_action("load_ammo") and destination == grid.defense_cell("left"))
+	return false
 
 func ammo_damage() -> float:
 	var total: float = 0.0
@@ -99,19 +150,23 @@ func refresh_tutorial() -> void:
 func tutorial_text() -> String:
 	match tutorial_step:
 		0:
-			return "Compra y coloca una veta de carbón."
+			return "Compra una veta de carbón y colócala en la casilla dorada."
 		1:
-			return "Extrae una pepita de carbón y véndela."
+			if mining.nuggets_at(TUTORIAL_ORE_CELL) > 0:
+				return "Arrastra la pepita hasta el cofre marcado para venderla."
+			return "Haz clic en la veta hasta extraer una pepita. Después la venderemos."
 		2:
-			return "Amplía la base a 7x5 en EXPANSION."
+			return "Tu primera venta te dio 500 monedas extra. Amplía la base a 7 × 5."
 		3:
-			return "Coloca tu primera cinta transportadora."
+			return "Compra una cinta y colócala en la casilla marcada."
 		4:
-			return "Compra DESBLOQUEAR DEFENSAS."
+			return "Desbloquea las dos plataformas para defender la entrada."
 		5:
-			return "Coloca tu primer Lanzapapas gratuito."
+			return "Obtén tu lanzapapas gratuito y colócalo en la plataforma dorada."
 		6:
-			return "Carga munición para causar al menos 2 de daño."
+			if mining.nuggets_at(TUTORIAL_ORE_CELL) > 0:
+				return "Arrastra la pepita al lanzapapas marcado. Necesitas cargar 4 en total."
+			return "Extrae carbón de tu veta y arrástralo al lanzapapas: 4 pepitas preparan la primera noche."
 	return "¡Preparación lista! Inicia la primera noche."
 
 func can_start_night() -> bool:

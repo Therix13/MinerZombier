@@ -1,0 +1,192 @@
+extends SceneTree
+
+var passed: int = 0
+var failed: int = 0
+var game: Node2D
+var shop: Control
+var cycle: RefCounted
+var grid: RefCounted
+
+func _initialize() -> void:
+	call_deferred("run_checks")
+
+func check(condition: bool, description: String) -> void:
+	if condition:
+		passed += 1
+		print("PASS: ", description)
+	else:
+		failed += 1
+		print("FAIL: ", description)
+
+func settle() -> void:
+	await process_frame
+	await process_frame
+
+func mouse_event(point: Vector2, pressed: bool) -> void:
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.position = point
+	event.global_position = point
+	event.pressed = pressed
+	Input.parse_input_event(event)
+	await settle()
+
+func move_mouse(point: Vector2) -> void:
+	if DisplayServer.get_name() != "headless":
+		Input.warp_mouse(root.get_screen_transform().affine_inverse() * point)
+	var event := InputEventMouseMotion.new()
+	event.position = point
+	event.global_position = point
+	Input.parse_input_event(event)
+	await settle()
+
+func cell_point(cell: Vector2i) -> Vector2:
+	return root.get_screen_transform() * (game.get_global_transform_with_canvas() * grid.get_cell_rect(cell).get_center())
+
+func click_cell(cell: Vector2i) -> void:
+	var point: Vector2 = cell_point(cell)
+	await move_mouse(point)
+	await mouse_event(point, true)
+	await mouse_event(point, false)
+
+func drag_cell(source: Vector2i, destination: Vector2i) -> void:
+	var point: Vector2 = cell_point(source)
+	await move_mouse(point)
+	await mouse_event(point, true)
+	point = cell_point(destination)
+	await move_mouse(point)
+	await mouse_event(point, false)
+
+func key(code: Key, pressed: bool = true) -> void:
+	var event := InputEventKey.new()
+	event.keycode = code
+	event.physical_keycode = code
+	event.pressed = pressed
+	Input.parse_input_event(event)
+	await settle()
+
+func action_button() -> void:
+	var button: Button = shop.get("cycle_action")
+	var point: Vector2 = root.get_screen_transform() * (button.get_global_transform_with_canvas() * (button.size * 0.5))
+	await move_mouse(point)
+	await mouse_event(point, true)
+	await mouse_event(point, false)
+	await settle()
+
+func check_locked_actions() -> void:
+	var coins: int = game.get("economy").coins
+	game.call("buy_brass_vein")
+	game.call("buy_drill")
+	game.call("buy_junction_conveyor")
+	game.call("research_technology", "mining_i")
+	game.call("toggle_view")
+	shop.call("open_shop")
+	check(game.get("economy").coins == coins and not game.get("placing_brass") and not game.get("placing_drill") and not game.get("placing_belt"), "Unrelated purchases spend nothing and do not enter placement")
+	check(not shop.get("shop_open") and shop.get("view_button").disabled and shop.get("shop_button").disabled, "Shop and view controls stay locked during the tutorial")
+	check(not game.get("progression").has_technology("mining_i"), "Research cannot bypass the tutorial")
+
+func extract_one() -> void:
+	for index in range(7):
+		await click_cell(cycle.TUTORIAL_COAL_CELL)
+
+func run_checks() -> void:
+	root.show()
+	root.size = Vector2i(1280, 720)
+	var args: PackedStringArray = OS.get_cmdline_user_args()
+	var scene_name: String = args[0] if not args.is_empty() else "main.tscn"
+	game = load("res://" + scene_name).instantiate()
+	root.add_child(game)
+	current_scene = game
+	await settle()
+	await settle()
+	var display: CanvasLayer = game.get("display_settings")
+	display.resolution = Vector2i(1280, 720)
+	display.window_mode = 0
+	display.apply_display(false)
+	await settle()
+	await settle()
+	shop = game.get("shop")
+	cycle = game.get("cycle")
+	grid = game.get("grid")
+	check(cycle.tutorial_step == 0 and cycle.is_tutorial_active(), "Fresh game starts in guided mode")
+	check(game.has_node("TutorialGuide"), "Tutorial input guard is installed")
+	check_locked_actions()
+	await key(KEY_F10)
+	await key(KEY_F10, false)
+	await key(KEY_P)
+	await key(KEY_P, false)
+	check(not game.get("economy").developer_mode and not game.get("camera_controller").defense_view, "F10 and P cannot bypass tutorial locks")
+	await key(KEY_ESCAPE)
+	await key(KEY_ESCAPE, false)
+	check(paused and game.get("display_settings").menu_open, "ESC remains available during the tutorial")
+	await key(KEY_ESCAPE)
+	await key(KEY_ESCAPE, false)
+	check(not paused, "ESC resumes the guided game")
+	await action_button()
+	check(game.get("placing_coal") and game.get("economy").coins == 400, "Tutorial card buys one coal vein")
+	if not game.get("placing_coal"):
+		quit(1)
+		return
+	await click_cell(Vector2i(16, 1))
+	check(game.get("placing_coal") and game.get("mining").coal_veins.is_empty(), "Wrong placement cell is blocked without losing the purchase")
+	await key(KEY_R)
+	await key(KEY_R, false)
+	check(game.get("placement_direction") == 1, "Rotation cannot break the guided output direction")
+	await key(KEY_SHIFT)
+	await click_cell(cycle.TUTORIAL_COAL_CELL)
+	await key(KEY_SHIFT, false)
+	check(cycle.tutorial_step == 1 and game.get("mining").coal_veins.size() == 1, "Marked cell completes the coal placement step")
+	check(not game.get("placing_coal") and game.get("economy").coins == 400, "Shift cannot purchase extra objects during the tutorial")
+	await drag_cell(cycle.TUTORIAL_COAL_CELL, Vector2i(16, 1))
+	check(game.get("mining").coal_veins.has(cycle.TUTORIAL_COAL_CELL) and game.get("mining").coal_veins.size() == 1, "Dragging the vein cannot move it out of the guided route")
+	await extract_one()
+	check(game.get("mining").nuggets_at(cycle.TUTORIAL_ORE_CELL) == 1 and cycle.tutorial_step == 1, "Seven real mining clicks produce the tutorial nugget")
+	await drag_cell(cycle.TUTORIAL_ORE_CELL, Vector2i(16, 1))
+	check(game.get("mining").nuggets_at(cycle.TUTORIAL_ORE_CELL) == 1, "Dropping ore on an unrelated tile preserves it at the source")
+	await drag_cell(cycle.TUTORIAL_ORE_CELL, grid.sale_cell)
+	check(cycle.tutorial_step == 2 and game.get("economy").coins == 905, "Selling the nugget advances and grants the first-sale bonus once")
+	await click_cell(cycle.TUTORIAL_COAL_CELL)
+	check(game.get("mining").coal_veins[cycle.TUTORIAL_COAL_CELL]["progress"] == 0, "Mining is blocked during the expansion step")
+	await action_button()
+	check(cycle.tutorial_step == 3 and grid.cave_width == 7 and game.get("economy").coins == 405, "Card expands the base at the correct step")
+	await action_button()
+	check(game.get("placing_belt") and game.get("economy").coins == 355, "Conveyor purchase is enabled only in its step")
+	await click_cell(cycle.TUTORIAL_BELT_CELL)
+	check(cycle.tutorial_step == 4 and game.get("conveyors").belts.has(cycle.TUTORIAL_BELT_CELL), "Marked conveyor placement advances to defenses")
+	await action_button()
+	check(cycle.tutorial_step == 5 and grid.defense_tiles.size() == 2 and game.get("economy").coins == 255, "Card unlocks both defense platforms once")
+	await action_button()
+	check(game.get("placing_launcher") and game.get("economy").coins == 255, "First launcher is free")
+	await click_cell(grid.defense_cell("right"))
+	check(game.get("launchers").launchers.is_empty() and game.get("placing_launcher"), "Unmarked launcher platform is blocked")
+	await click_cell(grid.defense_cell("left"))
+	check(cycle.tutorial_step == 6 and not cycle.free_launcher_available, "Marked launcher placement consumes the free launcher and advances")
+	check_locked_actions()
+	for index in range(4):
+		await extract_one()
+		if index == 0:
+			await drag_cell(cycle.TUTORIAL_ORE_CELL, grid.sale_cell)
+			check(game.get("mining").nuggets_at(cycle.TUTORIAL_ORE_CELL) == 1 and cycle.coal_sold == 1, "Selling is blocked while loading tutorial ammunition")
+		await drag_cell(cycle.TUTORIAL_ORE_CELL, grid.defense_cell("left"))
+	check(cycle.tutorial_step == 7 and is_equal_approx(cycle.ammo_damage(), 2.0), "Four real mining-and-loading cycles prepare the first night")
+	var total_exp: int = game.get("progression").total_experience
+	await click_cell(cycle.TUTORIAL_COAL_CELL)
+	check(game.get("progression").total_experience == total_exp and game.get("mining").coal_veins[cycle.TUTORIAL_COAL_CELL]["progress"] == 0, "Final tutorial step permits only starting the night")
+	await action_button()
+	check(cycle.is_night and not cycle.is_tutorial_active(), "Card starts the first wave only after every tutorial step")
+	var manager: Node = game.get("zombie_manager")
+	manager.set_process(false)
+	manager.call("spawn_zombie")
+	for enemy in get_nodes_in_group("zombies"):
+		enemy.call("take_damage", 100.0)
+	manager.call("_process", 0.01)
+	game.call("dismiss_night_victory_popup")
+	await settle()
+	check(cycle.day == 2 and not cycle.is_night and not shop.get("shop_button").disabled, "Completing the first night unlocks normal play")
+	game.call("buy_brass_vein")
+	check(game.get("placing_brass"), "Previously blocked purchases unlock on day two")
+	game.call("cancel_placement")
+	shop.call("open_shop")
+	check(shop.get("shop_open"), "Shop navigation unlocks after the tutorial")
+	print("RESULT: ", passed, " passed; ", failed, " failed; tutorial=", scene_name)
+	quit(1 if failed > 0 else 0)

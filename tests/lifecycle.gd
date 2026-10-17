@@ -54,6 +54,7 @@ func run_checks() -> void:
 	await process_frame
 	check_first_automated_sale(game)
 	for iteration in range(3):
+		game.get("cycle").day = 2
 		game.get("progression").add_experience(120)
 		game.call("research_technology", "mining_i")
 		game.call("research_technology", "mining_ii")

@@ -18,6 +18,7 @@ signal restart_requested
 signal technology_requested(technology_id: String)
 
 const DisplaySettingsScript = preload("res://Scripts/display_settings.gd")
+const TutorialGuideScript = preload("res://Scripts/tutorial_guide.gd")
 
 const PANEL_WIDTH := 340.0
 const TOGGLE_SIZE := 58.0
@@ -41,6 +42,10 @@ var fixed_back_button: Button
 var shop_scroll: ScrollContainer
 var cycle: RefCounted
 var cycle_title: Label
+var cycle_heading: Label
+var cycle_badge: Label
+var cycle_steps: HBoxContainer
+var cycle_hint: Label
 var cycle_goal: Label
 var cycle_action: Button
 var progression: RefCounted
@@ -92,6 +97,16 @@ func set_cycle(game_cycle: RefCounted) -> void:
 	build_cycle_panel()
 	cycle.changed.connect(update_cycle)
 	update_cycle()
+	ensure_tutorial_guide.call_deferred()
+
+func ensure_tutorial_guide() -> void:
+	var game: Node = get_parent().get_parent()
+	for child in game.get_children():
+		if child.get_script() == TutorialGuideScript:
+			return
+	var guide := TutorialGuideScript.new()
+	guide.name = "TutorialGuide"
+	game.add_child(guide)
 
 func set_progression(player_progression: RefCounted) -> void:
 	progression = player_progression
@@ -189,7 +204,7 @@ func refresh_research_buttons() -> void:
 		return
 	if research_summary != null:
 		research_summary.text = "Nivel %d · %d PI disponibles" % [progression.level, progression.research_points]
-	var blocked: bool = cycle != null and (cycle.is_night or cycle.defeated)
+	var blocked: bool = cycle != null and (cycle.is_night or cycle.defeated or cycle.is_tutorial_active())
 	for technology_id in research_buttons:
 		var button: Button = research_buttons[technology_id]
 		var status: Label = research_status[technology_id]
@@ -197,70 +212,152 @@ func refresh_research_buttons() -> void:
 		button.disabled = blocked or not progression.can_research(technology_id)
 		button.text = "INVESTIGADA" if researched else "INVESTIGAR · %d PI" % progression.TECHNOLOGIES[technology_id]["cost"]
 		var reason: String = progression.research_block_reason(technology_id)
-		status.text = "Investiga durante el día." if blocked and not researched else ("Disponible" if reason.is_empty() else reason)
+		status.text = ("Completa el tutorial para investigar." if cycle != null and cycle.is_tutorial_active() else "Investiga durante el día.") if blocked and not researched else ("Disponible" if reason.is_empty() else reason)
 		status.add_theme_color_override("font_color", Color("#b8dc98") if researched or not button.disabled else Color("#c6b5a0"))
 
 func build_cycle_panel() -> void:
 	var panel := PanelContainer.new()
 	panel.name = "CyclePanel"
-	panel.anchor_left = 0.0
-	panel.anchor_right = 0.0
-	panel.anchor_top = 0.0
-	panel.anchor_bottom = 0.0
-	panel.offset_left = 20.0
-	panel.offset_right = 322.0
-	panel.offset_top = 91.0
-	panel.offset_bottom = 242.0
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_theme_stylebox_override("panel", create_style("#352516", "#a87843", 3, 9))
+	panel.position = Vector2(20, 91)
+	panel.size = Vector2(302, 0)
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	var style := create_style("#192920", "#435744", 1, 12)
+	style.border_width_left = 3
+	style.border_color = Color("#c9a469")
+	style.shadow_color = Color(0, 0, 0, 0.22)
+	style.shadow_size = 5
+	style.shadow_offset = Vector2(0, 3)
+	panel.add_theme_stylebox_override("panel", style)
 	add_child(panel)
 	var margin := MarginContainer.new()
-	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.mouse_filter = Control.MOUSE_FILTER_PASS
 	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 10)
+		margin.add_theme_constant_override("margin_" + side, 16)
 	panel.add_child(margin)
 	var column := VBoxContainer.new()
-	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	column.add_theme_constant_override("separation", 6)
+	column.mouse_filter = Control.MOUSE_FILTER_PASS
+	column.add_theme_constant_override("separation", 11)
 	margin.add_child(column)
-	cycle_title = create_label("DÍA 1", 18, Color("#f3ca85"))
-	cycle_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var header := HBoxContainer.new()
+	column.add_child(header)
+	cycle_heading = create_label("PRIMEROS PASOS", 12, Color("#aabb9e"))
+	cycle_heading.autowrap_mode = TextServer.AUTOWRAP_OFF
+	cycle_heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(cycle_heading)
+	cycle_badge = create_label("01 / 07", 12, Color("#efd29b"))
+	cycle_badge.autowrap_mode = TextServer.AUTOWRAP_OFF
+	header.add_child(cycle_badge)
+	cycle_steps = HBoxContainer.new()
+	cycle_steps.add_theme_constant_override("separation", 5)
+	column.add_child(cycle_steps)
+	for index in range(7):
+		var segment := ColorRect.new()
+		segment.custom_minimum_size.y = 3
+		segment.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		segment.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cycle_steps.add_child(segment)
+	cycle_title = create_label("", 21, Color("#f1e6c9"))
 	column.add_child(cycle_title)
-	cycle_goal = create_label("", 14, Color("#f0e0c8"))
-	cycle_goal.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	cycle_goal.custom_minimum_size.y = 39.0
+	cycle_goal = create_label("", 14, Color("#bacbb7"))
+	cycle_goal.custom_minimum_size.y = 58
 	column.add_child(cycle_goal)
-	cycle_action = create_button("INICIAR NOCHE")
-	cycle_action.custom_minimum_size.y = 40.0
+	cycle_action = create_button("")
+	cycle_action.custom_minimum_size.y = 39
+	cycle_action.add_theme_font_size_override("font_size", 14)
+	cycle_action.add_theme_color_override("font_color", Color("#222c20"))
+	cycle_action.add_theme_color_override("font_hover_color", Color("#222c20"))
+	cycle_action.add_theme_stylebox_override("normal", create_style("#d5b078", "#e6ca98", 1, 7))
+	cycle_action.add_theme_stylebox_override("hover", create_style("#ebc991", "#f6dfb5", 1, 7))
+	cycle_action.add_theme_stylebox_override("disabled", create_style("#263a2d", "#3b5240", 1, 7))
 	cycle_action.pressed.connect(_on_cycle_action)
 	column.add_child(cycle_action)
+	cycle_hint = create_label("", 12, Color("#8fA48c"))
+	column.add_child(cycle_hint)
 
 func _on_cycle_action() -> void:
+	if cycle_action.disabled:
+		return
 	if cycle.defeated:
 		restart_requested.emit()
+	elif cycle.is_tutorial_active():
+		match cycle.tutorial_step:
+			0: coal_vein_requested.emit()
+			2: expansion_requested.emit()
+			3: conveyor_requested.emit()
+			4: unlock_defense_platforms()
+			5: launcher_requested.emit()
+			7: night_requested.emit()
+		update_cycle()
 	elif cycle.can_start_night() and not shop_open and not shop_animating:
 		night_requested.emit()
 
 func update_cycle() -> void:
 	if cycle == null or cycle_title == null:
 		return
-	if cycle.defeated:
-		cycle_title.text = "BASE DESTRUIDA"
+	var tutorial: bool = cycle.is_tutorial_active()
+	cycle_heading.text = "PRIMEROS PASOS" if tutorial else "DEFENSA DE LA BASE"
+	cycle_badge.text = "%02d / 07" % mini(cycle.tutorial_step + 1, 7) if tutorial else "DÍA %d" % cycle.day
+	cycle_steps.visible = tutorial
+	cycle_hint.text = "Solo la acción de este paso está habilitada.\nESC abre el menú de pausa." if tutorial else ""
+	cycle_hint.visible = tutorial
+	for index in range(cycle_steps.get_child_count()):
+		cycle_steps.get_child(index).color = Color("#8db574") if index < cycle.tutorial_step else (Color("#e1b879") if index == cycle.tutorial_step else Color("#354b3a"))
+	if tutorial:
+		cycle_title.text = cycle.tutorial_title()
+		cycle_goal.text = cycle.tutorial_text()
+		cycle_action.disabled = false
+		var game: Node = get_parent().get_parent()
+		match cycle.tutorial_step:
+			0:
+				cycle_action.text = "COLOCA LA VETA MARCADA" if game.get("placing_coal") else "COMPRAR VETA · 100"
+				cycle_action.disabled = game.get("placing_coal") or not economy.can_afford(economy.COAL_VEIN_PRICE)
+				if game.get("placing_coal"):
+					cycle_goal.text = "Coloca la veta en la casilla dorada. Su salida quedará orientada hacia la derecha."
+			1, 6:
+				if cycle.tutorial_step == 6:
+					cycle_action.text = "MUNICIÓN · %d / 4" % roundi(cycle.ammo_damage() / 0.5)
+				elif cycle.mining.nuggets_at(cycle.TUTORIAL_ORE_CELL) > 0:
+					cycle_action.text = "ARRASTRA LA PEPITA AL COFRE"
+				else:
+					var vein: Dictionary = cycle.mining.coal_veins.get(cycle.TUTORIAL_COAL_CELL, {})
+					cycle_action.text = "EXTRAE CARBÓN · %d / %d" % [vein.get("progress", 0), cycle.mining.mining_clicks]
+				cycle_action.disabled = true
+			2:
+				cycle_action.text = "AMPLIAR A 7 × 5 · 500"
+				cycle_action.disabled = not economy.can_afford(economy.EXPANSION_PRICE)
+			3:
+				cycle_action.text = "COLOCA LA CINTA MARCADA" if game.get("placing_belt") else "COMPRAR CINTA · 50"
+				cycle_action.disabled = game.get("placing_belt") or not economy.can_afford(economy.CONVEYOR_PRICE)
+				if game.get("placing_belt"):
+					cycle_goal.text = "Coloca la cinta en la casilla dorada, justo debajo de tu veta."
+			4:
+				cycle_action.text = "DESBLOQUEAR DEFENSAS · 100"
+				cycle_action.disabled = not economy.can_afford(economy.DEFENSE_TILE_PRICE)
+			5:
+				cycle_action.text = "COLOCA EL LANZAPAPAS" if game.get("placing_launcher") else "OBTENER LANZAPAPAS · GRATIS"
+				cycle_action.disabled = game.get("placing_launcher")
+				if game.get("placing_launcher"):
+					cycle_goal.text = "Coloca el lanzapapas en la plataforma izquierda resaltada en dorado."
+			7:
+				cycle_action.text = "INICIAR PRIMERA NOCHE"
+				cycle_action.disabled = not cycle.can_start_night()
+	elif cycle.defeated:
+		cycle_title.text = "Base destruida"
 		cycle_goal.text = "La entrada ha caído. Vuelve a empezar."
 		cycle_action.text = "REINICIAR PARTIDA"
 		cycle_action.disabled = false
 	elif cycle.is_night:
-		cycle_title.text = "NOCHE %d · DEFENSA" % cycle.day
+		cycle_title.text = "Noche %d · Defensa" % cycle.day
 		cycle_goal.text = "Resiste la oleada y protege la entrada."
 		cycle_action.text = "NOCHE EN CURSO"
 		cycle_action.disabled = true
 	else:
-		cycle_title.text = "DÍA %d · PREPARACIÓN" % cycle.day
-		cycle_goal.text = ("TUTORIAL %d/7: %s" % [mini(cycle.tutorial_step + 1, 7), cycle.tutorial_text()]) if cycle.day == 1 else "Construye, fabrica munición y prepara la próxima noche."
+		cycle_title.text = "Día %d · Preparación" % cycle.day
+		cycle_goal.text = "Construye, fabrica munición y prepara la próxima noche."
 		cycle_action.text = "INICIAR NOCHE"
 		cycle_action.disabled = not cycle.can_start_night() or shop_open or shop_animating
-	shop_button.disabled = cycle.is_night or cycle.defeated
-	view_button.disabled = cycle.is_night or cycle.defeated
+	shop_button.disabled = tutorial or cycle.is_night or cycle.defeated
+	view_button.disabled = tutorial or cycle.is_night or cycle.defeated
 	update_progression()
 
 func create_style(background: String, border: String, border_size: int, radius: int) -> StyleBoxFlat:
@@ -425,6 +522,8 @@ func clear_content() -> void:
 		child.queue_free()
 
 func show_categories() -> void:
+	if cycle != null and cycle.is_tutorial_active():
+		return
 	shop_title.text = "TIENDA"
 	fixed_back_button.hide()
 	shop_scroll.scroll_vertical = 0
@@ -436,6 +535,8 @@ func show_categories() -> void:
 		shop_content.add_child(button)
 
 func open_category(category: String) -> void:
+	if cycle != null and cycle.is_tutorial_active():
+		return
 	shop_title.text = category
 	fixed_back_button.show()
 	shop_scroll.scroll_vertical = 0
@@ -503,6 +604,8 @@ func open_category(category: String) -> void:
 			shop_content.add_child(launcher_button)
 
 func unlock_defense_platforms() -> void:
+	if cycle != null and not cycle.allows_action("unlock_defense"):
+		return
 	var left_cell: Vector2i = grid.defense_cell("left")
 	var right_cell: Vector2i = grid.defense_cell("right")
 	if grid.defense_tiles.has(left_cell) and grid.defense_tiles.has(right_cell):
@@ -518,6 +621,8 @@ func unlock_defense_platforms() -> void:
 	open_category("DEFENSA")
 
 func open_shop() -> void:
+	if cycle != null and cycle.is_tutorial_active():
+		return
 	if shop_open or shop_animating or (cycle != null and (cycle.is_night or cycle.defeated)):
 		return
 	show_categories()

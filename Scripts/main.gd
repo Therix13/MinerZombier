@@ -183,6 +183,8 @@ func redraw_world() -> void:
 	renderer.queue_redraw()
 
 func buy_expansion() -> void:
+	if not cycle.allows_action("expand"):
+		return
 	if cycle.is_night or cycle.defeated:
 		return
 	if grid.cave_width >= 7 or not economy.spend(economy.EXPANSION_PRICE):
@@ -193,6 +195,8 @@ func buy_expansion() -> void:
 	shop.close_shop()
 
 func buy_brass_vein() -> void:
+	if not cycle.allows_action("buy_brass"):
+		return
 	if cycle.is_night or cycle.defeated:
 		return
 	if placing_coal or placing_brass or placing_belt or placing_drill or placing_launcher or not economy.spend(economy.BRASS_VEIN_PRICE):
@@ -204,6 +208,8 @@ func buy_brass_vein() -> void:
 	redraw_world()
 
 func buy_coal_vein() -> void:
+	if not cycle.allows_action("buy_coal"):
+		return
 	if cycle.is_night or cycle.defeated:
 		return
 	if placing_coal or placing_brass or placing_belt or placing_drill or placing_launcher or not economy.spend(economy.COAL_VEIN_PRICE):
@@ -227,6 +233,8 @@ func buy_junction_conveyor() -> void:
 	buy_belt("junction")
 
 func buy_belt(shape: String) -> void:
+	if not cycle.allows_action("buy_conveyor") or (cycle.is_tutorial_active() and shape != "straight"):
+		return
 	if cycle.is_night or cycle.defeated:
 		return
 	if placing_coal or placing_brass or placing_belt or placing_drill or placing_launcher or not economy.spend(economy.CONVEYOR_PRICE):
@@ -239,6 +247,8 @@ func buy_belt(shape: String) -> void:
 	redraw_world()
 
 func buy_drill() -> void:
+	if not cycle.allows_action("buy_drill"):
+		return
 	if cycle.is_night or cycle.defeated:
 		return
 	if placing_coal or placing_brass or placing_belt or placing_drill or placing_launcher or not economy.spend(economy.DRILL_PRICE):
@@ -256,6 +266,8 @@ func buy_right_defense_tile() -> void:
 	buy_defense_tile("right")
 
 func buy_defense_tile(_side: String) -> void:
+	if not cycle.allows_action("unlock_defense"):
+		return
 	if cycle.is_night or cycle.defeated:
 		return
 	var left_cell: Vector2i = grid.defense_cell("left")
@@ -268,10 +280,13 @@ func buy_defense_tile(_side: String) -> void:
 		if not economy.developer_mode:
 			economy.add(economy.DEFENSE_TILE_PRICE)
 		return
+	cycle.refresh_tutorial()
 	redraw_world()
 	shop.close_shop()
 
 func buy_launcher() -> void:
+	if not cycle.allows_action("buy_launcher"):
+		return
 	if cycle.is_night or cycle.defeated:
 		return
 	if placing_coal or placing_brass or placing_belt or placing_drill or placing_launcher:
@@ -312,7 +327,7 @@ func cancel_placement() -> void:
 	redraw_world()
 
 func complete_placement(price: int) -> void:
-	if Input.is_key_pressed(KEY_SHIFT) and economy.spend(price):
+	if not cycle.is_tutorial_active() and Input.is_key_pressed(KEY_SHIFT) and economy.spend(price):
 		placement_paid = not economy.developer_mode
 	else:
 		placing_coal = false
@@ -331,6 +346,8 @@ func on_zombie_defeated() -> void:
 	progression.add_experience(progression.ZOMBIE_EXPERIENCE)
 
 func research_technology(technology_id: String) -> void:
+	if not cycle.allows_action("research"):
+		return
 	if cycle.is_night or cycle.defeated or (night_victory_overlay != null and night_victory_overlay.visible):
 		return
 	progression.research(technology_id)
@@ -362,9 +379,9 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_P or event.physical_keycode == KEY_P:
 			toggle_view()
-		elif event.keycode == KEY_F10:
+		elif event.keycode == KEY_F10 and cycle.allows_action("developer"):
 			economy.toggle_developer_mode()
-		elif event.keycode == KEY_R and (placing_coal or placing_brass or placing_belt or placing_drill or placing_launcher or (holding_object and held_object_type in ["vein", "belt", "drill"])):
+		elif event.keycode == KEY_R and not cycle.is_tutorial_active() and (placing_coal or placing_brass or placing_belt or placing_drill or placing_launcher or (holding_object and held_object_type in ["vein", "belt", "drill"])):
 			placement_direction = (placement_direction + 1) % 4
 			if holding_object:
 				dragging_object = true
@@ -385,6 +402,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if cycle.is_night or cycle.defeated or shop.shop_open or holding_object:
 			return
 		var cell: Vector2i = grid.world_to_cell(get_local_mouse_position())
+		var placing: String = "launcher" if placing_launcher else ("coal" if placing_coal else ("belt" if placing_belt else ("other" if placing_brass or placing_drill else "")))
+		if not cycle.allows_world_press(cell, placing):
+			return
 		if placing_launcher:
 			if launchers.place(cell):
 				if placing_free_launcher:
@@ -434,6 +454,12 @@ func finish_object_interaction() -> void:
 	if not holding_object:
 		return
 	var destination: Vector2i = grid.world_to_cell(get_local_mouse_position())
+	if not cycle.allows_interaction(held_object_type, held_object_cell, destination, dragging_object):
+		holding_object = false
+		dragging_object = false
+		held_object_type = ""
+		redraw_world()
+		return
 	if not dragging_object and held_object_type == "vein":
 		mining.mine(held_object_cell)
 	elif dragging_object and held_object_type == "vein":
@@ -459,6 +485,8 @@ func finish_object_interaction() -> void:
 	redraw_world()
 
 func toggle_view() -> void:
+	if not cycle.allows_action("toggle_view"):
+		return
 	if cycle.is_night or cycle.defeated or (night_victory_overlay != null and night_victory_overlay.visible):
 		return
 	var next_view: bool = not camera_controller.defense_view
