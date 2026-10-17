@@ -5,6 +5,7 @@ signal changed
 enum WindowMode { WINDOWED, BORDERLESS, FULLSCREEN }
 
 const SETTINGS_PATH := "user://display_settings.cfg"
+const PAUSE_ACTION: StringName = &"mine_defense_pause"
 const INTERFACE_WIDTH: float = 1280.0
 const RESOLUTIONS := [Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440)]
 
@@ -26,10 +27,16 @@ var back_button: Button
 var mode_selector: OptionButton
 var resolution_selector: OptionButton
 var status: Label
+var pause_event_received: bool = false
 
 func _ready() -> void:
 	layer = 200
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	if not InputMap.has_action(PAUSE_ACTION):
+		InputMap.add_action(PAUSE_ACTION)
+		var pause_key := InputEventKey.new()
+		pause_key.physical_keycode = KEY_ESCAPE
+		InputMap.action_add_event(PAUSE_ACTION, pause_key)
 	if DisplayServer.get_name() != "headless":
 		load_settings()
 		apply_display(false)
@@ -278,16 +285,33 @@ func apply_selection() -> void:
 func quit_game() -> void:
 	get_tree().quit()
 
+func toggle_pause_menu() -> void:
+	if not menu_open:
+		open_menu()
+	elif settings_page.visible:
+		show_pause_page()
+	else:
+		close_menu()
+
+func _process(_delta: float) -> void:
+	# Input state still updates when a Control or another _input callback
+	# consumes ESC. Keep the shortcut working in that case, even when paused.
+	if Input.is_action_just_pressed(PAUSE_ACTION) and not pause_event_received:
+		toggle_pause_menu()
+	pause_event_received = false
+
 func handle_key_event(event: InputEvent) -> bool:
-	if not event is InputEventKey or not event.pressed or event.echo:
+	if not event is InputEventKey or not event.pressed:
 		return false
 	if event.keycode == KEY_ESCAPE or event.physical_keycode == KEY_ESCAPE:
-		if not menu_open:
-			open_menu()
-		elif settings_page.visible:
-			show_pause_page()
-		else:
-			close_menu()
+		pause_event_received = true
+		if not event.echo:
+			toggle_pause_menu()
+		return true
+	if event.echo:
+		return false
+	if event.keycode == KEY_BACKSPACE and not get_tree().paused and get_parent().has_method("cancel_placement"):
+		get_parent().cancel_placement()
 		return true
 	if event.keycode == KEY_F11 or (event.alt_pressed and event.keycode == KEY_ENTER):
 		if is_editor_embedded():

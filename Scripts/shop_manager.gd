@@ -17,6 +17,8 @@ signal night_requested
 signal restart_requested
 signal technology_requested(technology_id: String)
 
+const DisplaySettingsScript = preload("res://Scripts/display_settings.gd")
+
 const PANEL_WIDTH := 340.0
 const TOGGLE_SIZE := 58.0
 const MONEY_BOX_WIDTH := 148.0
@@ -51,6 +53,7 @@ var research_button: Button
 var research_summary: Label
 var research_buttons: Dictionary = {}
 var research_status: Dictionary = {}
+var fallback_display: CanvasLayer
 
 func setup(economy_manager: RefCounted, grid_manager: RefCounted) -> void:
 	economy = economy_manager
@@ -60,6 +63,32 @@ func setup(economy_manager: RefCounted, grid_manager: RefCounted) -> void:
 	build_interface()
 	economy.money_changed.connect(update_money)
 	update_money(economy.coins)
+	# Older scenes can have a built-in main script. Updating main.gd alone
+	# does not update those scenes, so install the pause menu here as well.
+	ensure_pause_menu.call_deferred()
+
+func ensure_pause_menu() -> void:
+	var ui_layer: CanvasLayer = get_parent() as CanvasLayer
+	if ui_layer == null or ui_layer.get_parent() == null:
+		return
+	var game: Node = ui_layer.get_parent()
+	for child in game.get_children():
+		if child.get_script() == DisplaySettingsScript:
+			return
+	fallback_display = DisplaySettingsScript.new()
+	fallback_display.name = "PauseMenu"
+	game.add_child(fallback_display)
+	fallback_display.changed.connect(update_pause_layout)
+	get_viewport().size_changed.connect(update_pause_layout)
+	update_pause_layout()
+
+func update_pause_layout() -> void:
+	if not is_instance_valid(fallback_display):
+		return
+	var factor: float = fallback_display.interface_scale()
+	(get_parent() as CanvasLayer).scale = Vector2.ONE * factor
+	set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	size = get_viewport().get_visible_rect().size / factor
 
 func set_cycle(game_cycle: RefCounted) -> void:
 	cycle = game_cycle
