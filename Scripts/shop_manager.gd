@@ -25,6 +25,14 @@ const TOGGLE_SIZE := 58.0
 const MONEY_BOX_WIDTH := 148.0
 const ANIMATION_TIME := 0.3
 const CATEGORIES := ["EXPANSION", "BASE", "DEFENSA", "TECNOLOGÍAS"]
+const RESEARCH_VIEW := {
+	"mining_i": ["pickaxe", "Extracción", "7 → 5 clics"],
+	"mining_ii": ["drill", "Taladros", "0,6 → 0,3 s"],
+	"logistics_i": ["belt", "Cintas", "4 → 3 s"],
+	"logistics_ii": ["fast_belt", "Cintas", "3 → 2 s"],
+	"defense_i": ["target", "Potencia", "+50 % daño"],
+	"defense_ii": ["ammo", "Cargador", "8 balas · 3 s"],
+}
 
 var economy: RefCounted
 var grid: RefCounted
@@ -54,6 +62,7 @@ var experience_bar: ProgressBar
 var research_summary: Label
 var research_buttons: Dictionary = {}
 var research_status: Dictionary = {}
+var research_details: Dictionary = {}
 var fallback_display: CanvasLayer
 
 func setup(economy_manager: RefCounted, grid_manager: RefCounted) -> void:
@@ -169,50 +178,128 @@ func open_research() -> void:
 func build_research_content() -> void:
 	if progression == null:
 		return
-	research_summary = create_label("", 18, Color("#d6edb4"))
+	research_summary = create_label("", 17, Color("#d6edb4"))
+	research_summary.tooltip_text = "Cada nivel otorga 1 punto de investigación.\nEXP: zombis +10 · carbón vendido +2 · latón vendido +3."
 	shop_content.add_child(research_summary)
-	shop_content.add_child(create_label("Cada nivel otorga 1 punto. Las mejoras se aplican a todas tus máquinas y torretas.", 14))
-	shop_content.add_child(create_label("EXP: zombi derrotado +10 · carbón vendido +2 · latón vendido +3.", 13))
 	var previous_branch: String = ""
+	var row: HBoxContainer
 	for technology_id in progression.TECHNOLOGIES:
 		var data: Dictionary = progression.TECHNOLOGIES[technology_id]
 		var branch: String = data["branch"]
 		if branch != previous_branch:
-			shop_content.add_child(HSeparator.new())
-			shop_content.add_child(create_label(branch, 19, Color("#f3ca85")))
+			var section := VBoxContainer.new()
+			section.add_theme_constant_override("separation", 6)
+			shop_content.add_child(section)
+			section.add_child(create_label(branch, 13, Color("#c8ad79")))
+			row = HBoxContainer.new()
+			row.add_theme_constant_override("separation", 5)
+			section.add_child(row)
 			previous_branch = branch
-		shop_content.add_child(create_label(data["name"], 17, Color("#d6edb4")))
-		shop_content.add_child(create_label(data["description"], 14))
-		var requirements: String = "Nivel %d · Coste: %d PI" % [data["level"], data["cost"]]
-		for prerequisite in data["requires"]:
-			requirements += "\nRequiere: %s" % progression.TECHNOLOGIES[prerequisite]["name"]
-		shop_content.add_child(create_label(requirements, 13))
-		var status := create_label("", 13)
-		research_status[technology_id] = status
-		shop_content.add_child(status)
-		var button := create_button("")
-		button.name = "Research_" + str(technology_id)
-		button.add_theme_font_size_override("font_size", 15)
-		button.pressed.connect(technology_requested.emit.bind(technology_id))
-		research_buttons[technology_id] = button
-		shop_content.add_child(button)
+		else:
+			var arrow := create_label("→", 19, Color("#a18a61"))
+			arrow.custom_minimum_size.x = 18
+			arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			row.add_child(arrow)
+		row.add_child(build_research_card(technology_id, data))
 	refresh_research_buttons()
+
+func build_research_card(technology_id: String, data: Dictionary) -> Button:
+	var view: Array = RESEARCH_VIEW[technology_id]
+	var button := Button.new()
+	button.name = "Research_" + technology_id
+	button.custom_minimum_size = Vector2(116, 116)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.clip_contents = true
+	button.pressed.connect(technology_requested.emit.bind(technology_id))
+	research_buttons[technology_id] = button
+	var margin := MarginContainer.new()
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(margin)
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	for side in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 8)
+	var column := VBoxContainer.new()
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_theme_constant_override("separation", 4)
+	margin.add_child(column)
+	var header := HBoxContainer.new()
+	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(header)
+	var icon := ResearchIcon.new()
+	icon.kind = view[0]
+	icon.custom_minimum_size = Vector2(28, 28)
+	header.add_child(icon)
+	var rank := compact_research_label("I" if data["requires"].is_empty() else "II", 13)
+	rank.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rank.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	header.add_child(rank)
+	var title := compact_research_label(view[1], 14)
+	column.add_child(title)
+	var effect := compact_research_label(view[2], 11)
+	column.add_child(effect)
+	var footer := HBoxContainer.new()
+	footer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	footer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	footer.alignment = BoxContainer.ALIGNMENT_END
+	column.add_child(footer)
+	var cost := compact_research_label("%d PI" % data["cost"], 12)
+	cost.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	footer.add_child(cost)
+	var status := compact_research_label("", 11)
+	footer.add_child(status)
+	research_status[technology_id] = status
+	var state_icon := ResearchIcon.new()
+	state_icon.custom_minimum_size = Vector2(16, 16)
+	footer.add_child(state_icon)
+	research_details[technology_id] = {"icon": icon, "state_icon": state_icon, "title": title, "effect": effect, "cost": cost, "rank": rank}
+	return button
+
+func compact_research_label(text: String, font_size: int) -> Label:
+	var label := create_label(text, font_size)
+	label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return label
 
 func refresh_research_buttons() -> void:
 	if progression == null:
 		return
 	if research_summary != null:
-		research_summary.text = "Nivel %d · %d PI disponibles" % [progression.level, progression.research_points]
+		research_summary.text = "Nivel %d · %d PI" % [progression.level, progression.research_points]
 	var blocked: bool = cycle != null and (cycle.is_night or cycle.defeated or cycle.is_tutorial_active())
 	for technology_id in research_buttons:
 		var button: Button = research_buttons[technology_id]
-		var status: Label = research_status[technology_id]
+		var data: Dictionary = progression.TECHNOLOGIES[technology_id]
+		var details: Dictionary = research_details[technology_id]
 		var researched: bool = progression.has_technology(technology_id)
-		button.disabled = blocked or not progression.can_research(technology_id)
-		button.text = "INVESTIGADA" if researched else "INVESTIGAR · %d PI" % progression.TECHNOLOGIES[technology_id]["cost"]
+		button.disabled = researched or blocked or not progression.can_research(technology_id)
+		var available: bool = not button.disabled
+		var color := Color("#a9ca91") if researched else (Color("#f0cd91") if available else Color("#988b75"))
+		var background: String = "#263b2c" if researched else ("#443622" if available else "#2b261e")
+		var border: String = "#83aa6c" if researched else ("#d5b078" if available else "#584d3b")
+		button.add_theme_stylebox_override("normal", create_style(background, border, 2, 9))
+		button.add_theme_stylebox_override("disabled", create_style(background, border, 2, 9))
+		button.add_theme_stylebox_override("hover", create_style("#5b4729", "#f0d198", 2, 9))
+		button.add_theme_stylebox_override("pressed", create_style("#302b1f", "#e4c28a", 2, 9))
+		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if available else Control.CURSOR_ARROW
+		for name in ["title", "effect", "cost", "rank"]:
+			details[name].add_theme_color_override("font_color", color)
+		details["icon"].tint = color
+		details["icon"].queue_redraw()
+		details["state_icon"].kind = "done" if researched else ("add" if available else "lock")
+		details["state_icon"].tint = color
+		details["state_icon"].queue_redraw()
+		var status: Label = research_status[technology_id]
+		status.text = "Nv. %d" % data["level"] if not researched and progression.level < int(data["level"]) else ""
+		status.add_theme_color_override("font_color", color)
 		var reason: String = progression.research_block_reason(technology_id)
-		status.text = ("Completa el tutorial para investigar." if cycle != null and cycle.is_tutorial_active() else "Investiga durante el día.") if blocked and not researched else ("Disponible" if reason.is_empty() else reason)
-		status.add_theme_color_override("font_color", Color("#b8dc98") if researched or not button.disabled else Color("#c6b5a0"))
+		if blocked and not researched:
+			reason = "Completa el tutorial." if cycle.is_tutorial_active() else "Investiga durante el día."
+		button.tooltip_text = "%s\n%s\nNivel %d · %d PI" % [data["name"], data["description"], data["level"], data["cost"]]
+		for prerequisite in data["requires"]:
+			button.tooltip_text += "\nRequiere: %s" % progression.TECHNOLOGIES[prerequisite]["name"]
+		button.tooltip_text += "\n" + ("Pulsa para investigar." if available else reason)
 
 func build_cycle_panel() -> void:
 	var panel := PanelContainer.new()
@@ -511,6 +598,7 @@ func update_money(amount: int) -> void:
 func clear_content() -> void:
 	research_buttons.clear()
 	research_status.clear()
+	research_details.clear()
 	research_summary = null
 	for child in shop_content.get_children():
 		shop_content.remove_child(child)
@@ -657,3 +745,52 @@ func finish_animation() -> void:
 		money_box.show()
 	if cycle != null:
 		update_cycle()
+
+class ResearchIcon extends Control:
+	var kind: String = "lock"
+	var tint := Color("#d5b078")
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_RESIZED:
+			queue_redraw()
+
+	func _draw() -> void:
+		var factor: float = minf(size.x, size.y) / 32.0
+		draw_set_transform((size - Vector2.ONE * 32.0 * factor) * 0.5, 0.0, Vector2.ONE * factor)
+		match kind:
+			"pickaxe":
+				draw_line(Vector2(9, 27), Vector2(20, 9), tint, 3.5, true)
+				draw_polyline(PackedVector2Array([Vector2(5, 15), Vector2(13, 7), Vector2(23, 8), Vector2(28, 14)]), tint, 3.5, true)
+			"drill":
+				draw_rect(Rect2(7, 4, 18, 6), tint)
+				draw_rect(Rect2(11, 12, 10, 8), tint)
+				draw_colored_polygon(PackedVector2Array([Vector2(11, 22), Vector2(21, 22), Vector2(16, 30)]), tint)
+			"belt", "fast_belt":
+				draw_rect(Rect2(2, 9, 28, 15), tint, false, 2.0)
+				draw_circle(Vector2(7, 16.5), 2, tint)
+				draw_circle(Vector2(25, 16.5), 2, tint)
+				for offset in ([0, 6] if kind == "fast_belt" else [3]):
+					draw_polyline(PackedVector2Array([Vector2(10 + offset, 12), Vector2(15 + offset, 16.5), Vector2(10 + offset, 21)]), tint, 2, true)
+			"target":
+				draw_arc(Vector2(16, 16), 10, 0, TAU, 24, tint, 2, true)
+				draw_circle(Vector2(16, 16), 3, tint)
+				draw_line(Vector2(16, 1), Vector2(16, 8), tint, 2, true)
+				draw_line(Vector2(16, 24), Vector2(16, 31), tint, 2, true)
+				draw_line(Vector2(1, 16), Vector2(8, 16), tint, 2, true)
+				draw_line(Vector2(24, 16), Vector2(31, 16), tint, 2, true)
+			"ammo":
+				for x in [5, 13, 21]:
+					draw_rect(Rect2(x, 12, 5, 15), tint)
+					draw_colored_polygon(PackedVector2Array([Vector2(x, 10), Vector2(x + 5, 10), Vector2(x + 2.5, 4)]), tint)
+			"done":
+				draw_polyline(PackedVector2Array([Vector2(6, 16), Vector2(13, 23), Vector2(27, 8)]), tint, 3.5, true)
+			"add":
+				draw_line(Vector2(7, 16), Vector2(25, 16), tint, 3, true)
+				draw_line(Vector2(16, 7), Vector2(16, 25), tint, 3, true)
+			"lock":
+				draw_arc(Vector2(16, 13), 7, PI, TAU, 16, tint, 2.5, true)
+				draw_rect(Rect2(6, 13, 20, 15), tint, false, 2.5)
+				draw_line(Vector2(16, 18), Vector2(16, 23), tint, 2.5, true)

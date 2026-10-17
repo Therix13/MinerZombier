@@ -134,7 +134,7 @@ func run_checks() -> void:
 	check(not shop.get("research_buttons")["mining_i"].disabled and shop.get("research_buttons")["mining_ii"].disabled, "Panel shows affordable research and locks advanced research")
 	buy_from_panel(shop, "mining_i")
 	check(player.call("has_technology", "mining_i") and player.get("research_points") == 0, "Research button unlocks technology and spends points")
-	check(shop.get("research_buttons")["mining_i"].text == "INVESTIGADA" and shop.get("research_buttons")["mining_i"].disabled, "Researched button becomes disabled and marked as researched")
+	check(shop.get("research_buttons")["mining_i"].tooltip_text.contains("Investigada") and shop.get("research_buttons")["mining_i"].disabled, "Researched button becomes disabled and marked as researched")
 	check(shop.get("research_summary").text.contains("0 PI"), "Research summary refreshes after purchase")
 	buy_from_panel(shop, "mining_i")
 	check(player.get("research_points") == 0, "Duplicate button events cannot spend points twice")
