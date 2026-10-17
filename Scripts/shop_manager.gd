@@ -20,7 +20,6 @@ signal technology_requested(technology_id: String)
 const DisplaySettingsScript = preload("res://Scripts/display_settings.gd")
 const TutorialGuideScript = preload("res://Scripts/tutorial_guide.gd")
 const IntroCinematicScript = preload("res://Scripts/intro_cinematic.gd")
-const BuildingUpgradesScript = preload("res://Scripts/building_upgrades.gd")
 
 const PANEL_WIDTH := 340.0
 const TOGGLE_SIZE := 58.0
@@ -128,17 +127,24 @@ func ensure_tutorial_guide() -> void:
 
 func set_progression(player_progression: RefCounted) -> void:
 	progression = player_progression
+	# Legacy scene scripts must also treat research solely as item unlocks.
+	var game: Node = get_parent().get_parent()
+	for connection in progression.technology_unlocked.get_connections():
+		var callback: Callable = connection["callable"]
+		if callback.get_object() == game and callback.get_method() == &"apply_technologies":
+			progression.technology_unlocked.disconnect(callback)
 	build_progression_panel()
 	progression.changed.connect(update_progression)
 	update_progression()
-	ensure_building_upgrades.call_deferred()
 
-func ensure_building_upgrades() -> void:
+func _process(_delta: float) -> void:
+	if progression == null:
+		return
+	# Preserve research locks even with older scenes that handle purchases themselves.
 	var game: Node = get_parent().get_parent()
-	if not game.has_node("BuildingUpgrades"):
-		var upgrades := BuildingUpgradesScript.new()
-		upgrades.name = "BuildingUpgrades"
-		game.add_child(upgrades)
+	var item: String = "brass" if game.get("placing_brass") else ("drill" if game.get("placing_drill") else (str(game.get("belt_shape")) if game.get("placing_belt") else ""))
+	if not item.is_empty() and not progression.is_item_unlocked(item):
+		game.cancel_placement()
 
 func build_progression_panel() -> void:
 	progression_panel = PanelContainer.new()

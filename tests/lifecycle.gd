@@ -59,9 +59,6 @@ func run_checks() -> void:
 		game.get("progression").add_experience(120)
 		game.call("research_technology", "drill")
 		game.call("research_technology", "brass")
-		game.get("economy").add(1000)
-		for cell in game.get("mining").coal_veins:
-			game.get_node("BuildingUpgrades").upgrade_at(cell)
 		var refs: Array[WeakRef] = manager_refs(game)
 		game.call("restart_game")
 		await scene_changed
@@ -70,7 +67,7 @@ func run_checks() -> void:
 		check(game.get("economy").coins == 500 and game.get("cycle").day == 1, "Restart %d resets coins and day" % (iteration + 1))
 		check(game.get("mining").coal_veins.is_empty() and game.get("conveyors").belts.is_empty(), "Restart %d resets placed objects" % (iteration + 1))
 		check(game.get("progression").level == 1 and game.get("progression").experience == 0 and game.get("progression").total_experience == 0 and game.get("progression").research_points == 0 and game.get("progression").unlocked.is_empty(), "Restart %d resets progression for the new game" % (iteration + 1))
-		check(game.get("mining").mining_clicks == 7 and game.get("drills").levels.is_empty() and game.get("drills").timers.is_empty(), "Restart %d clears local building improvements" % (iteration + 1))
+		check(game.get("mining").mining_clicks == 7 and is_equal_approx(game.get("drills").drill_interval, 0.6), "Restart %d restores base building statistics" % (iteration + 1))
 	# Close while a night is active, with enemies and their signal callbacks.
 	game.get("grid").purchase_defense_platforms()
 	var defense_cell: Vector2i = game.get("grid").defense_cell("left")

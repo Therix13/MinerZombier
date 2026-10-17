@@ -49,12 +49,10 @@ func _draw() -> void:
 		if holding_object and dragging_object and held_object_type == "belt" and cell == held_object_cell:
 			continue
 		draw_conveyor(grid.get_cell_rect(cell).get_center(), conveyors.belt_direction(cell), false, conveyors.belt_shape(cell))
-		draw_building_level(cell, conveyors.level_at(cell))
 	for cell in drills.drills:
 		if holding_object and dragging_object and held_object_type == "drill" and cell == held_object_cell:
 			continue
 		draw_drill(grid.get_cell_rect(cell).get_center(), int(drills.drills[cell]), false)
-		draw_building_level(cell, drills.level_at(cell))
 	for cell in mining.coal_nuggets:
 		var amount: int = int(mining.coal_nuggets[cell])
 		if holding_object and dragging_object and held_object_type == "nugget" and cell == held_object_cell:
@@ -72,13 +70,11 @@ func _draw() -> void:
 			continue
 		var vein: Dictionary = mining.brass_veins[cell]
 		draw_brass_vein(grid.get_cell_rect(cell).get_center(), int(vein["direction"]), int(vein["progress"]), false)
-		draw_building_level(cell, mining.level_at(cell))
 	for cell in mining.coal_veins:
 		if holding_object and dragging_object and held_object_type == "vein" and cell == held_object_cell:
 			continue
 		var vein: Dictionary = mining.coal_veins[cell]
 		draw_coal_vein(grid.get_cell_rect(cell).get_center(), int(vein["direction"]), int(vein["progress"]), false)
-		draw_building_level(cell, mining.level_at(cell))
 	for cell in grid.defense_tiles:
 		var platform_rect: Rect2 = grid.get_cell_rect(cell)
 		draw_defense_platform(platform_rect)
@@ -87,7 +83,6 @@ func _draw() -> void:
 		if holding_object and dragging_object and held_object_type == "launcher" and cell == held_object_cell:
 			continue
 		draw_launcher(grid.get_cell_rect(cell).get_center(), launchers.launchers[cell], false)
-		draw_building_level(cell, launchers.level_at(cell))
 	for cell in grid.defense_tiles:
 		var defense_outline: Rect2 = grid.get_cell_rect(cell)
 		draw_rect(defense_outline.grow(-1.0), Color("#eab958"), false, 3.0)
@@ -201,7 +196,7 @@ func draw_coal_vein(
 				Rect2(
 					rect.position + Vector2(5, 41),
 					Vector2(
-						38.0 * minf(float(progress) / float(mining.clicks_required(grid.world_to_cell(center))), 1.0),
+						38.0 * minf(float(progress) / float(mining.mining_clicks), 1.0),
 						4.0
 					)
 				),
@@ -364,7 +359,7 @@ func draw_brass_vein(center: Vector2, direction_index: int, progress: int, previ
 	draw_direction_arrow(center, direction_index)
 	if not preview:
 		draw_rect(Rect2(rect.position + Vector2(3, 36), Vector2(36, 4)), Color("#302117"))
-		draw_rect(Rect2(rect.position + Vector2(3, 36), Vector2(36.0 * minf(float(progress) / float(mining.clicks_required(grid.world_to_cell(center))), 1.0), 4)), Color("#f5d283"))
+		draw_rect(Rect2(rect.position + Vector2(3, 36), Vector2(36.0 * minf(float(progress) / float(mining.mining_clicks), 1.0), 4)), Color("#f5d283"))
 
 func draw_brass_nugget(center: Vector2, amount: int) -> void:
 	var points := PackedVector2Array([center + Vector2(-13, -4), center + Vector2(-6, -12), center + Vector2(7, -10), center + Vector2(13, 1), center + Vector2(6, 12), center + Vector2(-9, 9)])
@@ -389,7 +384,7 @@ func draw_launcher(center: Vector2, data: Dictionary, preview: bool) -> void:
 	draw_line(center, center + direction * 19.0, Color("#c6a066"), 7.0)
 	draw_circle(center + direction * 18.0, 5.0, Color("#3b2d20"))
 	var ammo: Array = data.get("ammo", [])
-	var slots: int = launchers.capacity_for(data)
+	var slots: int = launchers.capacity
 	for i in range(slots):
 		var offset_x: float = 5.0 + float(i) * (rect.size.x - 10.0) / float(maxi(slots - 1, 1))
 		draw_circle(rect.position + Vector2(offset_x, rect.size.y - 5.0), 1.8, Color("#f5d17b") if i < ammo.size() else Color("#2f2b25"))
@@ -401,12 +396,3 @@ func draw_defense_platform(rect: Rect2) -> void:
 	draw_rect(body.grow(-7.0), Color("#a7b1b9"), false, 2.0)
 	for offset: Vector2 in [Vector2(7, 7), Vector2(rect.size.x - 7, 7), Vector2(7, rect.size.y - 7), Vector2(rect.size.x - 7, rect.size.y - 7)]:
 		draw_circle(rect.position + offset, 2.6, Color("#e2ba74"))
-
-func draw_building_level(cell: Vector2i, level: int) -> void:
-	var corner: Vector2 = grid.get_cell_rect(cell).position + Vector2(7, 7)
-	for index in range(level - 1):
-		draw_circle(corner + Vector2(index * 6, 0), 2.5, Color("#2b2d21"))
-		draw_circle(corner + Vector2(index * 6, 0), 1.7, Color("#f1d28b"))
-	if cell == hovered_cell and (tutorial == null or not tutorial.is_tutorial_active()) and not holding_object:
-		var tip: Vector2 = grid.get_cell_rect(cell).end - Vector2(8, 8)
-		draw_polyline(PackedVector2Array([tip + Vector2(-3, 2), tip + Vector2(0, -2), tip + Vector2(3, 2)]), Color("#f1d28b"), 1.5)

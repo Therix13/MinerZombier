@@ -18,29 +18,6 @@ var capacity: int = CAPACITY
 var fire_interval: float = FIRE_INTERVAL
 var damage_multiplier: float = DAMAGE_MULTIPLIER
 
-func level_at(cell: Vector2i) -> int:
-	return int(launchers.get(cell, {}).get("level", 1))
-
-func capacity_for(data: Dictionary) -> int:
-	return capacity + [0, 1, 3][clampi(int(data.get("level", 1)) - 1, 0, 2)]
-
-func capacity_at(cell: Vector2i) -> int:
-	return capacity_for(launchers.get(cell, {}))
-
-func interval_at(cell: Vector2i) -> float:
-	return maxf(3.0, fire_interval - (level_at(cell) - 1) * 0.5)
-
-func damage_at(cell: Vector2i) -> float:
-	return damage_multiplier + [0.0, 0.15, 0.25][clampi(level_at(cell) - 1, 0, 2)]
-
-func upgrade(cell: Vector2i) -> bool:
-	if not launchers.has(cell) or level_at(cell) >= 3:
-		return false
-	launchers[cell]["level"] = level_at(cell) + 1
-	launchers[cell]["cooldown"] = minf(float(launchers[cell]["cooldown"]), interval_at(cell))
-	changed.emit()
-	return true
-
 func setup(grid_manager: RefCounted, mining_manager: RefCounted, conveyor_manager: RefCounted, drill_manager: RefCounted, world_node: Node2D) -> void:
 	grid = grid_manager
 	mining = mining_manager
@@ -76,7 +53,7 @@ func move(source: Vector2i, destination: Vector2i) -> bool:
 	return true
 
 func can_receive(cell: Vector2i) -> bool:
-	return launchers.has(cell) and (launchers[cell]["ammo"] as Array).size() < capacity_at(cell)
+	return launchers.has(cell) and (launchers[cell]["ammo"] as Array).size() < capacity
 
 func receive(cell: Vector2i, kind: String) -> bool:
 	if not can_receive(cell) or (kind != "coal" and kind != "brass"):
@@ -116,8 +93,8 @@ func advance(delta: float) -> void:
 		var target_position: Vector2 = world.to_local(nearest.global_position)
 		data["angle"] = (target_position - center).angle()
 		var kind: String = str(ammo.pop_front())
-		data["cooldown"] = interval_at(cell)
-		var damage: float = (2.0 if kind == "brass" else 1.0) * damage_at(cell)
+		data["cooldown"] = fire_interval
+		var damage: float = (2.0 if kind == "brass" else 1.0) * damage_multiplier
 		if nearest.has_method("take_damage"):
 			nearest.call("take_damage", damage)
 		elif nearest.has_method("apply_damage"):

@@ -33,23 +33,6 @@ func vein_at(cell: Vector2i) -> String:
 func nuggets_at(cell: Vector2i) -> int:
 	return int(coal_nuggets.get(cell, 0)) + int(brass_nuggets.get(cell, 0))
 
-func level_at(cell: Vector2i) -> int:
-	var veins: Dictionary = brass_veins if vein_at(cell) == "brass" else coal_veins
-	return int(veins.get(cell, {}).get("level", 1))
-
-func clicks_required(cell: Vector2i) -> int:
-	return maxi(3, mining_clicks - (level_at(cell) - 1) * 2)
-
-func upgrade(cell: Vector2i) -> bool:
-	if vein_at(cell).is_empty() or level_at(cell) >= 3:
-		return false
-	var veins: Dictionary = brass_veins if vein_at(cell) == "brass" else coal_veins
-	veins[cell]["level"] = level_at(cell) + 1
-	# Keep existing effort without producing ore or a free sale during upgrade.
-	veins[cell]["progress"] = mini(int(veins[cell]["progress"]), clicks_required(cell) - 1)
-	changed.emit()
-	return true
-
 func nugget_type(cell: Vector2i) -> String:
 	if int(coal_nuggets.get(cell, 0)) > 0:
 		return "coal"
@@ -78,7 +61,7 @@ func mine(cell: Vector2i) -> bool:
 	var dictionary: Dictionary = brass_veins if kind == "brass" else coal_veins
 	var vein: Dictionary = dictionary[cell]
 	var progress: int = int(vein["progress"]) + 1
-	if progress >= clicks_required(cell):
+	if progress >= mining_clicks:
 		var destination: Vector2i = cell + DIRECTIONS[int(vein["direction"])]
 		if not grid.owned_tiles.has(destination) or not can_move_nugget(destination):
 			return false
