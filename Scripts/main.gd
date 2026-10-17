@@ -348,6 +348,10 @@ func apply_technologies(_technology_id: String) -> void:
 	redraw_world()
 
 func _input(event: InputEvent) -> void:
+	# Handle pause before placement, victory dialogs, or gameplay shortcuts.
+	if display_settings != null and display_settings.handle_key_event(event):
+		get_viewport().set_input_as_handled()
+		return
 	if display_settings != null and display_settings.menu_open:
 		return
 	if night_victory_overlay != null and night_victory_overlay.visible:
@@ -365,7 +369,7 @@ func _input(event: InputEvent) -> void:
 			if holding_object:
 				dragging_object = true
 			redraw_world()
-		elif event.keycode == KEY_ESCAPE and (placing_coal or placing_brass or placing_belt or placing_drill or placing_launcher):
+		elif event.keycode == KEY_BACKSPACE and (placing_coal or placing_brass or placing_belt or placing_drill or placing_launcher):
 			cancel_placement()
 	if event is InputEventMouseButton:
 		camera_controller.handle_button(event, shop.shop_open or shop.shop_animating)

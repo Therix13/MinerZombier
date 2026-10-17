@@ -2,23 +2,33 @@ extends CanvasLayer
 
 signal changed
 
+enum WindowMode { WINDOWED, BORDERLESS, FULLSCREEN }
+
 const SETTINGS_PATH := "user://display_settings.cfg"
 const INTERFACE_WIDTH: float = 1280.0
 const RESOLUTIONS := [Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440)]
 
 var resolution := Vector2i(1920, 1080)
-var fullscreen: bool = true
+var window_mode: int = WindowMode.FULLSCREEN
 var menu_open: bool = false
 var previously_paused: bool = false
+var previous_focus: WeakRef
 var menu_root: Control
 var overlay: Control
+var pause_button: Button
+var pause_page: VBoxContainer
+var settings_page: VBoxContainer
+var continue_button: Button
 var settings_button: Button
+var quit_button: Button
+var apply_button: Button
+var back_button: Button
 var mode_selector: OptionButton
 var resolution_selector: OptionButton
 var status: Label
 
 func _ready() -> void:
-	layer = 50
+	layer = 200
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	if DisplayServer.get_name() != "headless":
 		load_settings()
@@ -31,6 +41,9 @@ func interface_scale() -> float:
 	if DisplayServer.get_name() == "headless" and get_window().content_scale_size == Vector2i.ZERO:
 		return 1.0
 	return float(resolution.x) / INTERFACE_WIDTH
+
+func is_editor_embedded() -> bool:
+	return Engine.is_embedded_in_editor() or get_window().is_embedded()
 
 func load_settings() -> void:
 	var screen_size: Vector2i = DisplayServer.screen_get_size(get_window().current_screen)
@@ -45,32 +58,46 @@ func load_settings() -> void:
 	var height: Variant = config.get_value("display", "height", resolution.y)
 	if width is int and height is int and Vector2i(width, height) in RESOLUTIONS:
 		resolution = Vector2i(width, height)
-	var saved_mode: Variant = config.get_value("display", "fullscreen", true)
-	if saved_mode is bool:
-		fullscreen = saved_mode
+	# Migrate the previous two-mode configuration without losing preferences.
+	var old_fullscreen: Variant = config.get_value("display", "fullscreen", true)
+	if old_fullscreen is bool:
+		window_mode = WindowMode.FULLSCREEN if old_fullscreen else WindowMode.WINDOWED
+	var saved_mode: Variant = config.get_value("display", "mode", window_mode)
+	if saved_mode is int and saved_mode in WindowMode.values():
+		window_mode = saved_mode
 
 func save_settings() -> Error:
 	var config := ConfigFile.new()
 	config.set_value("display", "width", resolution.x)
 	config.set_value("display", "height", resolution.y)
-	config.set_value("display", "fullscreen", fullscreen)
+	config.set_value("display", "mode", window_mode)
+	config.set_value("display", "fullscreen", window_mode == WindowMode.FULLSCREEN)
 	return config.save(SETTINGS_PATH)
 
 func apply_display(persist: bool = true) -> void:
 	var window: Window = get_window()
-	# The selected resolution is the actual 2D render target, capped at QHD.
-	# Native fullscreen fills the monitor without changing its display mode.
+	# Render at the selected resolution, keeping the image's aspect ratio.
 	window.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
 	window.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
 	window.content_scale_factor = 1.0
 	window.content_scale_size = resolution
-	if DisplayServer.get_name() != "headless" and not window.is_embedded():
-		if fullscreen:
+	if DisplayServer.get_name() != "headless" and not is_editor_embedded():
+		var screen_index: int = window.current_screen
+		if window_mode == WindowMode.FULLSCREEN:
+			window.unresizable = false
+			window.borderless = false
 			window.mode = Window.MODE_FULLSCREEN
+		elif window_mode == WindowMode.BORDERLESS:
+			window.mode = Window.MODE_WINDOWED
+			window.borderless = true
+			window.unresizable = true
+			window.size = DisplayServer.screen_get_size(screen_index)
+			window.position = DisplayServer.screen_get_position(screen_index)
 		else:
 			window.mode = Window.MODE_WINDOWED
 			window.borderless = false
-			var usable: Rect2i = DisplayServer.screen_get_usable_rect(window.current_screen)
+			window.unresizable = false
+			var usable: Rect2i = DisplayServer.screen_get_usable_rect(screen_index)
 			var available := Vector2i(maxi(usable.size.x - 40, 1), maxi(usable.size.y - 80, 1))
 			var fit: float = minf(1.0, minf(float(available.x) / resolution.x, float(available.y) / resolution.y))
 			window.min_size = Vector2i(mini(800, available.x), mini(450, available.y))
@@ -78,8 +105,19 @@ func apply_display(persist: bool = true) -> void:
 			window.position = usable.position + (usable.size - window.size) / 2
 	update_layout()
 	changed.emit()
-	if persist and save_settings() != OK and status != null:
-		status.text = "Aplicado. No se pudo guardar la selección para el próximo inicio."
+	if persist:
+		var save_error: Error = save_settings()
+		if status != null:
+			status.text = display_hint(true)
+			if save_error != OK:
+				status.text += "\nNo se pudo guardar la selección para el próximo inicio."
+
+func display_hint(applied: bool = false) -> String:
+	if is_editor_embedded():
+		return "El editor controla esta ventana. Ejecuta el juego en una ventana independiente para probar los modos de pantalla. La resolución sí se aplica."
+	if applied:
+		return "Configuración aplicada."
+	return "Hasta 2560 × 1440 (2K / QHD).\nSin bordes y pantalla completa ocupan todo el monitor."
 
 func update_layout() -> void:
 	if menu_root == null:
@@ -91,12 +129,12 @@ func build_interface() -> void:
 	menu_root = Control.new()
 	menu_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(menu_root)
-	settings_button = make_button("⚙")
-	settings_button.tooltip_text = "Pantalla y resolución · F11: pantalla completa"
-	settings_button.position = Vector2(214, 20)
-	settings_button.size = Vector2(58, 58)
-	settings_button.pressed.connect(open_menu)
-	menu_root.add_child(settings_button)
+	pause_button = make_button("PAUSA · ESC")
+	pause_button.tooltip_text = "Continuar, ajustes y salir del juego"
+	pause_button.position = Vector2(214, 20)
+	pause_button.size = Vector2(150, 58)
+	pause_button.pressed.connect(open_menu)
+	menu_root.add_child(pause_button)
 	overlay = Control.new()
 	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -110,41 +148,60 @@ func build_interface() -> void:
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	overlay.add_child(center)
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(500, 0)
+	panel.custom_minimum_size = Vector2(520, 0)
 	panel.add_theme_stylebox_override("panel", make_style("#352516", "#a87843"))
 	center.add_child(panel)
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
 		margin.add_theme_constant_override("margin_" + side, 24)
 	panel.add_child(margin)
-	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 14)
-	margin.add_child(column)
-	add_label(column, "PANTALLA", 27)
-	add_label(column, "Modo de pantalla", 17)
+	var pages := VBoxContainer.new()
+	margin.add_child(pages)
+	pause_page = VBoxContainer.new()
+	pause_page.add_theme_constant_override("separation", 16)
+	pages.add_child(pause_page)
+	add_label(pause_page, "PAUSA", 29)
+	continue_button = make_button("CONTINUAR")
+	continue_button.pressed.connect(close_menu)
+	pause_page.add_child(continue_button)
+	settings_button = make_button("AJUSTES")
+	settings_button.pressed.connect(open_settings)
+	pause_page.add_child(settings_button)
+	quit_button = make_button("SALIR DEL JUEGO")
+	quit_button.pressed.connect(quit_game)
+	pause_page.add_child(quit_button)
+	add_label(pause_page, "ESC: continuar · Retroceso: cancelar colocación al jugar", 15)
+	settings_page = VBoxContainer.new()
+	settings_page.add_theme_constant_override("separation", 14)
+	pages.add_child(settings_page)
+	add_label(settings_page, "AJUSTES DE PANTALLA", 27)
+	add_label(settings_page, "Modo de ventana", 17)
 	mode_selector = OptionButton.new()
-	mode_selector.add_item("Pantalla completa")
-	mode_selector.add_item("Ventana")
+	mode_selector.add_item("Ventana", WindowMode.WINDOWED)
+	mode_selector.add_item("Ventana sin bordes", WindowMode.BORDERLESS)
+	mode_selector.add_item("Pantalla completa", WindowMode.FULLSCREEN)
 	mode_selector.custom_minimum_size.y = 42
-	column.add_child(mode_selector)
-	add_label(column, "Resolución del juego", 17)
+	settings_page.add_child(mode_selector)
+	add_label(settings_page, "Resolución del juego", 17)
 	resolution_selector = OptionButton.new()
 	for candidate: Vector2i in RESOLUTIONS:
 		resolution_selector.add_item("%d × %d%s" % [candidate.x, candidate.y, " · 2K / QHD" if candidate.x == 2560 else ""])
 	resolution_selector.custom_minimum_size.y = 42
-	column.add_child(resolution_selector)
-	status = add_label(column, "La imagen se adapta al monitor sin deformarse.\nF11: alternar pantalla completa. Esc: cerrar.", 15)
+	settings_page.add_child(resolution_selector)
+	status = add_label(settings_page, display_hint(), 15)
+	status.custom_minimum_size.y = 64
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
-	column.add_child(row)
-	var apply_button := make_button("APLICAR")
+	settings_page.add_child(row)
+	apply_button = make_button("APLICAR")
 	apply_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	apply_button.pressed.connect(apply_selection)
 	row.add_child(apply_button)
-	var close_button := make_button("CERRAR")
-	close_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	close_button.pressed.connect(close_menu)
-	row.add_child(close_button)
+	back_button = make_button("VOLVER")
+	back_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	back_button.pressed.connect(show_pause_page)
+	row.add_child(back_button)
+	settings_page.hide()
 	overlay.hide()
 
 func add_label(parent: Node, text: String, font_size: int) -> Label:
@@ -179,12 +236,27 @@ func make_button(text: String) -> Button:
 func open_menu() -> void:
 	if menu_open:
 		return
-	mode_selector.select(0 if fullscreen else 1)
-	resolution_selector.select(RESOLUTIONS.find(resolution))
+	var focused: Control = get_viewport().gui_get_focus_owner()
+	previous_focus = weakref(focused) if focused != null else null
 	previously_paused = get_tree().paused
 	menu_open = true
 	overlay.show()
 	get_tree().paused = true
+	show_pause_page()
+
+func show_pause_page() -> void:
+	settings_page.hide()
+	pause_page.show()
+	continue_button.grab_focus()
+
+func open_settings() -> void:
+	if not menu_open:
+		open_menu()
+	mode_selector.select(window_mode)
+	resolution_selector.select(RESOLUTIONS.find(resolution))
+	status.text = display_hint()
+	pause_page.hide()
+	settings_page.show()
 	mode_selector.grab_focus()
 
 func close_menu() -> void:
@@ -193,28 +265,42 @@ func close_menu() -> void:
 	menu_open = false
 	overlay.hide()
 	get_tree().paused = previously_paused
-	settings_button.grab_focus()
+	var focused: Control = previous_focus.get_ref() as Control if previous_focus != null else null
+	if is_instance_valid(focused) and focused.is_visible_in_tree():
+		focused.grab_focus()
+	previous_focus = null
 
 func apply_selection() -> void:
-	if mode_selector.selected == 0 and get_window().is_embedded():
-		status.text = "Ejecuta el juego en una ventana independiente para usar pantalla completa."
-		return
+	window_mode = mode_selector.get_selected_id()
 	resolution = RESOLUTIONS[resolution_selector.selected]
-	fullscreen = mode_selector.selected == 0
-	status.text = "Configuración aplicada. F11: alternar pantalla completa."
 	apply_display()
 
-func _input(event: InputEvent) -> void:
+func quit_game() -> void:
+	get_tree().quit()
+
+func handle_key_event(event: InputEvent) -> bool:
 	if not event is InputEventKey or not event.pressed or event.echo:
-		return
+		return false
+	if event.keycode == KEY_ESCAPE or event.physical_keycode == KEY_ESCAPE:
+		if not menu_open:
+			open_menu()
+		elif settings_page.visible:
+			show_pause_page()
+		else:
+			close_menu()
+		return true
 	if event.keycode == KEY_F11 or (event.alt_pressed and event.keycode == KEY_ENTER):
-		if not get_window().is_embedded():
-			fullscreen = not fullscreen
+		if is_editor_embedded():
+			open_settings()
+		else:
+			window_mode = WindowMode.WINDOWED if window_mode == WindowMode.FULLSCREEN else WindowMode.FULLSCREEN
 			apply_display()
-			mode_selector.select(0 if fullscreen else 1)
-		get_viewport().set_input_as_handled()
-	elif menu_open and event.keycode == KEY_ESCAPE:
-		close_menu()
+			mode_selector.select(window_mode)
+		return true
+	return false
+
+func _input(event: InputEvent) -> void:
+	if handle_key_event(event):
 		get_viewport().set_input_as_handled()
 
 func _exit_tree() -> void:
