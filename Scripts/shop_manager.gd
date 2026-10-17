@@ -20,19 +20,18 @@ signal technology_requested(technology_id: String)
 const DisplaySettingsScript = preload("res://Scripts/display_settings.gd")
 const TutorialGuideScript = preload("res://Scripts/tutorial_guide.gd")
 const IntroCinematicScript = preload("res://Scripts/intro_cinematic.gd")
+const BuildingUpgradesScript = preload("res://Scripts/building_upgrades.gd")
 
 const PANEL_WIDTH := 340.0
 const TOGGLE_SIZE := 58.0
 const MONEY_BOX_WIDTH := 148.0
 const ANIMATION_TIME := 0.3
-const CATEGORIES := ["EXPANSION", "BASE", "DEFENSA", "TECNOLOGÍAS"]
+const CATEGORIES := ["EXPANSION", "BASE", "DEFENSA", "INVESTIGACIÓN"]
 const RESEARCH_VIEW := {
-	"mining_i": ["pickaxe", "Extracción", "7 → 5 clics"],
-	"mining_ii": ["drill", "Taladros", "0,6 → 0,3 s"],
-	"logistics_i": ["belt", "Cintas", "4 → 3 s"],
-	"logistics_ii": ["fast_belt", "Cintas", "3 → 2 s"],
-	"defense_i": ["target", "Potencia", "+50 % daño"],
-	"defense_ii": ["ammo", "Cargador", "8 balas · 3 s"],
+	"drill": ["drill", "Taladro", "Automático"],
+	"brass": ["ore", "Latón", "Nueva veta"],
+	"curved_belts": ["curve", "Curvas", "Izquierda · derecha"],
+	"junction_belt": ["junction", "Unión en T", "3 entradas"],
 }
 
 var economy: RefCounted
@@ -64,6 +63,7 @@ var research_summary: Label
 var research_buttons: Dictionary = {}
 var research_status: Dictionary = {}
 var research_details: Dictionary = {}
+var item_buttons: Dictionary = {}
 var fallback_display: CanvasLayer
 
 func setup(economy_manager: RefCounted, grid_manager: RefCounted) -> void:
@@ -131,6 +131,14 @@ func set_progression(player_progression: RefCounted) -> void:
 	build_progression_panel()
 	progression.changed.connect(update_progression)
 	update_progression()
+	ensure_building_upgrades.call_deferred()
+
+func ensure_building_upgrades() -> void:
+	var game: Node = get_parent().get_parent()
+	if not game.has_node("BuildingUpgrades"):
+		var upgrades := BuildingUpgradesScript.new()
+		upgrades.name = "BuildingUpgrades"
+		game.add_child(upgrades)
 
 func build_progression_panel() -> void:
 	progression_panel = PanelContainer.new()
@@ -176,6 +184,7 @@ func update_progression() -> void:
 	experience_bar.tooltip_text = "EXP %d / %d\nGana EXP vendiendo minerales y derrotando zombis." % [progression.experience, progression.experience_to_next_level()]
 	progression_panel.visible = not shop_open and not shop_animating
 	refresh_research_buttons()
+	refresh_item_buttons()
 
 func open_research() -> void:
 	if cycle != null and (cycle.is_night or cycle.defeated):
@@ -183,7 +192,7 @@ func open_research() -> void:
 	if not shop_open:
 		open_shop()
 	if shop_open:
-		open_category("TECNOLOGÍAS")
+		open_category("INVESTIGACIÓN")
 
 func build_research_content() -> void:
 	if progression == null:
@@ -193,8 +202,8 @@ func build_research_content() -> void:
 	shop_content.add_child(research_summary)
 	var previous_branch: String = ""
 	var row: HBoxContainer
-	for technology_id in progression.TECHNOLOGIES:
-		var data: Dictionary = progression.TECHNOLOGIES[technology_id]
+	for technology_id in progression.RESEARCHES:
+		var data: Dictionary = progression.RESEARCHES[technology_id]
 		var branch: String = data["branch"]
 		if branch != previous_branch:
 			var section := VBoxContainer.new()
@@ -241,7 +250,7 @@ func build_research_card(technology_id: String, data: Dictionary) -> Button:
 	icon.kind = view[0]
 	icon.custom_minimum_size = Vector2(28, 28)
 	header.add_child(icon)
-	var rank := compact_research_label("I" if data["requires"].is_empty() else "II", 13)
+	var rank := compact_research_label("", 13)
 	rank.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rank.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	header.add_child(rank)
@@ -280,7 +289,7 @@ func refresh_research_buttons() -> void:
 	var blocked: bool = cycle != null and (cycle.is_night or cycle.defeated or cycle.is_tutorial_active())
 	for technology_id in research_buttons:
 		var button: Button = research_buttons[technology_id]
-		var data: Dictionary = progression.TECHNOLOGIES[technology_id]
+		var data: Dictionary = progression.RESEARCHES[technology_id]
 		var details: Dictionary = research_details[technology_id]
 		var researched: bool = progression.has_technology(technology_id)
 		button.disabled = researched or blocked or not progression.can_research(technology_id)
@@ -308,7 +317,7 @@ func refresh_research_buttons() -> void:
 			reason = "Completa el tutorial." if cycle.is_tutorial_active() else "Investiga durante el día."
 		button.tooltip_text = "%s\n%s\nNivel %d · %d PI" % [data["name"], data["description"], data["level"], data["cost"]]
 		for prerequisite in data["requires"]:
-			button.tooltip_text += "\nRequiere: %s" % progression.TECHNOLOGIES[prerequisite]["name"]
+			button.tooltip_text += "\nRequiere: %s" % progression.RESEARCHES[prerequisite]["name"]
 		button.tooltip_text += "\n" + ("Pulsa para investigar." if available else reason)
 
 func build_cycle_panel() -> void:
@@ -598,7 +607,10 @@ func set_view_mode(defense_enabled: bool) -> void:
 func update_money(amount: int) -> void:
 	money_label.text = "∞ DEV" if economy.developer_mode else str(amount)
 	if shop_open:
-		if shop_title.text == "TECNOLOGÍAS":
+		if shop_title.text == "INVESTIGACIÓN":
+			return
+		if shop_title.text == "BASE":
+			refresh_item_buttons()
 			return
 		if shop_title.text in CATEGORIES:
 			open_category(shop_title.text)
@@ -606,6 +618,7 @@ func update_money(amount: int) -> void:
 			show_categories()
 
 func clear_content() -> void:
+	item_buttons.clear()
 	research_buttons.clear()
 	research_status.clear()
 	research_details.clear()
@@ -635,7 +648,7 @@ func open_category(category: String) -> void:
 	shop_scroll.scroll_vertical = 0
 	clear_content()
 	match category:
-		"TECNOLOGÍAS":
+		"INVESTIGACIÓN":
 			build_research_content()
 		"EXPANSION":
 			shop_content.add_child(create_label("AMPLIACION DE LA BASE", 18, Color("#f3ca85")))
@@ -651,35 +664,14 @@ func open_category(category: String) -> void:
 			shop_content.add_child(button)
 		"BASE":
 			shop_content.add_child(create_label("MINERIA", 19, Color("#f3ca85")))
-			var button := create_button("VETA DE CARBON - 100")
-			button.disabled = not economy.can_afford(economy.COAL_VEIN_PRICE)
-			button.pressed.connect(coal_vein_requested.emit)
-			shop_content.add_child(button)
-			var brass_button := create_button("VETA DE LATON - 150")
-			brass_button.disabled = not economy.can_afford(economy.BRASS_VEIN_PRICE)
-			brass_button.pressed.connect(brass_vein_requested.emit)
-			shop_content.add_child(brass_button)
+			add_item_button("VETA DE CARBÓN · 100", economy.COAL_VEIN_PRICE, "coal", coal_vein_requested)
+			add_item_button("VETA DE LATÓN · 150", economy.BRASS_VEIN_PRICE, "brass", brass_vein_requested)
 			shop_content.add_child(create_label("AUTOMATIZACION", 19, Color("#f3ca85")))
-			var conveyor_button := create_button("CINTA TRANSPORTADORA - 50")
-			conveyor_button.disabled = not economy.can_afford(economy.CONVEYOR_PRICE)
-			conveyor_button.pressed.connect(conveyor_requested.emit)
-			shop_content.add_child(conveyor_button)
-			var corner_button := create_button("CINTA EN L DERECHA - 50")
-			corner_button.disabled = not economy.can_afford(economy.CONVEYOR_PRICE)
-			corner_button.pressed.connect(corner_conveyor_requested.emit)
-			shop_content.add_child(corner_button)
-			var left_corner_button := create_button("CINTA EN L IZQUIERDA - 50")
-			left_corner_button.disabled = not economy.can_afford(economy.CONVEYOR_PRICE)
-			left_corner_button.pressed.connect(left_corner_conveyor_requested.emit)
-			shop_content.add_child(left_corner_button)
-			var junction_button := create_button("CINTA EN T - 50")
-			junction_button.disabled = not economy.can_afford(economy.CONVEYOR_PRICE)
-			junction_button.pressed.connect(junction_conveyor_requested.emit)
-			shop_content.add_child(junction_button)
-			var drill_button := create_button("TALADRO AUTOMATICO - 200")
-			drill_button.disabled = not economy.can_afford(economy.DRILL_PRICE)
-			drill_button.pressed.connect(drill_requested.emit)
-			shop_content.add_child(drill_button)
+			add_item_button("CINTA RECTA · 50", economy.CONVEYOR_PRICE, "straight", conveyor_requested)
+			add_item_button("CINTA EN L DERECHA · 50", economy.CONVEYOR_PRICE, "corner_right", corner_conveyor_requested)
+			add_item_button("CINTA EN L IZQUIERDA · 50", economy.CONVEYOR_PRICE, "corner_left", left_corner_conveyor_requested)
+			add_item_button("CINTA EN T · 50", economy.CONVEYOR_PRICE, "junction", junction_conveyor_requested)
+			add_item_button("TALADRO AUTOMÁTICO · 200", economy.DRILL_PRICE, "drill", drill_requested)
 		"DEFENSA":
 			var left_cell: Vector2i = grid.defense_cell("left")
 			var right_cell: Vector2i = grid.defense_cell("right")
@@ -695,6 +687,36 @@ func open_category(category: String) -> void:
 			launcher_button.disabled = not (cycle != null and cycle.free_launcher_available) and not economy.can_afford(economy.LAUNCHER_PRICE)
 			launcher_button.pressed.connect(launcher_requested.emit)
 			shop_content.add_child(launcher_button)
+
+func add_item_button(text: String, price: int, item: String, request: Signal) -> void:
+	var button := create_button(text)
+	button.pressed.connect(request_item.bind(item, request))
+	item_buttons[item] = {"button": button, "price": price}
+	var icon := ResearchIcon.new()
+	icon.name = "ResearchLock"
+	icon.kind = "lock"
+	icon.position = Vector2(9, 17)
+	icon.size = Vector2(15, 15)
+	button.add_child(icon)
+	shop_content.add_child(button)
+	refresh_item_buttons()
+
+func request_item(item: String, request: Signal) -> void:
+	if progression != null and not progression.is_item_unlocked(item):
+		return
+	if cycle != null and (cycle.is_night or cycle.defeated or cycle.is_tutorial_active()):
+		return
+	request.emit()
+
+func refresh_item_buttons() -> void:
+	for item in item_buttons:
+		var button: Button = item_buttons[item]["button"]
+		var unlocked: bool = progression == null or progression.is_item_unlocked(item)
+		button.disabled = not unlocked or not economy.can_afford(item_buttons[item]["price"]) or (cycle != null and (cycle.is_night or cycle.defeated or cycle.is_tutorial_active()))
+		button.get_node("ResearchLock").visible = not unlocked
+		button.tooltip_text = ""
+		if not unlocked:
+			button.tooltip_text = "Investigar: %s" % progression.RESEARCHES[progression.ITEM_RESEARCH[item]]["name"]
 
 func unlock_defense_platforms() -> void:
 	if cycle != null and not cycle.allows_action("unlock_defense"):
@@ -771,6 +793,15 @@ class ResearchIcon extends Control:
 		var factor: float = minf(size.x, size.y) / 32.0
 		draw_set_transform((size - Vector2.ONE * 32.0 * factor) * 0.5, 0.0, Vector2.ONE * factor)
 		match kind:
+			"ore":
+				draw_colored_polygon(PackedVector2Array([Vector2(3, 22), Vector2(8, 9), Vector2(21, 5), Vector2(29, 17), Vector2(23, 28), Vector2(9, 28)]), tint)
+				draw_line(Vector2(10, 12), Vector2(18, 9), Color("#352516"), 2, true)
+			"curve", "junction":
+				var lines := [PackedVector2Array([Vector2(5, 27), Vector2(5, 7), Vector2(27, 7)]), PackedVector2Array([Vector2(13, 27), Vector2(13, 15), Vector2(27, 15)])]
+				for points in lines:
+					draw_polyline(points, tint, 2.5, true)
+				if kind == "junction":
+					draw_line(Vector2(9, 11), Vector2(9, 1), tint, 5, true)
 			"pickaxe":
 				draw_line(Vector2(9, 27), Vector2(20, 9), tint, 3.5, true)
 				draw_polyline(PackedVector2Array([Vector2(5, 15), Vector2(13, 7), Vector2(23, 8), Vector2(28, 14)]), tint, 3.5, true)

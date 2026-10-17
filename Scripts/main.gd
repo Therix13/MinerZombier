@@ -62,7 +62,6 @@ func _ready() -> void:
 	grid = GridScript.new()
 	economy = EconomyScript.new()
 	progression = ProgressionScript.new()
-	progression.technology_unlocked.connect(apply_technologies)
 	mining = MiningScript.new()
 	mining.setup(grid)
 	mining.changed.connect(redraw_world)
@@ -195,6 +194,8 @@ func buy_expansion() -> void:
 	shop.close_shop()
 
 func buy_brass_vein() -> void:
+	if not progression.is_item_unlocked("brass"):
+		return
 	if not cycle.allows_action("buy_brass"):
 		return
 	if cycle.is_night or cycle.defeated:
@@ -233,6 +234,8 @@ func buy_junction_conveyor() -> void:
 	buy_belt("junction")
 
 func buy_belt(shape: String) -> void:
+	if not progression.is_item_unlocked(shape):
+		return
 	if not cycle.allows_action("buy_conveyor") or (cycle.is_tutorial_active() and shape != "straight"):
 		return
 	if cycle.is_night or cycle.defeated:
@@ -247,6 +250,8 @@ func buy_belt(shape: String) -> void:
 	redraw_world()
 
 func buy_drill() -> void:
+	if not progression.is_item_unlocked("drill"):
+		return
 	if not cycle.allows_action("buy_drill"):
 		return
 	if cycle.is_night or cycle.defeated:
@@ -351,18 +356,6 @@ func research_technology(technology_id: String) -> void:
 	if cycle.is_night or cycle.defeated or (night_victory_overlay != null and night_victory_overlay.visible):
 		return
 	progression.research(technology_id)
-
-func apply_technologies(_technology_id: String) -> void:
-	mining.mining_clicks = 5 if progression.has_technology("mining_i") else mining.COAL_CLICKS
-	drills.drill_interval = 0.3 if progression.has_technology("mining_ii") else drills.DRILL_INTERVAL
-	conveyors.move_interval = 2.0 if progression.has_technology("logistics_ii") else (3.0 if progression.has_technology("logistics_i") else conveyors.MOVE_INTERVAL)
-	launchers.damage_multiplier = 0.75 if progression.has_technology("defense_i") else launchers.DAMAGE_MULTIPLIER
-	launchers.capacity = 8 if progression.has_technology("defense_ii") else launchers.CAPACITY
-	launchers.fire_interval = 3.0 if progression.has_technology("defense_ii") else launchers.FIRE_INTERVAL
-	for data in launchers.launchers.values():
-		data["cooldown"] = minf(float(data["cooldown"]), launchers.fire_interval)
-	cycle.refresh_tutorial()
-	redraw_world()
 
 func _input(event: InputEvent) -> void:
 	# Handle pause before placement, victory dialogs, or gameplay shortcuts.

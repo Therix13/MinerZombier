@@ -44,6 +44,22 @@ func belt_direction(cell: Vector2i) -> int:
 func belt_shape(cell: Vector2i) -> String:
 	return str(belt_data(cell).get("shape", STRAIGHT))
 
+func level_at(cell: Vector2i) -> int:
+	return int(belt_data(cell).get("level", 1))
+
+func interval_at(cell: Vector2i) -> float:
+	return maxf(2.0, move_interval - (level_at(cell) - 1))
+
+func upgrade(cell: Vector2i) -> bool:
+	if not belts.has(cell) or level_at(cell) >= 3:
+		return false
+	var data: Dictionary = belt_data(cell)
+	data["level"] = level_at(cell) + 1
+	data["timer"] = minf(float(data.get("timer", 0.0)), maxf(2.0, move_interval - (int(data["level"]) - 1)))
+	belts[cell] = data
+	changed.emit()
+	return true
+
 func can_place(cell: Vector2i) -> bool:
 	return grid.owned_tiles.has(cell) and (grid.is_valid_cell(cell) or grid.is_ammo_cell(cell)) and not grid.is_defense_position(cell) and (drills == null or not drills.drills.has(cell)) and cell != grid.sale_cell and not belts.has(cell) and (launchers == null or not launchers.launchers.has(cell)) and mining.vein_at(cell) == "" and mining.nuggets_at(cell) == 0
 
@@ -59,11 +75,12 @@ func move(source: Vector2i, destination: Vector2i, direction: int) -> bool:
 		return false
 	if source != destination and not can_place(destination):
 		return false
-	var shape: String = belt_shape(source)
+	var data: Dictionary = belt_data(source).duplicate(true)
 	var previous_entry: int = int(last_junction_entry.get(source, -1))
 	belts.erase(source)
 	last_junction_entry.erase(source)
-	belts[destination] = {"direction": posmod(direction, 4), "shape": shape}
+	data["direction"] = posmod(direction, 4)
+	belts[destination] = data
 	if destination == source and previous_entry >= 0:
 		last_junction_entry[destination] = previous_entry
 	changed.emit()
@@ -94,17 +111,27 @@ func accepts_from(destination: Vector2i, source: Vector2i) -> bool:
 	return false
 
 func advance(delta: float) -> void:
-	accumulator += delta
-	if accumulator < move_interval:
-		return
-	accumulator = fmod(accumulator, move_interval)
-	tick()
+	var ready: Array[Vector2i] = []
+	for key in belts:
+		var cell: Vector2i = key
+		var data: Dictionary = belt_data(cell)
+		var interval: float = interval_at(cell)
+		var timer: float = float(data.get("timer", 0.0)) + maxf(0.0, delta)
+		if timer + 0.000001 >= interval:
+			ready.append(cell)
+			timer = maxf(0.0, timer - floori(timer / interval + 0.000001) * interval)
+		data["timer"] = timer
+		belts[cell] = data
+	if not ready.is_empty():
+		tick(ready)
 
-func tick() -> void:
+func tick(ready: Array[Vector2i] = []) -> void:
 	var requests: Dictionary = {}
 	var sales: Array[Dictionary] = []
 	for key in belts:
 		var source: Vector2i = key
+		if not ready.is_empty() and source not in ready:
+			continue
 		if mining.nuggets_at(source) == 0:
 			continue
 		var destination: Vector2i = source + DIRECTIONS[belt_direction(source)]
