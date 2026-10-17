@@ -13,6 +13,7 @@ const ZombieManagerScript = preload("res://Scripts/zombie_manager.gd")
 const DefenseZoneScript = preload("res://Scripts/defense_zone.gd")
 const CycleScript = preload("res://Scripts/day_night_manager.gd")
 const ProgressionScript = preload("res://Scripts/progression_manager.gd")
+const DisplaySettingsScript = preload("res://Scripts/display_settings.gd")
 
 const DRAG_THRESHOLD := 8.0
 
@@ -27,6 +28,7 @@ var zombie_manager: Node2D
 var defense_zone: Node2D
 var cycle: RefCounted
 var progression: RefCounted
+var display_settings: CanvasLayer
 var placing_free_launcher: bool = false
 var shop: Control
 var renderer: Node2D
@@ -55,6 +57,8 @@ var drag_world_position := Vector2.ZERO
 @onready var ui_layer: CanvasLayer = $CanvasLayer
 
 func _ready() -> void:
+	display_settings = DisplaySettingsScript.new()
+	add_child(display_settings)
 	grid = GridScript.new()
 	economy = EconomyScript.new()
 	progression = ProgressionScript.new()
@@ -120,7 +124,19 @@ func _ready() -> void:
 	shop.defense_platforms_unlocked.connect(redraw_world)
 	shop.defense_platforms_unlocked.connect(cycle.refresh_tutorial)
 	build_night_victory_popup()
+	display_settings.changed.connect(update_display_layout)
+	get_viewport().size_changed.connect(update_display_layout)
+	update_display_layout()
 	redraw_world()
+
+func update_display_layout() -> void:
+	var factor: float = display_settings.interface_scale()
+	ui_layer.scale = Vector2.ONE * factor
+	shop.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	shop.size = get_viewport().get_visible_rect().size / factor
+	get_node("CapaVictoria").scale = Vector2.ONE * factor
+	update_night_victory_layout()
+	camera_controller.update_zoom_limits()
 
 func _exit_tree() -> void:
 	# RefCounted managers refer to each other. Break those cycles on scene
@@ -332,6 +348,8 @@ func apply_technologies(_technology_id: String) -> void:
 	redraw_world()
 
 func _input(event: InputEvent) -> void:
+	if display_settings != null and display_settings.menu_open:
+		return
 	if night_victory_overlay != null and night_victory_overlay.visible:
 		if event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_ESCAPE]:
 			dismiss_night_victory_popup()
@@ -355,6 +373,8 @@ func _input(event: InputEvent) -> void:
 			finish_object_interaction()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if display_settings != null and display_settings.menu_open:
+		return
 	if night_victory_overlay != null and night_victory_overlay.visible:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
@@ -530,7 +550,8 @@ func build_night_victory_popup() -> void:
 func update_night_victory_layout() -> void:
 	if night_victory_overlay == null:
 		return
-	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var factor: float = display_settings.interface_scale() if display_settings != null else 1.0
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size / factor
 	night_victory_overlay.position = Vector2.ZERO
 	night_victory_overlay.size = viewport_size
 	night_victory_shade.position = Vector2.ZERO

@@ -16,6 +16,7 @@ var min_zoom: float = 1.0
 var max_zoom: float = 1.0
 var dragging: bool = false
 var last_mouse_position: Vector2 = Vector2.ZERO
+var previous_viewport_size: Vector2 = Vector2.ZERO
 
 func setup(target: Camera2D, source: Viewport, grid_manager: RefCounted) -> void:
 	camera = target
@@ -38,6 +39,11 @@ func get_active_min_zoom() -> float:
 
 func update_zoom_limits(initial: bool = false) -> void:
 	var viewport_size: Vector2 = viewport.get_visible_rect().size
+	if not initial and previous_viewport_size.x > 0.0 and viewport_size.x != previous_viewport_size.x:
+		var ratio: float = viewport_size.x / previous_viewport_size.x
+		camera.zoom *= ratio
+		mine_zoom *= ratio
+	previous_viewport_size = viewport_size
 	var map_size: Vector2 = grid.get_map_size()
 	max_zoom = viewport_size.x / (VISIBLE_COLUMNS * grid.TILE_SIZE)
 	min_zoom = maxf(viewport_size.x / map_size.x, viewport_size.y / map_size.y)
