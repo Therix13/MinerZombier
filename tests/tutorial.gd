@@ -8,6 +8,7 @@ var cycle: RefCounted
 var grid: RefCounted
 
 func _initialize() -> void:
+	Engine.set_meta(&"mine_defense_intro_seen", true)
 	call_deferred("run_checks")
 
 func check(condition: bool, description: String) -> void:

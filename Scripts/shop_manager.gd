@@ -19,6 +19,7 @@ signal technology_requested(technology_id: String)
 
 const DisplaySettingsScript = preload("res://Scripts/display_settings.gd")
 const TutorialGuideScript = preload("res://Scripts/tutorial_guide.gd")
+const IntroCinematicScript = preload("res://Scripts/intro_cinematic.gd")
 
 const PANEL_WIDTH := 340.0
 const TOGGLE_SIZE := 58.0
@@ -106,6 +107,15 @@ func set_cycle(game_cycle: RefCounted) -> void:
 	cycle.changed.connect(update_cycle)
 	update_cycle()
 	ensure_tutorial_guide.call_deferred()
+	ensure_intro.call_deferred()
+
+func ensure_intro() -> void:
+	# Install from the shop so older scenes with a built-in main script work too.
+	if Engine.has_meta(IntroCinematicScript.SESSION_KEY):
+		return
+	var intro := IntroCinematicScript.new()
+	intro.name = "IntroCinematic"
+	get_parent().get_parent().add_child(intro)
 
 func ensure_tutorial_guide() -> void:
 	var game: Node = get_parent().get_parent()
