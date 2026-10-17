@@ -47,7 +47,6 @@ var progression: RefCounted
 var progression_panel: PanelContainer
 var level_label: Label
 var experience_bar: ProgressBar
-var research_button: Button
 var research_summary: Label
 var research_buttons: Dictionary = {}
 var research_status: Dictionary = {}
@@ -126,20 +125,7 @@ func build_progression_panel() -> void:
 	level_label.add_theme_color_override("font_outline_color", Color("#152019"))
 	level_label.add_theme_constant_override("outline_size", 3)
 	row.add_child(level_label)
-	research_button = Button.new()
-	research_button.flat = true
-	research_button.custom_minimum_size.y = 24
-	research_button.add_theme_font_size_override("font_size", 14)
-	research_button.add_theme_color_override("font_color", Color("#c4cebd"))
-	research_button.add_theme_color_override("font_hover_color", Color("#ffe0a0"))
-	research_button.add_theme_color_override("font_pressed_color", Color("#f3ca85"))
-	research_button.add_theme_color_override("font_disabled_color", Color("#899082"))
-	research_button.add_theme_color_override("font_outline_color", Color("#152019"))
-	research_button.add_theme_constant_override("outline_size", 3)
-	for state in ["normal", "hover", "pressed", "disabled"]:
-		research_button.add_theme_stylebox_override(state, StyleBoxEmpty.new())
-	research_button.pressed.connect(open_research)
-	row.add_child(research_button)
+	level_label.custom_minimum_size.y = 24
 	experience_bar = ProgressBar.new()
 	experience_bar.custom_minimum_size.y = 6
 	experience_bar.show_percentage = false
@@ -155,12 +141,7 @@ func update_progression() -> void:
 	experience_bar.max_value = progression.experience_to_next_level()
 	experience_bar.value = progression.experience
 	experience_bar.tooltip_text = "EXP %d / %d\nGana EXP vendiendo minerales y derrotando zombis." % [progression.experience, progression.experience_to_next_level()]
-	var points: int = progression.research_points
-	research_button.text = "TECNOLOGÍAS%s" % (" · %d PI" % points if points > 0 else "")
-	research_button.tooltip_text = "%d puntos de investigación disponibles. Cada nivel otorga 1 punto." % points
-	research_button.add_theme_color_override("font_color", Color("#f3ca85") if points > 0 else Color("#c4cebd"))
 	progression_panel.visible = not shop_open and not shop_animating
-	research_button.disabled = cycle != null and (cycle.is_night or cycle.defeated)
 	refresh_research_buttons()
 
 func open_research() -> void:

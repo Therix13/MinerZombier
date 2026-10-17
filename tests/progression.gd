@@ -108,9 +108,15 @@ func run_checks() -> void:
 	await process_frame
 	check(player.get("total_experience") == 27, "Removing an enemy without a kill grants no EXP")
 	check(shop.get("level_label").text.contains("NIVEL 2") and shop.get("experience_bar").value == 2, "HUD shows current level and remaining EXP")
-	shop.get("research_button").pressed.emit()
+	shop.get("shop_button").pressed.emit()
 	await create_timer(0.4).timeout
-	check(shop.get("shop_open") and shop.get("shop_title").text == "TECNOLOGÍAS", "HUD button opens the research category")
+	for category_button in shop.get("shop_content").get_children():
+		if category_button is Button and category_button.text.begins_with("TECNOLOGÍAS"):
+			category_button.pressed.emit()
+			break
+	await process_frame
+	await process_frame
+	check(shop.get("shop_open") and shop.get("shop_title").text == "TECNOLOGÍAS", "Shop category opens research through its remaining UI entry point")
 	check(shop.get("research_buttons").size() == 6, "Research panel offers all six technologies")
 	check(not shop.get("progression_panel").visible, "HUD hides while shop is open so it cannot cover research controls")
 	var scroll: ScrollContainer = shop.get("shop_scroll")
