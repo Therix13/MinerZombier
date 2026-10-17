@@ -10,6 +10,7 @@ var mining: RefCounted
 var conveyors: RefCounted
 var drills: Dictionary = {}
 var accumulator: float = 0.0
+var drill_interval: float = DRILL_INTERVAL
 
 func setup(grid_manager: RefCounted, mining_manager: RefCounted, conveyor_manager: RefCounted) -> void:
 	grid = grid_manager
@@ -48,10 +49,10 @@ func move(source: Vector2i, destination: Vector2i, direction: int) -> bool:
 
 func advance(delta: float) -> void:
 	accumulator += delta
-	if accumulator < DRILL_INTERVAL:
+	if accumulator < drill_interval:
 		return
-	var steps: int = mini(floori(accumulator / DRILL_INTERVAL), 8)
-	accumulator = fmod(accumulator, DRILL_INTERVAL)
+	var steps: int = mini(floori(accumulator / drill_interval), 8)
+	accumulator = fmod(accumulator, drill_interval)
 	for i in range(steps):
 		tick()
 

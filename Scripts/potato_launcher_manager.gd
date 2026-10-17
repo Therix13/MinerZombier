@@ -14,6 +14,9 @@ var drills: RefCounted
 var launchers: Dictionary = {}
 var world: Node2D
 var shots: Array[Dictionary] = []
+var capacity: int = CAPACITY
+var fire_interval: float = FIRE_INTERVAL
+var damage_multiplier: float = DAMAGE_MULTIPLIER
 
 func setup(grid_manager: RefCounted, mining_manager: RefCounted, conveyor_manager: RefCounted, drill_manager: RefCounted, world_node: Node2D) -> void:
 	grid = grid_manager
@@ -50,7 +53,7 @@ func move(source: Vector2i, destination: Vector2i) -> bool:
 	return true
 
 func can_receive(cell: Vector2i) -> bool:
-	return launchers.has(cell) and (launchers[cell]["ammo"] as Array).size() < CAPACITY
+	return launchers.has(cell) and (launchers[cell]["ammo"] as Array).size() < capacity
 
 func receive(cell: Vector2i, kind: String) -> bool:
 	if not can_receive(cell) or (kind != "coal" and kind != "brass"):
@@ -90,8 +93,8 @@ func advance(delta: float) -> void:
 		var target_position: Vector2 = world.to_local(nearest.global_position)
 		data["angle"] = (target_position - center).angle()
 		var kind: String = str(ammo.pop_front())
-		data["cooldown"] = FIRE_INTERVAL
-		var damage: float = (2.0 if kind == "brass" else 1.0) * DAMAGE_MULTIPLIER
+		data["cooldown"] = fire_interval
+		var damage: float = (2.0 if kind == "brass" else 1.0) * damage_multiplier
 		if nearest.has_method("take_damage"):
 			nearest.call("take_damage", damage)
 		elif nearest.has_method("apply_damage"):

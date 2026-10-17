@@ -9,6 +9,7 @@ const DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 var drills: RefCounted
 var conveyors: RefCounted
 var grid: RefCounted
+var mining_clicks: int = COAL_CLICKS
 var coal_veins: Dictionary = {}
 var brass_veins: Dictionary = {}
 var coal_nuggets: Dictionary = {}
@@ -60,7 +61,7 @@ func mine(cell: Vector2i) -> bool:
 	var dictionary: Dictionary = brass_veins if kind == "brass" else coal_veins
 	var vein: Dictionary = dictionary[cell]
 	var progress: int = int(vein["progress"]) + 1
-	if progress >= COAL_CLICKS:
+	if progress >= mining_clicks:
 		var destination: Vector2i = cell + DIRECTIONS[int(vein["direction"])]
 		if not grid.owned_tiles.has(destination) or not can_move_nugget(destination):
 			return false

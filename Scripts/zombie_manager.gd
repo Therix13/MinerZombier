@@ -3,6 +3,7 @@ extends Node2D
 signal base_health_changed(health: float, max_health: float)
 signal wave_completed
 signal base_destroyed
+signal zombie_defeated
 
 const ZombieScript = preload("res://Scripts/zombie.gd")
 const SPAWN_INTERVAL: float = 5.0
@@ -62,6 +63,7 @@ func spawn_zombie() -> void:
 	zombie.z_index = 20
 	zombie.call("setup", start_position, target_position, health)
 	zombie.connect("base_attacked", _on_base_attacked)
+	zombie.connect("defeated", zombie_defeated.emit)
 	add_child(zombie)
 	spawn_count += 1
 	spawn_from_left = not spawn_from_left

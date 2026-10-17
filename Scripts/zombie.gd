@@ -2,6 +2,7 @@ extends Node2D
 
 signal reached_base
 signal base_attacked(damage: float)
+signal defeated
 
 const MAX_HEALTH: float = 3.0
 const MOVEMENT_SPEED: float = 35.0
@@ -56,6 +57,7 @@ func take_damage(amount: float) -> void:
 	if health <= 0.0:
 		remove_from_group("zombies")
 		set_process(false)
+		defeated.emit()
 		queue_free()
 	else:
 		queue_redraw()

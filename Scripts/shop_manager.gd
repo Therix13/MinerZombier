@@ -15,12 +15,13 @@ signal launcher_requested
 signal drill_requested
 signal night_requested
 signal restart_requested
+signal technology_requested(technology_id: String)
 
 const PANEL_WIDTH := 340.0
 const TOGGLE_SIZE := 58.0
 const MONEY_BOX_WIDTH := 148.0
 const ANIMATION_TIME := 0.3
-const CATEGORIES := ["EXPANSION", "BASE", "DEFENSA"]
+const CATEGORIES := ["EXPANSION", "BASE", "DEFENSA", "TECNOLOGÍAS"]
 
 var economy: RefCounted
 var grid: RefCounted
@@ -40,6 +41,16 @@ var cycle: RefCounted
 var cycle_title: Label
 var cycle_goal: Label
 var cycle_action: Button
+var progression: RefCounted
+var progression_panel: PanelContainer
+var level_label: Label
+var experience_bar: ProgressBar
+var research_label: Label
+var progression_hint: Label
+var research_button: Button
+var research_summary: Label
+var research_buttons: Dictionary = {}
+var research_status: Dictionary = {}
 
 func setup(economy_manager: RefCounted, grid_manager: RefCounted) -> void:
 	economy = economy_manager
@@ -56,8 +67,118 @@ func set_cycle(game_cycle: RefCounted) -> void:
 	cycle.changed.connect(update_cycle)
 	update_cycle()
 
+func set_progression(player_progression: RefCounted) -> void:
+	progression = player_progression
+	build_progression_panel()
+	progression.changed.connect(update_progression)
+	progression.level_up.connect(show_level_up)
+	update_progression()
+
+func build_progression_panel() -> void:
+	progression_panel = PanelContainer.new()
+	progression_panel.position = Vector2(20, 260)
+	progression_panel.size = Vector2(302, 0)
+	progression_panel.add_theme_stylebox_override("panel", create_style("#24352e", "#81a979", 3, 9))
+	add_child(progression_panel)
+	var margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 10)
+	progression_panel.add_child(margin)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 6)
+	margin.add_child(column)
+	level_label = create_label("", 18, Color("#d6edb4"))
+	column.add_child(level_label)
+	experience_bar = ProgressBar.new()
+	experience_bar.custom_minimum_size.y = 12
+	experience_bar.show_percentage = false
+	experience_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	experience_bar.add_theme_stylebox_override("background", create_style("#15221c", "#405c45", 1, 4))
+	experience_bar.add_theme_stylebox_override("fill", create_style("#86ba69", "#b2d98a", 1, 4))
+	column.add_child(experience_bar)
+	research_label = create_label("", 15, Color("#f3ca85"))
+	column.add_child(research_label)
+	progression_hint = create_label("Gana EXP vendiendo minerales y derrotando zombis.", 13)
+	column.add_child(progression_hint)
+	research_button = create_button("TECNOLOGÍAS")
+	research_button.custom_minimum_size.y = 38
+	research_button.add_theme_font_size_override("font_size", 15)
+	research_button.pressed.connect(open_research)
+	column.add_child(research_button)
+
+func show_level_up(new_level: int) -> void:
+	progression_hint.text = "¡Nivel %d! +1 punto de investigación." % new_level
+
+func update_progression() -> void:
+	if progression == null:
+		return
+	level_label.text = "NIVEL %d · EXP %d / %d" % [progression.level, progression.experience, progression.experience_to_next_level()]
+	experience_bar.max_value = progression.experience_to_next_level()
+	experience_bar.value = progression.experience
+	research_label.text = "Investigación: %d puntos disponibles" % progression.research_points
+	progression_panel.visible = not shop_open and not shop_animating
+	research_button.disabled = cycle != null and (cycle.is_night or cycle.defeated)
+	refresh_research_buttons()
+
+func open_research() -> void:
+	if cycle != null and (cycle.is_night or cycle.defeated):
+		return
+	if not shop_open:
+		open_shop()
+	if shop_open:
+		open_category("TECNOLOGÍAS")
+
+func build_research_content() -> void:
+	if progression == null:
+		return
+	research_summary = create_label("", 18, Color("#d6edb4"))
+	shop_content.add_child(research_summary)
+	shop_content.add_child(create_label("Cada nivel otorga 1 punto. Las mejoras se aplican a todas tus máquinas y torretas.", 14))
+	shop_content.add_child(create_label("EXP: zombi derrotado +10 · carbón vendido +2 · latón vendido +3.", 13))
+	var previous_branch: String = ""
+	for technology_id in progression.TECHNOLOGIES:
+		var data: Dictionary = progression.TECHNOLOGIES[technology_id]
+		var branch: String = data["branch"]
+		if branch != previous_branch:
+			shop_content.add_child(HSeparator.new())
+			shop_content.add_child(create_label(branch, 19, Color("#f3ca85")))
+			previous_branch = branch
+		shop_content.add_child(create_label(data["name"], 17, Color("#d6edb4")))
+		shop_content.add_child(create_label(data["description"], 14))
+		var requirements: String = "Nivel %d · Coste: %d PI" % [data["level"], data["cost"]]
+		for prerequisite in data["requires"]:
+			requirements += "\nRequiere: %s" % progression.TECHNOLOGIES[prerequisite]["name"]
+		shop_content.add_child(create_label(requirements, 13))
+		var status := create_label("", 13)
+		research_status[technology_id] = status
+		shop_content.add_child(status)
+		var button := create_button("")
+		button.name = "Research_" + str(technology_id)
+		button.add_theme_font_size_override("font_size", 15)
+		button.pressed.connect(technology_requested.emit.bind(technology_id))
+		research_buttons[technology_id] = button
+		shop_content.add_child(button)
+	refresh_research_buttons()
+
+func refresh_research_buttons() -> void:
+	if progression == null:
+		return
+	if research_summary != null:
+		research_summary.text = "Nivel %d · %d PI disponibles" % [progression.level, progression.research_points]
+	var blocked: bool = cycle != null and (cycle.is_night or cycle.defeated)
+	for technology_id in research_buttons:
+		var button: Button = research_buttons[technology_id]
+		var status: Label = research_status[technology_id]
+		var researched: bool = progression.has_technology(technology_id)
+		button.disabled = blocked or not progression.can_research(technology_id)
+		button.text = "INVESTIGADA" if researched else "INVESTIGAR · %d PI" % progression.TECHNOLOGIES[technology_id]["cost"]
+		var reason: String = progression.research_block_reason(technology_id)
+		status.text = "Investiga durante el día." if blocked and not researched else ("Disponible" if reason.is_empty() else reason)
+		status.add_theme_color_override("font_color", Color("#b8dc98") if researched or not button.disabled else Color("#c6b5a0"))
+
 func build_cycle_panel() -> void:
 	var panel := PanelContainer.new()
+	panel.name = "CyclePanel"
 	panel.anchor_left = 0.0
 	panel.anchor_right = 0.0
 	panel.anchor_top = 0.0
@@ -116,6 +237,7 @@ func update_cycle() -> void:
 		cycle_action.disabled = not cycle.can_start_night() or shop_open or shop_animating
 	shop_button.disabled = cycle.is_night or cycle.defeated
 	view_button.disabled = cycle.is_night or cycle.defeated
+	update_progression()
 
 func create_style(background: String, border: String, border_size: int, radius: int) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -263,12 +385,17 @@ func set_view_mode(defense_enabled: bool) -> void:
 func update_money(amount: int) -> void:
 	money_label.text = "∞ DEV" if economy.developer_mode else str(amount)
 	if shop_open:
+		if shop_title.text == "TECNOLOGÍAS":
+			return
 		if shop_title.text in CATEGORIES:
 			open_category(shop_title.text)
 		else:
 			show_categories()
 
 func clear_content() -> void:
+	research_buttons.clear()
+	research_status.clear()
+	research_summary = null
 	for child in shop_content.get_children():
 		shop_content.remove_child(child)
 		child.queue_free()
@@ -290,6 +417,8 @@ func open_category(category: String) -> void:
 	shop_scroll.scroll_vertical = 0
 	clear_content()
 	match category:
+		"TECNOLOGÍAS":
+			build_research_content()
 		"EXPANSION":
 			shop_content.add_child(create_label("AMPLIACION DE LA BASE", 18, Color("#f3ca85")))
 			shop_content.add_child(create_label("Tamaño actual: %dx%d" % [grid.cave_width, grid.cave_height]))

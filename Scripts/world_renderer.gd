@@ -190,7 +190,7 @@ func draw_coal_vein(
 				Rect2(
 					rect.position + Vector2(5, 41),
 					Vector2(
-						38.0 * float(progress) / float(mining.COAL_CLICKS),
+						38.0 * minf(float(progress) / float(mining.mining_clicks), 1.0),
 						4.0
 					)
 				),
@@ -353,7 +353,7 @@ func draw_brass_vein(center: Vector2, direction_index: int, progress: int, previ
 	draw_direction_arrow(center, direction_index)
 	if not preview:
 		draw_rect(Rect2(rect.position + Vector2(3, 36), Vector2(36, 4)), Color("#302117"))
-		draw_rect(Rect2(rect.position + Vector2(3, 36), Vector2(36.0 * float(progress) / float(mining.COAL_CLICKS), 4)), Color("#f5d283"))
+		draw_rect(Rect2(rect.position + Vector2(3, 36), Vector2(36.0 * minf(float(progress) / float(mining.mining_clicks), 1.0), 4)), Color("#f5d283"))
 
 func draw_brass_nugget(center: Vector2, amount: int) -> void:
 	var points := PackedVector2Array([center + Vector2(-13, -4), center + Vector2(-6, -12), center + Vector2(7, -10), center + Vector2(13, 1), center + Vector2(6, 12), center + Vector2(-9, 9)])
@@ -378,8 +378,10 @@ func draw_launcher(center: Vector2, data: Dictionary, preview: bool) -> void:
 	draw_line(center, center + direction * 19.0, Color("#c6a066"), 7.0)
 	draw_circle(center + direction * 18.0, 5.0, Color("#3b2d20"))
 	var ammo: Array = data.get("ammo", [])
-	for i in range(5):
-		draw_circle(rect.position + Vector2(7.0 + i * 7.0, rect.size.y - 5.0), 2.4, Color("#f5d17b") if i < ammo.size() else Color("#2f2b25"))
+	var slots: int = launchers.capacity
+	for i in range(slots):
+		var offset_x: float = 5.0 + float(i) * (rect.size.x - 10.0) / float(maxi(slots - 1, 1))
+		draw_circle(rect.position + Vector2(offset_x, rect.size.y - 5.0), 1.8, Color("#f5d17b") if i < ammo.size() else Color("#2f2b25"))
 
 func draw_defense_platform(rect: Rect2) -> void:
 	var body: Rect2 = rect.grow(-3.0)

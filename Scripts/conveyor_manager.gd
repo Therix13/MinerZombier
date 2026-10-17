@@ -18,6 +18,7 @@ var drills: RefCounted
 var belts: Dictionary = {}
 var last_junction_entry: Dictionary = {}
 var accumulator: float = 0.0
+var move_interval: float = MOVE_INTERVAL
 
 func setup(grid_manager: RefCounted, mining_manager: RefCounted) -> void:
 	grid = grid_manager
@@ -94,9 +95,9 @@ func accepts_from(destination: Vector2i, source: Vector2i) -> bool:
 
 func advance(delta: float) -> void:
 	accumulator += delta
-	if accumulator < MOVE_INTERVAL:
+	if accumulator < move_interval:
 		return
-	accumulator = fmod(accumulator, MOVE_INTERVAL)
+	accumulator = fmod(accumulator, move_interval)
 	tick()
 
 func tick() -> void:

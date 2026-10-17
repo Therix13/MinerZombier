@@ -12,6 +12,7 @@ const LauncherScript = preload("res://Scripts/potato_launcher_manager.gd")
 const ZombieManagerScript = preload("res://Scripts/zombie_manager.gd")
 const DefenseZoneScript = preload("res://Scripts/defense_zone.gd")
 const CycleScript = preload("res://Scripts/day_night_manager.gd")
+const ProgressionScript = preload("res://Scripts/progression_manager.gd")
 
 const DRAG_THRESHOLD := 8.0
 
@@ -25,6 +26,7 @@ var launchers: RefCounted
 var zombie_manager: Node2D
 var defense_zone: Node2D
 var cycle: RefCounted
+var progression: RefCounted
 var placing_free_launcher: bool = false
 var shop: Control
 var renderer: Node2D
@@ -55,6 +57,8 @@ var drag_world_position := Vector2.ZERO
 func _ready() -> void:
 	grid = GridScript.new()
 	economy = EconomyScript.new()
+	progression = ProgressionScript.new()
+	progression.technology_unlocked.connect(apply_technologies)
 	mining = MiningScript.new()
 	mining.setup(grid)
 	mining.changed.connect(redraw_world)
@@ -85,6 +89,7 @@ func _ready() -> void:
 	zombie_manager = ZombieManagerScript.new()
 	add_child(zombie_manager)
 	zombie_manager.setup(grid)
+	zombie_manager.zombie_defeated.connect(on_zombie_defeated)
 	cycle = CycleScript.new()
 	cycle.setup(grid, mining, conveyors, launchers, economy)
 	zombie_manager.wave_completed.connect(on_wave_completed)
@@ -96,8 +101,10 @@ func _ready() -> void:
 	ui_layer.add_child(shop)
 	shop.setup(economy, grid)
 	shop.set_cycle(cycle)
+	shop.set_progression(progression)
 	shop.night_requested.connect(start_night)
 	shop.restart_requested.connect(restart_game)
+	shop.technology_requested.connect(research_technology)
 	shop.view_toggle_requested.connect(toggle_view)
 	shop.expansion_requested.connect(buy_expansion)
 	shop.coal_vein_requested.connect(buy_coal_vein)
@@ -302,6 +309,27 @@ func complete_placement(price: int) -> void:
 
 func on_sale_completed(kind: String) -> void:
 	economy.add(economy.BRASS_SELL_PRICE if kind == "brass" else economy.COAL_SELL_PRICE)
+	progression.award_sale(kind)
+
+func on_zombie_defeated() -> void:
+	progression.add_experience(progression.ZOMBIE_EXPERIENCE)
+
+func research_technology(technology_id: String) -> void:
+	if cycle.is_night or cycle.defeated or (night_victory_overlay != null and night_victory_overlay.visible):
+		return
+	progression.research(technology_id)
+
+func apply_technologies(_technology_id: String) -> void:
+	mining.mining_clicks = 5 if progression.has_technology("mining_i") else mining.COAL_CLICKS
+	drills.drill_interval = 0.3 if progression.has_technology("mining_ii") else drills.DRILL_INTERVAL
+	conveyors.move_interval = 2.0 if progression.has_technology("logistics_ii") else (3.0 if progression.has_technology("logistics_i") else conveyors.MOVE_INTERVAL)
+	launchers.damage_multiplier = 0.75 if progression.has_technology("defense_i") else launchers.DAMAGE_MULTIPLIER
+	launchers.capacity = 8 if progression.has_technology("defense_ii") else launchers.CAPACITY
+	launchers.fire_interval = 3.0 if progression.has_technology("defense_ii") else launchers.FIRE_INTERVAL
+	for data in launchers.launchers.values():
+		data["cooldown"] = minf(float(data["cooldown"]), launchers.fire_interval)
+	cycle.refresh_tutorial()
+	redraw_world()
 
 func _input(event: InputEvent) -> void:
 	if night_victory_overlay != null and night_victory_overlay.visible:

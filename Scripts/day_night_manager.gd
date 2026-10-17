@@ -56,7 +56,7 @@ func ammo_damage() -> float:
 	for launcher in launchers.launchers.values():
 		var ammo: Array = launcher["ammo"]
 		for kind in ammo:
-			total += 1.0 if kind == "brass" else 0.5
+			total += (2.0 if kind == "brass" else 1.0) * launchers.damage_multiplier
 	return total
 
 func has_ammo() -> bool:
@@ -111,7 +111,7 @@ func tutorial_text() -> String:
 		5:
 			return "Coloca tu primer Lanzapapas gratuito."
 		6:
-			return "Carga 4 de carbón o 2 de latón en las torretas."
+			return "Carga munición para causar al menos 2 de daño."
 	return "¡Preparación lista! Inicia la primera noche."
 
 func can_start_night() -> bool:
