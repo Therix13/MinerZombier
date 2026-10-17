@@ -45,7 +45,6 @@ var cycle_title: Label
 var cycle_heading: Label
 var cycle_badge: Label
 var cycle_steps: HBoxContainer
-var cycle_hint: Label
 var cycle_goal: Label
 var cycle_action: Button
 var progression: RefCounted
@@ -271,8 +270,6 @@ func build_cycle_panel() -> void:
 	cycle_action.add_theme_stylebox_override("disabled", create_style("#263a2d", "#3b5240", 1, 7))
 	cycle_action.pressed.connect(_on_cycle_action)
 	column.add_child(cycle_action)
-	cycle_hint = create_label("", 12, Color("#8fA48c"))
-	column.add_child(cycle_hint)
 
 func _on_cycle_action() -> void:
 	if cycle_action.disabled:
@@ -298,8 +295,6 @@ func update_cycle() -> void:
 	cycle_heading.text = "PRIMEROS PASOS" if tutorial else "DEFENSA DE LA BASE"
 	cycle_badge.text = "%02d / 07" % mini(cycle.tutorial_step + 1, 7) if tutorial else "DÍA %d" % cycle.day
 	cycle_steps.visible = tutorial
-	cycle_hint.text = "Solo la acción de este paso está habilitada.\nESC abre el menú de pausa." if tutorial else ""
-	cycle_hint.visible = tutorial
 	for index in range(cycle_steps.get_child_count()):
 		cycle_steps.get_child(index).color = Color("#8db574") if index < cycle.tutorial_step else (Color("#e1b879") if index == cycle.tutorial_step else Color("#354b3a"))
 	if tutorial:
