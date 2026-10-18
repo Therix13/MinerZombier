@@ -1,207 +1,95 @@
-extends SceneTree
+extends "res://tests/building_controls.gd"
 
 const IntroScript = preload("res://Scripts/intro_cinematic.gd")
-var passed: int = 0
-var failed: int = 0
-var game: Node2D
-var intro: CanvasLayer
-var scene_name: String = "main.tscn"
-var capture: bool = false
 
 func _initialize() -> void:
+	Engine.remove_meta(IntroScript.SESSION_KEY)
 	call_deferred("run_checks")
-
-func check(condition: bool, description: String) -> void:
-	if condition:
-		passed += 1
-		print("PASS: ", description)
-	else:
-		failed += 1
-		print("FAIL: ", description)
-
-func settle() -> void:
-	await process_frame
-	await process_frame
-	if DisplayServer.get_name() != "headless":
-		await RenderingServer.frame_post_draw
-
-func load_game() -> void:
-	game = load("res://" + scene_name).instantiate()
-	root.add_child(game)
-	current_scene = game
-	await settle()
-	intro = game.get_node_or_null("IntroCinematic")
-
-func go_to(value: float, filename: String = "") -> void:
-	intro.elapsed = value
-	intro.present_frame()
-	await settle()
-	if capture and not filename.is_empty() and DisplayServer.get_name() != "headless":
-		var folder: String = OS.get_environment("INTRO_CAPTURE_DIR")
-		if folder.is_empty():
-			folder = OS.get_user_data_dir()
-		DirAccess.make_dir_recursive_absolute(folder)
-		root.get_texture().get_image().save_png(folder.path_join(filename + ".png"))
-		print("CAPTURE: ", folder.path_join(filename + ".png"))
-
-func send_key(code: Key) -> void:
-	for down: bool in [true, false]:
-		var event := InputEventKey.new()
-		event.keycode = code
-		event.physical_keycode = code
-		event.pressed = down
-		Input.parse_input_event(event)
-		await settle()
-
-func click_skip() -> void:
-	var button: Button = intro.skip_button
-	var point: Vector2 = root.get_screen_transform() * (button.get_global_transform_with_canvas() * (button.size * 0.5))
-	if DisplayServer.get_name() != "headless":
-		Input.warp_mouse(point)
-	var motion := InputEventMouseMotion.new()
-	motion.position = point
-	Input.parse_input_event(motion)
-	await settle()
-	for down: bool in [true, false]:
-		var event := InputEventMouseButton.new()
-		event.button_index = MOUSE_BUTTON_LEFT
-		event.position = point
-		event.global_position = point
-		event.pressed = down
-		Input.parse_input_event(event)
-		await settle()
-
-func skip_is_drawn() -> bool:
-	var picture: Image = root.get_texture().get_image()
-	var button: Button = intro.skip_button
-	var rect: Rect2 = button.get_global_transform_with_canvas() * Rect2(Vector2.ZERO, button.size)
-	var lit_pixels: int = 0
-	for y in range(ceili(rect.position.y), floori(rect.end.y)):
-		for x in range(ceili(rect.position.x), floori(rect.end.x)):
-			if picture.get_pixel(x, y).get_luminance() > 0.1:
-				lit_pixels += 1
-	return lit_pixels > 20
-
-func pristine() -> bool:
-	return game.economy.coins == 500 and game.progression.total_experience == 0 and game.cycle.day == 1 and game.cycle.tutorial_step == 0 and game.grid.owned_tiles.size() == 9 and game.launchers.launchers.is_empty() and get_nodes_in_group("zombies").is_empty()
 
 func run_checks() -> void:
 	root.show()
-	root.size = Vector2i(1280, 720)
+	root.size = Vector2i(1280,720)
 	var args: PackedStringArray = OS.get_cmdline_user_args()
-	if not args.is_empty():
-		scene_name = args[0]
-	capture = "--capture" in args
-	await load_game()
-	check(intro != null and paused and not game.ui_layer.visible, "Introduction starts automatically and hides and pauses gameplay")
-	if intro == null:
-		quit(1)
-		return
-	intro.set_process(false)
-	game.display_settings.resolution = Vector2i(1280, 720)
-	game.display_settings.apply_display(false)
+	var scene: String = args[0] if not args.is_empty() else "main.tscn"
+	game = load("res://"+scene).instantiate()
+	root.add_child(game)
+	current_scene = game
 	await settle()
-	check(intro.layer < game.display_settings.layer, "Pause and display settings remain above the introduction")
-	check(Engine.has_meta(IntroScript.SESSION_KEY), "A session marks its introduction as seen")
-	check(pristine(), "Cinematic armies and buildings never enter the playable game state")
-	check(intro.film.renderer.get_script() == preload("res://Scripts/world_renderer.gd") and intro.film.zone.get_script() == preload("res://Scripts/defense_zone.gd"), "The film reuses the actual gameplay renderer and battlefield")
-	check(intro.film.actors.size() == 80 and intro.film.actors[0].get_script().get_base_script() == preload("res://Scripts/zombie.gd"), "The horde uses the same zombie models as gameplay without registering combat targets")
-	await go_to(2.0, "intro-title")
-	check(intro.title.text == "Día 0: El Comienzo De Todo" and intro.title.visible and intro.title.modulate.a == 1.0, "Opening card has the requested white title on black")
-	await go_to(5.6, "intro-base")
-	check(intro.film.drills.drills.size() == 5 and intro.film.compactors.machines.size() == 2 and intro.film.launchers.launchers.size() == 6, "The opening reveal shows an advanced mine built from playable machines and defenses")
-	await go_to(9.0, "intro-battle")
-	check(not intro.title.visible and intro.fade.color.a == 0.0, "Opening card transitions into the battle")
-	var visible_enemies: int = 0
-	for actor in intro.film.actors:
-		if Rect2(0, 64, 1280, 574).has_point(intro.film.world.transform * actor.position): visible_enemies += 1
-	check(visible_enemies >= 30, "The battle camera keeps the approaching horde inside the cinematic frame")
+	await settle()
+	var intro: CanvasLayer = game.get_node("IntroCinematic")
+	intro.set_process(false)
+	check(paused and not game.get_node("CanvasLayer").visible,"Opening cinematic pauses simulation and hides the HUD")
+	check(Engine.has_meta(IntroScript.SESSION_KEY),"Opening is marked seen for this session")
+	check(game.economy.coins == 500 and game.progression.total_experience == 0 and game.grid.owned_tiles.size() == 9,"Opening grants no money, resources or buildings")
+	check(intro.film.renderer.get_script() == preload("res://Scripts/world_renderer.gd") and intro.film.renderer.grid == game.grid,"Film renders the real current mine with the gameplay artwork")
+	intro.elapsed = 4
+	intro.present_frame()
+	var barrier: Node2D = intro.film.barrier
+	var restrained := true
+	for actor: Node2D in barrier.actors:
+		restrained = restrained and actor.position.y < barrier.FENCE_Y and not actor.is_in_group("zombies")
+	check(restrained and barrier.destruction == 0 and get_nodes_in_group("zombies").is_empty(),"Zombies wait behind an intact fence without becoming active combat targets")
+	check("cerca" in intro.title.text,"Opening explains why the zombies cannot enter")
 	if DisplayServer.get_name() != "headless":
-		var picture: Image = root.get_texture().get_image()
-		check(picture.get_pixel(10, 600).get_luminance() > 0.05 and picture.get_pixel(1270, 600).get_luminance() > 0.05 and picture.get_pixel(10, 650).get_luminance() < 0.01, "Mine tiles cover wide-shot edges while letterbox bars remain black")
-	await send_key(KEY_P)
-	await send_key(KEY_R)
-	check(pristine() and not game.shop.shop_open and not game.camera_controller.defense_view, "Game hotkeys cannot mutate the paused tutorial during the film")
-	await send_key(KEY_ESCAPE)
-	check(game.display_settings.menu_open and paused, "Escape opens the real pause menu during the film")
-	intro._process(2.0)
-	check(intro.elapsed == 9.0, "Movie timeline freezes while pause or settings is open")
-	game.display_settings.open_settings()
-	check(game.display_settings.settings_page.visible, "Display settings are accessible without dismissing the introduction")
-	await send_key(KEY_ESCAPE)
-	await send_key(KEY_ESCAPE)
-	check(not game.display_settings.menu_open and paused, "Closing pause returns to the movie while gameplay stays paused")
-	intro._process(0.1)
-	check(is_equal_approx(intro.elapsed, 9.1), "Movie continues after closing pause")
-	await go_to(21.1, "intro-collapse")
+		await settle()
+		root.get_texture().get_image().save_png("/workspace/.onboarding/display-test/fence-opening.png")
+	var display: CanvasLayer
+	for child in game.get_children():
+		if child.has_method("toggle_pause_menu"): display = child
+	await key(KEY_ESCAPE)
+	check(display.menu_open and paused,"Escape keeps real pause and settings accessible during the film")
+	var time: float = intro.elapsed
+	intro._process(2)
+	check(intro.elapsed == time,"Pause menu stops the cinematic timeline")
+	await key(KEY_ESCAPE)
+	check(not display.menu_open and paused,"Closing pause returns to the cinematic without starting gameplay")
+	await click_control(intro.skip_button)
+	await settle()
+	check(not paused and game.cycle.is_tutorial_active() and game.get_node("CanvasLayer").visible,"Skipping the opening starts the protected tutorial")
+	check(game.has_node("TutorialBarrier") and not game.cycle.barrier_broken,"The real-world fence remains during the tutorial")
+	mover = game.get_node("WorldInteractions")
+	shop = game.shop
+	compactors = game.get_node("Compactors")
+	# Prepare readiness without using money or changing combat state.
+	game.grid.expand()
+	game.grid.purchase_defense_platforms()
+	var launcher: Vector2i = game.grid.defense_cell("left")
+	game.launchers.place(launcher)
+	for index in range(4): game.launchers.receive(launcher,"coal")
+	game.cycle.tutorial_step = game.cycle.TUTORIAL_LAST_STEP
+	game.cycle.changed.emit()
+	await settle()
+	check(game.has_node("BarrierBreach") and paused and not game.cycle.is_night,"Tutorial completion starts the second scene automatically")
+	var breach: CanvasLayer = game.get_node("BarrierBreach")
+	breach.set_process(false)
+	check(breach.film.renderer.launchers == game.launchers,"The collapse shows the actual player's defenses")
+	check(not game.cycle.start_night(),"Combat cannot start before the collapse scene finishes")
+	breach.elapsed = 4
+	breach.present_frame()
+	check(breach.film.barrier.destruction > 0 and breach.film.barrier.destruction < 1,"The fence breaks progressively with moving boards")
 	if DisplayServer.get_name() != "headless":
-		check(skip_is_drawn(), "Skip text remains visibly drawn after returning from pause and settings")
-	await go_to(24.4, "intro-overrun")
-	check(is_instance_valid(intro.film.hits[0]), "Damage effects remain valid when scrubbing or pausing the movie")
-	check(intro.film.zombie_position(0).y >= 160.0, "The horde visibly overruns the defenses and reaches the mine before the fall")
-	await go_to(26.6, "intro-ruins")
-	check(intro.film.abandoned and not intro.film.daylight, "The defeated mine becomes an abandoned ruin")
-	await go_to(30.7, "intro-three-years")
-	check(intro.title.visible and intro.title.text == "3 años después", "Time jump displays three years later")
-	await go_to(38.3, "intro-arrival")
-	check(intro.film.abandoned and intro.film.daylight, "The returning miner walks through the overgrown remains of the same mine")
-	var display: CanvasLayer = game.display_settings
-	display.resolution = Vector2i(2560, 1440)
-	display.apply_display(false)
-	await settle()
-	check(intro.screen.size == Vector2(2560, 1440) and intro.frame.scale.is_equal_approx(Vector2(2, 2)), "Film and skip control scale correctly at QHD")
-	await go_to(38.3, "intro-arrival-qhd")
-	check(pristine(), "Completing the story does not grant coins, EXP, defenses, or enemies")
-	intro._process(IntroScript.DURATION)
-	await settle()
-	check(not paused and game.ui_layer.visible and not game.has_node("IntroCinematic"), "Natural completion removes the film and resumes the tutorial")
-	check(game.cycle.is_tutorial_active() and game.cycle.tutorial_step == 0, "The first guided tutorial step is ready after the arrival")
-	check(not game.shop.shop_button.disabled and not game.shop.cycle_action.visible and game.get_node("TutorialGuide").pointer.target == game.shop.shop_button, "The tutorial points to the real shop menu after the introduction")
-	game.restart_game()
-	await scene_changed
-	await settle()
-	game = current_scene
-	check(not paused and not game.has_node("IntroCinematic"), "Restarting a game in the same session does not replay the film")
-	# A fresh process/session still offers the introduction, including its skip button.
-	game.free()
-	Engine.remove_meta(IntroScript.SESSION_KEY)
-	await load_game()
-	intro.set_process(false)
-	await go_to(6.0)
-	var old_intro: WeakRef = weakref(intro)
-	await click_skip()
-	check(old_intro.get_ref() == null and not paused and game.ui_layer.visible, "The real skip button immediately releases the film and its pause")
-	check(pristine() and game.cycle.is_tutorial_active(), "Skipping starts the same untouched tutorial")
-	# F10 should also reach DEV directly from the opening cinematic.
-	game.free()
-	Engine.remove_meta(IntroScript.SESSION_KEY)
-	await load_game()
-	intro.set_process(false)
-	await send_key(KEY_F10)
-	check(game.economy.developer_mode and game.cycle.tutorial_skipped and not paused and not game.has_node("IntroCinematic") and game.ui_layer.visible, "F10 skips the opening cinematic and tutorial directly into DEV")
-	# Scene removal from external code must release an introduction-owned pause.
-	game.free()
-	Engine.remove_meta(IntroScript.SESSION_KEY)
-	await load_game()
-	intro.set_process(false)
-	await send_key(KEY_ESCAPE)
-	intro.queue_free()
-	await settle()
-	check(paused and game.display_settings.menu_open, "Removing the film preserves an open pause menu")
-	game.display_settings.close_menu()
-	check(not paused and game.ui_layer.visible, "Closing that menu no longer leaves the tutorial permanently paused")
-	game.free()
-	await settle()
-	if "--realtime" in args:
-		Engine.remove_meta(IntroScript.SESSION_KEY)
-		await load_game()
-		var start: int = Time.get_ticks_msec()
-		await intro.finished
 		await settle()
-		var duration: float = float(Time.get_ticks_msec() - start) / 1000.0
-		check(duration > 40.0 and duration < 50.0 and not paused, "The full introduction plays and finishes in real time without timeline jumps")
-		check(pristine() and game.cycle.is_tutorial_active(), "Real-time playback hands control to a clean tutorial")
-		game.free()
-		await settle()
-	print("RESULT: ", passed, " passed, ", failed, " failed")
-	quit(0 if failed == 0 else 1)
+		root.get_texture().get_image().save_png("/workspace/.onboarding/display-test/fence-collapse.png")
+	breach.elapsed = breach.runtime_duration()
+	breach.present_frame()
+	check(breach.film.barrier.destruction == 1,"The fence is destroyed before the first night")
+	breach._process(0)
+	await settle()
+	check(not paused and game.cycle.is_night and game.cycle.barrier_broken and game.zombie_manager.active_wave,"Ending the collapse starts the first actual horde exactly once")
+	check(game.zombie_manager.spawn_count == 1 and game.cycle.day == 1,"The cinematic itself never spawned or consumed real enemies")
+	check(game.shop.get_node("CyclePanel").visible and game.get_node("CanvasLayer").visible,"Combat restores both HUD and defense card")
+	game.free()
+	await settle()
+	Engine.remove_meta(IntroScript.SESSION_KEY)
+	game = load("res://"+scene).instantiate()
+	root.add_child(game)
+	current_scene = game
+	await settle()
+	await settle()
+	await key(KEY_F10)
+	check(game.economy.developer_mode and game.cycle.tutorial_skipped and game.cycle.barrier_broken and not paused,"F10 during the opening skips the film and the full tutorial")
+	check(not game.has_node("BarrierBreach") and not game.cycle.is_night and game.economy.coins == 500,"DEV skip triggers neither the collapse nor a premature night or rewards")
+	game.free()
+	await settle()
+	print("RESULT: ",passed," passed; ",failed," failed; fence story; ",scene)
+	quit(1 if failed else 0)

@@ -62,7 +62,7 @@ func run() -> void:
 	var intro: Node = load("res://Scripts/intro_cinematic.gd").new()
 	game.add_child(intro)
 	intro.set_process(false)
-	intro.elapsed = 12.0
+	intro.elapsed = 4.0
 	intro.present_frame()
 	await measure("cinematic", intro.film)
 	intro.finish()

@@ -133,8 +133,11 @@ func check_locked_actions() -> void:
 	check(not game.get("progression").has_research("drill"), "Research cannot bypass the tutorial")
 
 func extract_one() -> void:
-	for index in range(5):
-		await click_cell(cycle.TUTORIAL_COAL_CELL)
+	for attempt in range(30):
+		for index in range(5): await click_cell(cycle.TUTORIAL_COAL_CELL)
+		if cycle.tutorial_step != 6 or game.mining.nugget_type(cycle.TUTORIAL_ORE_CELL) == "coal": return
+		var parking: Array[Vector2i] = game.get_node("TutorialGuide").targets()
+		await drag_cell(parking[0],parking[1])
 
 func earn_purchase_money() -> void:
 	check(cycle.needs_tutorial_income() and cycle.allows_action("mine_coal") and cycle.allows_action("sell_coal") and shop.shop_button.disabled, "Insufficient funds unlock mining and selling without skipping the purchase")
@@ -245,7 +248,13 @@ func run_checks() -> void:
 	check(cycle.fusion_sold and cycle.tutorial_step == 3 and game.economy.coins == 440 and cycle.needs_tutorial_income(), "Selling the fused nugget pays only its sale price and opens the income task")
 	await earn_purchase_money()
 	await purchase_route("EXPANSION", "expansion")
-	check(cycle.tutorial_step == 4 and grid.cave_width == 7 and game.economy.coins == 0, "Expansion costs its full price from earned money")
+	check(cycle.tutorial_step == 3 and cycle.vein_lesson_active() and grid.cave_width == 7 and game.economy.coins == 0, "Expansion opens the vein-fusion lesson without granting coins")
+	await earn_purchase_money()
+	await purchase_route("VETAS","coal")
+	await click_cell(cycle.TUTORIAL_NEW_VEIN_CELL)
+	check(game.mining.coal_veins.size() == 2 and game.economy.coins == 0 and cycle.tutorial_display_step() == 5,"The second vein is paid for and marked as the fifth lesson")
+	await drag_cell(cycle.TUTORIAL_NEW_VEIN_CELL,cycle.TUTORIAL_COAL_CELL)
+	check(cycle.vein_fusion_taught and cycle.tutorial_step == 4 and game.mining.vein_level(cycle.TUTORIAL_COAL_CELL) == 2 and game.mining.coal_veins.size() == 1,"A real drag fuses the two veins before defense preparation")
 	await earn_purchase_money()
 	await purchase_route("DEFENSA", "defense_platforms")
 	check(cycle.tutorial_step == 5 and grid.defense_tiles.size() == 2 and game.economy.coins == 35 and cycle.level3_sold, "Platforms are bought with mined sales")
@@ -272,8 +281,16 @@ func run_checks() -> void:
 	var total_exp: int = game.get("progression").total_experience
 	await click_cell(cycle.TUTORIAL_COAL_CELL)
 	check(game.get("progression").total_experience == total_exp and game.get("mining").coal_veins[cycle.TUTORIAL_COAL_CELL]["progress"] == 0, "Final tutorial step permits only starting the night")
-	await action_button()
-	check(cycle.is_night and not cycle.is_tutorial_active(), "Card starts the first wave only after every tutorial step")
+	check(game.has_node("BarrierBreach") and paused and not cycle.is_night,"Completing the tutorial automatically starts the fence-collapse scene before combat")
+	var breach: CanvasLayer = game.get_node("BarrierBreach")
+	breach.set_process(false)
+	check(not cycle.start_night(),"The first night cannot bypass the fence collapse")
+	breach.elapsed = breach.runtime_duration()
+	breach.present_frame()
+	check(breach.film.barrier.destruction == 1.0,"The fence is visibly destroyed at the end of the second scene")
+	breach.finish()
+	await settle()
+	check(cycle.is_night and cycle.barrier_broken and not paused and not cycle.is_tutorial_active(),"The collapse ends directly in the first active wave")
 	var night_cash: int = game.economy.coins
 	var manager: Node = game.get("zombie_manager")
 	manager.set_process(false)

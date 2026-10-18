@@ -28,6 +28,11 @@ func _ready() -> void:
 	pointer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	cycle.changed.connect(on_step_changed)
 	get_viewport().size_changed.connect(focus_objective)
+	var barrier := preload("res://Scripts/tutorial_barrier.gd").new()
+	barrier.name = "TutorialBarrier"
+	barrier.live_game = game
+	barrier.grid = cycle.grid
+	game.add_child(barrier)
 	on_step_changed()
 
 func on_step_changed() -> void:
@@ -214,6 +219,11 @@ func _input(event: InputEvent) -> void:
 		game.set("placement_direction", 1)
 
 func targets() -> Array[Vector2i]:
+	if cycle.vein_lesson_active() and not cycle.needs_tutorial_income():
+		if cycle.mining.coal_veins.has(cycle.TUTORIAL_NEW_VEIN_CELL): return [cycle.TUTORIAL_NEW_VEIN_CELL,cycle.TUTORIAL_COAL_CELL]
+		var cells: Array[Vector2i] = []
+		if game.get("placing_coal"): cells.append(cycle.TUTORIAL_NEW_VEIN_CELL)
+		return cells
 	var result: Array[Vector2i] = []
 	if cycle.advanced_income(): return cycle.income_targets()
 	if cycle.tutorial_step == 2 or cycle.needs_tutorial_income():
@@ -246,13 +256,13 @@ func _draw() -> void:
 	for index in range(cells.size()):
 		var rect: Rect2 = cycle.grid.get_cell_rect(cells[index]).grow(-1.5)
 		var color := Color("#f0c777")
-		if cells.size() == 2 and index == 0 and (not lesson or (cycle.tutorial_step in [1, 2, 6] or cycle.needs_tutorial_income())):
+		if cells.size() == 2 and index == 0 and (not lesson or (cycle.tutorial_step in [1, 2, 6] or cycle.needs_tutorial_income() or cycle.vein_lesson_active())):
 			color = Color("#b6d98e")
 		draw_rect(rect, Color(color, 0.12))
 		draw_rect(rect, Color(color, glow), false, 2.0)
-	if cells.size() == 1 and cycle.mining.vein_at(cells[0]) != "" and (not lesson or (cycle.tutorial_step in [1, 2, 6] or cycle.needs_tutorial_income())):
+	if cells.size() == 1 and cycle.mining.vein_at(cells[0]) != "" and (not lesson or (cycle.tutorial_step in [1, 2, 6] or cycle.needs_tutorial_income() or cycle.vein_lesson_active())):
 		draw_mining_click(cells[0])
-	if cells.size() == 2 and (not lesson or (cycle.tutorial_step in [1, 2, 6] or cycle.needs_tutorial_income())):
+	if cells.size() == 2 and (not lesson or (cycle.tutorial_step in [1, 2, 6] or cycle.needs_tutorial_income() or cycle.vein_lesson_active())):
 		var source: Vector2 = cycle.grid.get_cell_rect(cells[0]).get_center()
 		var destination: Vector2 = cycle.grid.get_cell_rect(cells[1]).get_center()
 		var direction: Vector2 = (destination - source).normalized()

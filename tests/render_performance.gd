@@ -88,11 +88,11 @@ func run_checks() -> void:
 	var intro: Node = load("res://Scripts/intro_cinematic.gd").new()
 	game.add_child(intro)
 	intro.set_process(false)
-	intro.elapsed = 12.0
+	intro.elapsed = 4.0
 	intro.present_frame()
 	await settle()
 	check(not renderer.visible and not furnace.visible and not rhythm.visible, "The cinematic excludes the covered game from rendering")
-	check(intro.film.actors.size() == 80, "Optimization preserves all eighty cinematic enemies")
+	check(intro.film.barrier.actors.size() == intro.film.barrier.HORDE_SIZE, "The fence film retains its complete decorative horde")
 	if DisplayServer.get_name() != "headless":
 		var calls: float = Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
 		check(calls < 350, "The full cinematic stays below 350 draw calls (%d)" % calls)

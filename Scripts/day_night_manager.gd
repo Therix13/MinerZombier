@@ -5,6 +5,7 @@ signal changed
 const NIGHT_REWARD: int = 0
 const TUTORIAL_EXPANSION_BONUS: int = 0
 const TUTORIAL_COAL_CELL := Vector2i(14, 0)
+const TUTORIAL_NEW_VEIN_CELL := Vector2i(14, 1)
 const TUTORIAL_ORE_CELL := Vector2i(15, 0)
 const TUTORIAL_FUSION_CELL := Vector2i(15, 1)
 const TUTORIAL_SALES_TARGET: int = 5
@@ -24,12 +25,15 @@ const TUTORIAL_TITLES := [
 	"Carga la munición", "¡Todo listo!",
 ]
 const TUTORIAL_LAST_STEP: int = 7
+const TUTORIAL_DISPLAY_STEPS: int = 8
 
 var day: int = 1
 var is_night: bool = false
 var defeated: bool = false
 var tutorial_step: int = 0
 var fusion_taught: bool = false
+var vein_fusion_taught: bool = false
+var barrier_broken: bool = false
 var fusion_sold: bool = false
 var level3_sold: bool = false
 var level4_sold: bool = false
@@ -53,6 +57,7 @@ func setup(grid_manager: RefCounted, mining_manager: RefCounted, conveyor_manage
 	economy = economy_manager
 	mining.changed.connect(refresh_tutorial)
 	mining.fusion_completed.connect(_on_fusion)
+	mining.vein_fused.connect(_on_vein_fused)
 	mining.sale_completed.connect(_on_sale)
 	conveyors.sale_completed.connect(_on_sale)
 	conveyors.changed.connect(refresh_tutorial)
@@ -72,6 +77,7 @@ func dispose() -> void:
 	if mining != null:
 		mining.changed.disconnect(refresh_tutorial)
 		mining.fusion_completed.disconnect(_on_fusion)
+		mining.vein_fused.disconnect(_on_vein_fused)
 		mining.sale_completed.disconnect(_on_sale)
 	if conveyors != null:
 		conveyors.changed.disconnect(refresh_tutorial)
@@ -83,6 +89,14 @@ func dispose() -> void:
 	conveyors = null
 	launchers = null
 	economy = null
+
+func vein_lesson_active() -> bool:
+	return is_tutorial_active() and tutorial_step == 3 and grid.cave_width >= 7 and not vein_fusion_taught
+
+func _on_vein_fused(cell: Vector2i) -> void:
+	if vein_lesson_active() and cell == TUTORIAL_COAL_CELL and mining.vein_level(cell) >= 2:
+		vein_fusion_taught = true
+		refresh_tutorial()
 
 func _on_fusion(kind: String) -> void:
 	if is_tutorial_active() and tutorial_step == 2 and kind == "coal_2":
@@ -109,6 +123,7 @@ func is_research_tutorial_active() -> bool:
 func skip_tutorial() -> void:
 	if tutorial_skipped: return
 	tutorial_skipped = true
+	barrier_broken = true
 	tutorial_step = TUTORIAL_LAST_STEP
 	research_tutorial_pending = false
 	changed.emit()
@@ -122,6 +137,7 @@ func _on_research_unlocked(_research_id: String) -> void:
 		changed.emit()
 
 func tutorial_purchase_price() -> int:
+	if vein_lesson_active(): return 0 if mining.coal_veins.has(TUTORIAL_NEW_VEIN_CELL) else economy.COAL_VEIN_PRICE
 	match tutorial_step:
 		3: return economy.EXPANSION_PRICE
 		4: return economy.DEFENSE_TILE_PRICE
@@ -161,11 +177,17 @@ func allows_action(action: String) -> bool:
 		return action == "research"
 	if not is_tutorial_active():
 		return true
+	if vein_lesson_active() and not needs_tutorial_income():
+		return action in ["buy_coal", "place_coal", "fuse_veins"]
 	if needs_tutorial_income():
 		return action in ["mine_coal", "sell_coal", "fuse", "sell_fused"]
 	return action in TUTORIAL_ACTIONS[clampi(tutorial_step, 0, TUTORIAL_LAST_STEP)]
 
+func tutorial_display_step() -> int:
+	return mini(TUTORIAL_DISPLAY_STEPS,tutorial_step + 1 + (1 if tutorial_step > 3 or vein_lesson_active() else 0))
+
 func tutorial_title() -> String:
+	if vein_lesson_active(): return "Fusiona tus vetas"
 	return TUTORIAL_TITLES[clampi(tutorial_step, 0, TUTORIAL_LAST_STEP)]
 
 func allows_world_press(cell: Vector2i, placing: String = "") -> bool:
@@ -174,13 +196,15 @@ func allows_world_press(cell: Vector2i, placing: String = "") -> bool:
 	if not is_tutorial_active():
 		return true
 	if placing == "coal":
-		return allows_action("place_coal") and cell == TUTORIAL_COAL_CELL
+		return allows_action("place_coal") and cell == (TUTORIAL_NEW_VEIN_CELL if vein_lesson_active() else TUTORIAL_COAL_CELL)
 	if placing == "belt":
 		return false
 	if placing == "launcher":
 		return allows_action("place_launcher") and cell == grid.defense_cell("left")
 	if not placing.is_empty():
 		return false
+	if vein_lesson_active() and not needs_tutorial_income():
+		return cell in [TUTORIAL_COAL_CELL,TUTORIAL_NEW_VEIN_CELL]
 	if advanced_income():
 		var kind: String = mining.nugget_type(cell)
 		return (cell == TUTORIAL_COAL_CELL and mining.nuggets_at(TUTORIAL_ORE_CELL) == 0) or (grid.is_valid_cell(cell) and grid.owned_tiles.has(cell) and kind in ["coal", "coal_2", "coal_3", "coal_4"] and mining.ore_level(kind) <= income_level())
@@ -197,6 +221,8 @@ func allows_interaction(kind: String, source: Vector2i, destination: Vector2i, d
 		if destination == grid.sale_cell: return material == "coal_" + str(income_level())
 		return grid.is_valid_cell(destination) and grid.owned_tiles.has(destination) and (mining.can_move_nugget(destination) or (mining.ore_level(material) < income_level() and mining.can_fuse(source, destination)))
 	if kind == "vein":
+		if vein_lesson_active() and not needs_tutorial_income():
+			return dragged and source == TUTORIAL_NEW_VEIN_CELL and destination == TUTORIAL_COAL_CELL and mining.can_fuse_veins(source,destination)
 		return allows_action("mine_coal") and source == TUTORIAL_COAL_CELL and source == destination and not dragged
 	if kind == "nugget" and source == TUTORIAL_FUSION_CELL and dragged:
 		return allows_action("sell_fused") and mining.nugget_type(source) == "coal_2" and destination == grid.sale_cell
@@ -232,7 +258,7 @@ func refresh_tutorial() -> void:
 			1:
 				completed = coal_sold >= TUTORIAL_SALES_TARGET
 			2: completed = fusion_sold
-			3: completed = grid.cave_width >= 7 and grid.cave_height >= 5
+			3: completed = grid.cave_width >= 7 and grid.cave_height >= 5 and vein_fusion_taught
 			4: completed = level3_sold and grid.defense_tiles.size() >= 2
 			5: completed = level4_sold and not launchers.launchers.is_empty()
 			6: completed = ammo_damage() >= 2.0
@@ -243,6 +269,9 @@ func refresh_tutorial() -> void:
 		changed.emit()
 
 func tutorial_text() -> String:
+	if vein_lesson_active() and not needs_tutorial_income():
+		if mining.coal_veins.has(TUTORIAL_NEW_VEIN_CELL): return "Arrastra la segunda veta sobre la primera: 2 vetas del mismo material y nivel crean una superior. Puedes llegar hasta Nv. 4."
+		return "Compra otra veta de carbón y colócala en la casilla dorada para fusionar las minas."
 	if needs_tutorial_income():
 		var missing: int = tutorial_purchase_price() - economy.coins
 		if advanced_income():
@@ -280,7 +309,7 @@ func can_start_night() -> bool:
 	return not is_night and not defeated and not is_research_tutorial_active() and not launchers.launchers.is_empty() and has_ammo() and (day > 1 or tutorial_step >= TUTORIAL_LAST_STEP)
 
 func start_night() -> bool:
-	if not can_start_night():
+	if not can_start_night() or (is_tutorial_active() and not barrier_broken):
 		return false
 	is_night = true
 	changed.emit()

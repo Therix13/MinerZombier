@@ -55,6 +55,7 @@ const RESEARCH_VIEW := {
 var economy: RefCounted
 var grid: RefCounted
 var shop_open: bool = false
+var breach_queued: bool = false
 var shop_animating: bool = false
 var tween: Tween
 var money_box: PanelContainer
@@ -177,6 +178,27 @@ func set_cycle(game_cycle: RefCounted) -> void:
 	update_cycle()
 	ensure_tutorial_guide.call_deferred()
 	ensure_intro.call_deferred()
+
+func queue_first_night() -> void:
+	if breach_queued or cycle == null or not cycle.is_tutorial_active() or cycle.tutorial_step != cycle.TUTORIAL_LAST_STEP or not cycle.can_start_night(): return
+	breach_queued = true
+	show_breach.call_deferred()
+
+func show_breach() -> void:
+	if not cycle.is_tutorial_active() or not cycle.can_start_night():
+		breach_queued = false
+		return
+	var game: Node = get_parent().get_parent()
+	close_shop()
+	game.get_node("WorldInteractions").cancel_active()
+	var film := IntroCinematicScript.new()
+	film.breach = true
+	film.name = "BarrierBreach"
+	film.finished.connect(func():
+		cycle.barrier_broken = true
+		night_requested.emit()
+	)
+	game.add_child(film)
 
 func ensure_intro() -> void:
 	# Install from the shop so older scenes with a built-in main script work too.
@@ -551,7 +573,7 @@ func build_cycle_panel() -> void:
 	cycle_steps = HBoxContainer.new()
 	cycle_steps.add_theme_constant_override("separation", 5)
 	column.add_child(cycle_steps)
-	for index in range(cycle.TUTORIAL_LAST_STEP):
+	for index in range(cycle.TUTORIAL_DISPLAY_STEPS):
 		var segment := ColorRect.new()
 		segment.custom_minimum_size.y = 3
 		segment.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -583,7 +605,7 @@ func _on_cycle_action() -> void:
 		restart_requested.emit()
 	elif cycle.is_tutorial_active():
 		if cycle.tutorial_step == cycle.TUTORIAL_LAST_STEP:
-			night_requested.emit()
+			queue_first_night()
 		update_cycle()
 	elif cycle.can_start_night() and not shop_open and not shop_animating:
 		night_requested.emit()
@@ -593,12 +615,12 @@ func update_cycle() -> void:
 		return
 	var tutorial: bool = cycle.is_tutorial_active()
 	cycle_heading.text = "PRIMEROS PASOS" if tutorial else "DEFENSA DE LA BASE"
-	cycle_badge.text = "%02d / %02d" % [mini(cycle.tutorial_step + 1, cycle.TUTORIAL_LAST_STEP), cycle.TUTORIAL_LAST_STEP] if tutorial else "DÍA %d" % cycle.day
+	cycle_badge.text = "%02d / %02d" % [cycle.tutorial_display_step(), cycle.TUTORIAL_DISPLAY_STEPS] if tutorial else "DÍA %d" % cycle.day
 	cycle_steps.visible = tutorial
 	cycle_goal.add_theme_color_override("default_color", Color("#bacbb7"))
 	cycle_action.show()
 	for index in range(cycle_steps.get_child_count()):
-		cycle_steps.get_child(index).color = Color("#8db574") if index < cycle.tutorial_step else (Color("#e1b879") if index == cycle.tutorial_step else Color("#354b3a"))
+		cycle_steps.get_child(index).color = Color("#8db574") if index < cycle.tutorial_display_step() - 1 else (Color("#e1b879") if index == cycle.tutorial_display_step() - 1 else Color("#354b3a"))
 	if tutorial:
 		cycle_title.text = cycle.tutorial_title()
 		cycle_goal.text = cycle.tutorial_text()
@@ -621,12 +643,17 @@ func update_cycle() -> void:
 				cycle_action.hide()
 				if cycle.needs_tutorial_income():
 					cycle_goal.text = cycle.tutorial_text()
+				elif cycle.vein_lesson_active() and cycle.mining.coal_veins.has(cycle.TUTORIAL_NEW_VEIN_CELL):
+					cycle_goal.text = cycle.tutorial_text()
+				elif game.get("placing_coal") and cycle.vein_lesson_active():
+					cycle_goal.text = "Coloca la segunda veta en la casilla dorada."
 				elif game.get("placing_launcher"):
 					cycle_goal.text = "Coloca el Lanzapepitas en la plataforma dorada."
 				else:
 					cycle_goal.text = tutorial_navigation_text()
 			7:
-				cycle_action.text = "INICIAR PRIMERA NOCHE"
+				queue_first_night()
+				cycle_action.text = "LA CERCA ESTÁ CEDIENDO…"
 				cycle_action.disabled = not cycle.can_start_night()
 	elif cycle.is_research_tutorial_active():
 		cycle_heading.text = "INVESTIGACIÓN"
@@ -669,6 +696,9 @@ func tutorial_purchase() -> Dictionary:
 			if not game.get("placing_coal"):
 				return {"category": "VETAS", "item": "coal", "instruction": "Compra la veta de carbón."}
 		3:
+			if cycle.vein_lesson_active():
+				if not game.get("placing_coal") and not cycle.mining.coal_veins.has(cycle.TUTORIAL_NEW_VEIN_CELL): return {"category": "VETAS", "item": "coal", "instruction": "Compra otra veta de carbón para fusionarlas."}
+				return {}
 			return {"category": "EXPANSION", "item": "expansion", "instruction": "Compra la ampliación a 7 × 5."}
 		4:
 			return {"category": "DEFENSA", "item": "defense_platforms", "instruction": "Compra las plataformas."}

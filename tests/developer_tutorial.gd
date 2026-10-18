@@ -29,7 +29,7 @@ func run_checks() -> void:
 	await mouse_move(point(at))
 	await mouse_button(point(at), true)
 	await mouse_button(point(at), false)
-	check(compactors.machines.has(at) and not mover.placement_active(), "An advanced machine can be selected and placed outside the marked tutorial cell from day one")
+	check(game.get_node("Construction").plans.has(at) and not mover.placement_active(), "An advanced machine can be selected and placed outside the marked tutorial cell from day one")
 	game.buy_expansion()
 	await wait_shop()
 	shop.unlock_defense_platforms()
