@@ -35,6 +35,7 @@ const ITEM_CATEGORIES := {
 	"AUTOMATIZACIÓN": ["straight", "corner_right", "corner_left", "junction"],
 }
 const RESOURCE_LABELS := {"coal": "CARBÓN · NIVEL 1", "brass": "LATÓN · NIVEL 1", "coal_2": "CARBÓN · NIVEL 2", "brass_2": "LATÓN · NIVEL 2"}
+const CATEGORY_ART := {"EXPANSION": "expansion", "VETAS": "coal", "HERRAMIENTAS": "drill", "AUTOMATIZACIÓN": "junction", "DEFENSA": "launcher", "INVESTIGACIÓN": "research", "RECURSOS": "resources"}
 const RESEARCH_VIEW := {
 	"drill": ["drill", "Taladro", "Automático"],
 	"brass": ["ore", "Latón", "Nueva veta"],
@@ -75,6 +76,7 @@ var research_status: Dictionary = {}
 var research_details: Dictionary = {}
 var item_buttons: Dictionary = {}
 var resource_buttons: Dictionary = {}
+var item_grid: GridContainer
 var category_buttons: Dictionary = {}
 var purchase_buttons: Dictionary = {}
 var fallback_display: CanvasLayer
@@ -394,18 +396,22 @@ func build_research_card(technology_id: String, data: Dictionary) -> Button:
 	var header := HBoxContainer.new()
 	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(header)
-	var icon := ResearchIcon.new()
-	icon.kind = view[0]
-	icon.custom_minimum_size = Vector2(28, 28)
+	var icon := ItemPreview.new()
+	icon.kind = {"straight_belt": "straight", "curved_belts": "corner_right", "junction_belt": "junction"}.get(technology_id, technology_id)
+	icon.custom_minimum_size = Vector2(64, 64)
+	icon.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(icon)
 	var rank := compact_research_label("", 13)
 	rank.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rank.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	header.add_child(rank)
+	rank.hide()
 	var title := compact_research_label(view[1], 14)
 	column.add_child(title)
+	title.hide()
 	var effect := compact_research_label(view[2], 11)
 	column.add_child(effect)
+	effect.hide()
 	var footer := HBoxContainer.new()
 	footer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	footer.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -452,7 +458,7 @@ func refresh_research_buttons() -> void:
 		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if available else Control.CURSOR_ARROW
 		for name in ["title", "effect", "cost", "rank"]:
 			details[name].add_theme_color_override("font_color", color)
-		details["icon"].tint = color
+		details["icon"].tint = Color.WHITE if researched or available else Color(1, 1, 1, 0.5)
 		details["icon"].queue_redraw()
 		details["state_icon"].kind = "done" if researched else ("add" if available else "lock")
 		details["state_icon"].tint = color
@@ -675,6 +681,46 @@ func create_button(value: String) -> Button:
 	button.add_theme_stylebox_override("disabled", create_style("#352719", "#59442f", 2, 8))
 	return button
 
+# Catalog tiles show the same models that are drawn on the playing field.
+func catalog_grid() -> GridContainer:
+	if item_grid == null:
+		item_grid = GridContainer.new()
+		item_grid.columns = 2
+		item_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		item_grid.add_theme_constant_override("h_separation", 8)
+		item_grid.add_theme_constant_override("v_separation", 8)
+		shop_content.add_child(item_grid)
+	return item_grid
+
+func create_art_button(kind: String, description: String, price: int = -1) -> Button:
+	var button := create_button("")
+	button.custom_minimum_size = Vector2(116, 108)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.tooltip_text = description
+	var margin := MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for side in ["left", "top", "right", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 8)
+	button.add_child(margin)
+	var column := VBoxContainer.new()
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_theme_constant_override("separation", 4)
+	margin.add_child(column)
+	var art := ItemPreview.new()
+	art.kind = kind
+	art.custom_minimum_size = Vector2(64, 64)
+	art.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(art)
+	var cost := create_label("◆ %d" % price, 16, Color("#ffdf9c"))
+	cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cost.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cost.visible = price >= 0
+	column.add_child(cost)
+	button.set_meta("price_label", cost)
+	button.set_meta("item_art", art)
+	return button
+
 func create_label(value: String, font_size: int = 17, color: Color = Color("#f0e0c8")) -> Label:
 	var label := Label.new()
 	label.text = value
@@ -764,7 +810,8 @@ func build_interface() -> void:
 	close_button.pressed.connect(close_shop)
 	header.add_child(close_button)
 	content.add_child(HSeparator.new())
-	fixed_back_button = create_button("← VOLVER")
+	fixed_back_button = create_button("←")
+	fixed_back_button.tooltip_text = "Volver"
 	fixed_back_button.pressed.connect(show_categories)
 	fixed_back_button.hide()
 	content.add_child(fixed_back_button)
@@ -830,6 +877,7 @@ func update_money(amount: int) -> void:
 			show_categories()
 
 func clear_content() -> void:
+	item_grid = null
 	item_buttons.clear()
 	resource_buttons.clear()
 	category_buttons.clear()
@@ -847,15 +895,14 @@ func show_categories() -> void:
 	fixed_back_button.hide()
 	shop_scroll.scroll_vertical = 0
 	clear_content()
-	shop_content.add_child(create_label("CATEGORIAS", 20, Color("#f3ca85")))
 	var categories: Array = CATEGORIES.duplicate()
 	if economy.developer_mode: categories.append("RECURSOS")
 	for category in categories:
-		var button := create_button(category + "  >")
+		var button := create_art_button(CATEGORY_ART[category], category.capitalize())
 		button.disabled = cycle != null and cycle.is_guided_tutorial_active() and tutorial_purchase().get("category", "") != category
 		button.pressed.connect(open_category.bind(category))
 		category_buttons[category] = button
-		shop_content.add_child(button)
+		catalog_grid().add_child(button)
 	if cycle != null: update_cycle()
 
 func open_category(category: String) -> void:
@@ -870,25 +917,23 @@ func open_category(category: String) -> void:
 		"RECURSOS":
 			var interactions: Node = get_parent().get_parent().get_node("WorldInteractions")
 			for kind: String in RESOURCE_LABELS:
-				var button := create_button(RESOURCE_LABELS[kind])
+				var button := create_art_button("ore:" + kind, RESOURCE_LABELS[kind])
 				button.pressed.connect(interactions.select_resource.bind(kind))
 				resource_buttons[kind] = button
-				shop_content.add_child(button)
+				catalog_grid().add_child(button)
 		"INVESTIGACIÓN":
 			build_research_content()
 		"EXPANSION":
-			shop_content.add_child(create_label("AMPLIACION DE LA BASE", 18, Color("#f3ca85")))
-			shop_content.add_child(create_label("Tamaño actual: %dx%d" % [grid.cave_width, grid.cave_height]))
-			var button := create_button("")
+			var button := create_art_button("expansion", "Ampliar a 7 × 5", economy.EXPANSION_PRICE)
 			if grid.cave_width >= 7:
-				button.text = "EXPANSION MAXIMA: 7x5"
+				button.get_meta("price_label").text = "✓"
+				button.tooltip_text = "Base ampliada a 7 × 5"
 				button.disabled = true
 			else:
-				button.text = "AMPLIAR A 7x5 - 500"
 				button.disabled = not economy.can_afford(economy.EXPANSION_PRICE)
 				button.pressed.connect(request_item.bind("expansion", expansion_requested))
 			purchase_buttons["expansion"] = button
-			shop_content.add_child(button)
+			catalog_grid().add_child(button)
 		"VETAS":
 			add_item_button("VETA DE CARBÓN · 100", economy.COAL_VEIN_PRICE, "coal", coal_vein_requested)
 			add_item_button("VETA DE LATÓN · 150", economy.BRASS_VEIN_PRICE, "brass", brass_vein_requested)
@@ -903,31 +948,32 @@ func open_category(category: String) -> void:
 		"DEFENSA":
 			var left_cell: Vector2i = grid.defense_cell("left")
 			var right_cell: Vector2i = grid.defense_cell("right")
-			var platforms_button := create_button("DESBLOQUEAR DEFENSAS - 100")
+			var platforms_button := create_art_button("platform", "Desbloquear plataformas de defensa", economy.DEFENSE_TILE_PRICE)
 			if grid.defense_tiles.has(left_cell) and grid.defense_tiles.has(right_cell):
-				platforms_button.text = "DEFENSAS - COMPRADAS"
+				platforms_button.get_meta("price_label").text = "✓"
+				platforms_button.tooltip_text = "Plataformas desbloqueadas"
 				platforms_button.disabled = true
 			else:
 				platforms_button.disabled = not economy.can_afford(economy.DEFENSE_TILE_PRICE)
 				platforms_button.pressed.connect(unlock_defense_platforms)
-			shop_content.add_child(platforms_button)
+			catalog_grid().add_child(platforms_button)
 			platforms_button.disabled = platforms_button.disabled or not tutorial_allows_item("defense_platforms")
 			purchase_buttons["defense_platforms"] = platforms_button
-			var launcher_button := create_button("LANZAPEPITAS - GRATIS" if cycle != null and cycle.free_launcher_available else "LANZAPEPITAS - 200")
+			var launcher_button := create_art_button("launcher", "Lanzapepitas", 0 if cycle != null and cycle.free_launcher_available else economy.LAUNCHER_PRICE)
 			launcher_button.disabled = not (cycle != null and cycle.free_launcher_available) and not economy.can_afford(economy.LAUNCHER_PRICE)
 			launcher_button.disabled = launcher_button.disabled or not tutorial_allows_item("launcher")
 			launcher_button.pressed.connect(request_item.bind("launcher", launcher_requested))
 			purchase_buttons["launcher"] = launcher_button
-			shop_content.add_child(launcher_button)
+			catalog_grid().add_child(launcher_button)
 	if cycle != null: update_cycle()
 
 func add_item_button(text: String, price: int, item: String, request: Signal) -> void:
 	if progression != null and not progression.is_item_unlocked(item): return
-	var button := create_button(text)
+	var button := create_art_button(item, text.get_slice(" · ", 0), price)
 	button.pressed.connect(request_item.bind(item, request))
-	item_buttons[item] = {"button": button, "price": price}
+	item_buttons[item] = {"button": button, "price": price, "name": text.get_slice(" · ", 0)}
 	purchase_buttons[item] = button
-	shop_content.add_child(button)
+	catalog_grid().add_child(button)
 	refresh_item_buttons()
 
 func request_item(item: String, request: Signal) -> void:
@@ -947,9 +993,9 @@ func refresh_item_buttons() -> void:
 		var button: Button = item_buttons[item]["button"]
 		var unlocked: bool = progression == null or progression.is_item_unlocked(item)
 		button.disabled = not unlocked or not economy.can_afford(item_buttons[item]["price"]) or not tutorial_allows_item(item) or (cycle != null and (cycle.is_night or cycle.defeated))
-		button.tooltip_text = ""
+		button.tooltip_text = item_buttons[item].get("name", item)
 		if not unlocked:
-			button.tooltip_text = "Investigar: %s" % progression.RESEARCHES[progression.ITEM_RESEARCH[item]]["name"]
+			button.tooltip_text += "\nInvestigar: %s" % progression.RESEARCHES[progression.ITEM_RESEARCH[item]]["name"]
 
 func unlock_defense_platforms() -> void:
 	if not tutorial_allows_item("defense_platforms") or (cycle != null and not cycle.allows_action("unlock_defense")):
@@ -1076,3 +1122,75 @@ class ResearchIcon extends Control:
 				draw_arc(Vector2(16, 13), 7, PI, TAU, 16, tint, 2.5, true)
 				draw_rect(Rect2(6, 13, 20, 15), tint, false, 2.5)
 				draw_line(Vector2(16, 18), Vector2(16, 23), tint, 2.5, true)
+
+# Isolated drawing nodes reuse the world artwork without joining its simulation.
+class ItemPreview extends Control:
+	var kind := "coal"
+	var tint := Color.WHITE:
+		set(value):
+			tint = value
+			modulate = value
+	var model: Node2D
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _ready() -> void:
+		if kind == "compactor":
+			model = CompactorArt.new()
+		else:
+			model = ItemArt.new()
+			model.kind = kind
+		add_child(model)
+		resized.connect(layout_model)
+		layout_model()
+
+	func layout_model() -> void:
+		model.position = size * 0.5
+		model.scale = Vector2.ONE * minf(size.x, size.y) / 54.0
+
+class CompactorArt extends "res://Scripts/compactor_manager.gd":
+	func _ready() -> void:
+		set_process(false)
+		set_process_input(false)
+		set_process_unhandled_input(false)
+
+	func _draw() -> void:
+		draw_machine(Vector2.ZERO, {"direction": 0, "kind": "", "count": 0})
+
+class ItemArt extends "res://Scripts/world_renderer.gd":
+	var kind := "coal"
+
+	func _init() -> void:
+		grid = preload("res://Scripts/grid_manager.gd").new()
+		mining = preload("res://Scripts/mining_manager.gd").new()
+		conveyors = preload("res://Scripts/conveyor_manager.gd").new()
+		drills = preload("res://Scripts/drill_manager.gd").new()
+		launchers = preload("res://Scripts/potato_launcher_manager.gd").new()
+
+	func _draw() -> void:
+		match kind:
+			"coal": draw_coal_vein(Vector2.ZERO, 1, 0, false)
+			"brass": draw_brass_vein(Vector2.ZERO, 1, 0, false)
+			"straight", "corner_right", "corner_left", "junction":
+				draw_conveyor(Vector2.ZERO, 0, false, kind)
+			"drill", "research":
+				draw_drill(Vector2.ZERO, 0, false)
+				if kind == "research":
+					draw_circle(Vector2(15, 15), 9, Color("#1a2b21"))
+					draw_line(Vector2(10, 15), Vector2(20, 15), Color("#ffdf9c"), 2)
+					draw_line(Vector2(15, 10), Vector2(15, 20), Color("#ffdf9c"), 2)
+			"launcher": draw_launcher(Vector2.ZERO, {"ammo": [], "angle": -PI * 0.5}, false)
+			"platform": draw_defense_platform(Rect2(-24, -24, 48, 48))
+			"resources":
+				draw_set_transform(Vector2.ZERO, 0, Vector2.ONE * 0.8)
+				draw_nugget(Vector2(-11, -5), "coal_2", 1)
+				draw_nugget(Vector2(11, 5), "brass_2", 1)
+			"expansion":
+				for y in range(5):
+					for x in range(7):
+						var owned: bool = x >= 2 and x <= 4 and y >= 1 and y <= 3
+						draw_rect(Rect2(-24 + x * 7, -17 + y * 7, 6, 6), Color("#7b946f") if owned else Color("#d1ad66"))
+			_:
+				if kind.begins_with("ore:"):
+					draw_nugget(Vector2.ZERO, kind.trim_prefix("ore:"), 1)
