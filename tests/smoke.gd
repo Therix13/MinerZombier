@@ -64,9 +64,13 @@ func run_checks() -> void:
 	conveyors.call("tick")
 	check(economy.get("coins") == 45 and mining.call("nuggets_at", Vector2i(15, 0)) == 0, "Conveyor sells coal and pays economy")
 	check(cycle.get("coal_sold") == 6, "Conveyor coal sale also updates sale count")
+	mining.items_for("coal_3")[Vector2i(16, 1)] = 1
+	mining.move_nugget(Vector2i(16, 1), grid.sale_cell)
 	grid.call("purchase_defense_platforms")
 	cycle.call("refresh_tutorial")
 	var defense_cell: Vector2i = grid.call("defense_cell", "left")
+	mining.items_for("coal_4")[Vector2i(16, 1)] = 1
+	mining.move_nugget(Vector2i(16, 1), grid.sale_cell)
 	check(launchers.call("place", defense_cell), "Place launcher on defense platform")
 	for i in range(4):
 		launchers.call("receive", defense_cell, "coal")

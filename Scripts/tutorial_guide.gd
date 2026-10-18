@@ -213,6 +213,7 @@ func _input(event: InputEvent) -> void:
 
 func targets() -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
+	if cycle.advanced_income(): return cycle.income_targets()
 	if cycle.tutorial_step == 2 or cycle.needs_tutorial_income():
 		if cycle.mining.nugget_type(cycle.TUTORIAL_FUSION_CELL) == "coal_2":
 			return [cycle.TUTORIAL_FUSION_CELL, cycle.grid.sale_cell]
@@ -223,6 +224,9 @@ func targets() -> Array[Vector2i]:
 		0:
 			if game.get("placing_coal"): result.append(cycle.TUTORIAL_COAL_CELL)
 		1, 6:
+			if cycle.tutorial_step == 6 and cycle.mining.nugget_type(cycle.TUTORIAL_ORE_CELL) in ["coal_2", "coal_3", "coal_4"]:
+				for cell: Vector2i in cycle.grid.owned_tiles:
+					if cycle.grid.is_valid_cell(cell) and cycle.mining.can_move_nugget(cell): return [cycle.TUTORIAL_ORE_CELL, cell]
 			if cycle.mining.nuggets_at(cycle.TUTORIAL_ORE_CELL) > 0:
 				return [cycle.TUTORIAL_ORE_CELL, cycle.grid.sale_cell if cycle.tutorial_step == 1 else cycle.grid.defense_cell("left")]
 			return [cycle.TUTORIAL_COAL_CELL]

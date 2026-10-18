@@ -139,13 +139,35 @@ func extract_one() -> void:
 func earn_purchase_money() -> void:
 	check(cycle.needs_tutorial_income() and cycle.allows_action("mine_coal") and cycle.allows_action("sell_coal") and shop.shop_button.disabled, "Insufficient funds unlock mining and selling without skipping the purchase")
 	var balance: int = game.economy.coins
+	var earned: int = 0
 	var count: int = 0
-	while cycle.needs_tutorial_income() and count < 200:
-		for click in range(5): game.mining.mine(cycle.TUTORIAL_COAL_CELL)
-		check(game.get_node("WorldInteractions").drop("nugget", cycle.TUTORIAL_ORE_CELL, grid.sale_cell), "A mined nugget can be sold to fund the pending purchase")
+	var requested: int = cycle.income_level()
+	var mover: Node = game.get_node("WorldInteractions")
+	if requested > 2:
+		game.economy.coins = 1000
+		check(cycle.needs_tutorial_income(), "Even excess coins cannot skip the required level-%d sale" % requested)
+		game.economy.coins = balance
+		check(not cycle.allows_action("unlock_defense" if requested == 3 else "buy_launcher"), "The requested tier must be sold before its purchase")
+		game.mining.coal_nuggets[cycle.TUTORIAL_ORE_CELL] = 1
+		check(not mover.drop("nugget", cycle.TUTORIAL_ORE_CELL, grid.sale_cell), "A lower-tier sale cannot bypass the level-%d lesson" % requested)
+		game.mining.coal_nuggets.erase(cycle.TUTORIAL_ORE_CELL)
+	while cycle.needs_tutorial_income() and count < 300:
+		if requested == 2:
+			for click in range(5): game.mining.mine(cycle.TUTORIAL_COAL_CELL)
+			check(mover.drop("nugget", cycle.TUTORIAL_ORE_CELL, grid.sale_cell), "A mined nugget funds the expansion")
+			earned += game.economy.sale_value("coal")
+		else:
+			var targets: Array[Vector2i] = cycle.income_targets()
+			if targets.size() == 1:
+				for click in range(5): game.mining.mine(targets[0])
+			else:
+				if targets[1] == grid.sale_cell:
+					check(game.mining.nugget_type(targets[0]) == "coal_" + str(requested), "The guide requests the correct tier for sale")
+					earned += game.economy.sale_value("coal_" + str(requested))
+				check(mover.drop("nugget", targets[0], targets[1]), "The highlighted level-%d fusion route is playable" % requested)
 		count += 1
 	await settle()
-	check(not cycle.needs_tutorial_income() and game.economy.coins == balance + count * 5 and not cycle.allows_action("mine_coal"), "Only actual sales fund the next purchase; the guided menu then unlocks")
+	check(count < 300 and not cycle.needs_tutorial_income() and game.economy.coins == balance + earned and not cycle.allows_action("mine_coal"), "Only actual tier sales fund the next purchase; its menu then unlocks")
 
 func run_checks() -> void:
 	root.show()
@@ -226,15 +248,19 @@ func run_checks() -> void:
 	check(cycle.tutorial_step == 4 and grid.cave_width == 7 and game.economy.coins == 0, "Expansion costs its full price from earned money")
 	await earn_purchase_money()
 	await purchase_route("DEFENSA", "defense_platforms")
-	check(cycle.tutorial_step == 5 and grid.defense_tiles.size() == 2 and game.economy.coins == 0, "Platforms are bought with mined sales")
+	check(cycle.tutorial_step == 5 and grid.defense_tiles.size() == 2 and game.economy.coins == 35 and cycle.level3_sold, "Platforms are bought with mined sales")
 	await earn_purchase_money()
 	await purchase_route("DEFENSA", "launcher")
-	check(game.placing_launcher and game.economy.coins == 200, "Selecting the launcher reserves no money")
+	check(game.placing_launcher and game.economy.coins == 305, "Selecting the launcher reserves no money")
 	await click_cell(grid.defense_cell("right"))
-	check(game.launchers.launchers.is_empty() and game.placing_launcher and game.economy.coins == 200, "Wrong launcher placement preserves the purchase funds")
+	check(game.launchers.launchers.is_empty() and game.placing_launcher and game.economy.coins == 305, "Wrong launcher placement preserves the purchase funds")
 	await click_cell(grid.defense_cell("left"))
-	check(cycle.tutorial_step == 6 and game.economy.coins == 0 and not cycle.free_launcher_available, "The first launcher costs 200 at placement")
+	check(cycle.tutorial_step == 6 and game.economy.coins == 105 and cycle.level4_sold and not cycle.free_launcher_available, "The first launcher costs 200 at placement")
 	await check_locked_actions()
+	game.mining.items_for("coal_3")[cycle.TUTORIAL_ORE_CELL] = 1
+	var parking: Array[Vector2i] = game.get_node("TutorialGuide").targets()
+	await drag_cell(parking[0], parking[1])
+	check(game.mining.nugget_type(parking[1]) == "coal_3" and game.mining.nuggets_at(cycle.TUTORIAL_ORE_CELL) == 0, "Leftover high-tier ore can be parked before loading raw ammunition")
 	var sold: int = cycle.coal_sold
 	for index in range(4):
 		await extract_one()
