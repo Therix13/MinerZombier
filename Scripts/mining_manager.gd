@@ -8,7 +8,7 @@ signal vein_fused(cell: Vector2i)
 
 const COAL_CLICKS := 5
 const BRASS_CLICKS := 7
-const ORE_KINDS := ["coal", "brass", "coal_2", "brass_2", "coal_3", "brass_3", "coal_4", "brass_4", "brass_ingot", "brass_ingot_2", "brass_ingot_3", "brass_ingot_4"]
+const ORE_KINDS := ["coal", "brass", "coal_2", "brass_2", "coal_3", "brass_3", "coal_4", "brass_4", "brass_ingot", "brass_ingot_2", "brass_ingot_3", "brass_ingot_4", "iron", "iron_2", "iron_3", "iron_4", "iron_ingot", "iron_ingot_2", "iron_ingot_3", "iron_ingot_4"]
 const DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 
 var drills: RefCounted
@@ -20,6 +20,9 @@ var mining_clicks: int = COAL_CLICKS
 var drop_random := RandomNumberGenerator.new()
 var coal_veins: Dictionary = {}
 var brass_veins: Dictionary = {}
+var iron_veins: Dictionary = {}
+var iron_items: Dictionary = {"iron": {}, "iron_2": {}, "iron_3": {}, "iron_4": {}, "iron_ingot": {}, "iron_ingot_2": {}, "iron_ingot_3": {}, "iron_ingot_4": {}}
+var construction: Node2D
 var coal_nuggets: Dictionary = {}
 var brass_nuggets: Dictionary = {}
 var coal_level2_nuggets: Dictionary = {}
@@ -40,16 +43,21 @@ func dispose() -> void:
 	compactors = null
 	furnaces = null
 	grid = null
+	construction = null
 
 func vein_at(cell: Vector2i) -> String:
 	if coal_veins.has(cell):
 		return "coal"
 	if brass_veins.has(cell):
 		return "brass"
+	if iron_veins.has(cell): return "iron"
 	return ""
 
+func veins_for(kind: String) -> Dictionary:
+	return iron_veins if kind == "iron" else (brass_veins if kind == "brass" else coal_veins)
+
 func vein_level(cell: Vector2i) -> int:
-	var data: Dictionary = brass_veins.get(cell, {}) if brass_veins.has(cell) else coal_veins.get(cell, {})
+	var data: Dictionary = veins_for(vein_at(cell)).get(cell, {})
 	return clampi(int(data.get("level", 1)), 1, 4)
 
 func can_fuse_veins(source: Vector2i, destination: Vector2i) -> bool:
@@ -63,7 +71,7 @@ func can_fuse_veins(source: Vector2i, destination: Vector2i) -> bool:
 
 func fuse_veins(source: Vector2i, destination: Vector2i) -> bool:
 	if not can_fuse_veins(source, destination): return false
-	var veins: Dictionary = brass_veins if vein_at(source) == "brass" else coal_veins
+	var veins: Dictionary = veins_for(vein_at(source))
 	var result: Dictionary = veins[destination].duplicate(true)
 	result["level"] = vein_level(destination) + 1
 	result["progress"] = 0
@@ -83,7 +91,10 @@ func nuggets_at(cell: Vector2i) -> int:
 	return count
 
 func nugget_stores() -> Dictionary:
-	return {"coal": coal_nuggets, "brass": brass_nuggets, "coal_2": coal_level2_nuggets, "brass_2": brass_level2_nuggets, "coal_3": coal_level3_nuggets, "brass_3": brass_level3_nuggets, "coal_4": coal_level4_nuggets, "brass_4": brass_level4_nuggets, "brass_ingot": ingots["brass_ingot"], "brass_ingot_2": ingots["brass_ingot_2"], "brass_ingot_3": ingots["brass_ingot_3"], "brass_ingot_4": ingots["brass_ingot_4"]}
+	var result: Dictionary = {"coal": coal_nuggets, "brass": brass_nuggets, "coal_2": coal_level2_nuggets, "brass_2": brass_level2_nuggets, "coal_3": coal_level3_nuggets, "brass_3": brass_level3_nuggets, "coal_4": coal_level4_nuggets, "brass_4": brass_level4_nuggets, "brass_ingot": ingots["brass_ingot"], "brass_ingot_2": ingots["brass_ingot_2"], "brass_ingot_3": ingots["brass_ingot_3"], "brass_ingot_4": ingots["brass_ingot_4"]}
+
+	result.merge(iron_items)
+	return result
 
 func items_for(kind: String) -> Dictionary:
 	return nugget_stores().get(kind, {})
@@ -123,7 +134,7 @@ func occupied_by_furnace(cell: Vector2i) -> bool:
 	return is_instance_valid(furnaces) and furnaces.machines.has(cell)
 
 func occupied_by_machine(cell: Vector2i) -> bool:
-	return occupied_by_compactor(cell) or occupied_by_furnace(cell)
+	return occupied_by_compactor(cell) or occupied_by_furnace(cell) or (is_instance_valid(construction) and construction.plans.has(cell))
 
 func nugget_type(cell: Vector2i) -> String:
 	var inventories: Dictionary = nugget_stores()
@@ -140,19 +151,19 @@ func can_move_nugget(cell: Vector2i) -> bool:
 func place_vein(cell: Vector2i, direction: int, kind: String = "coal") -> bool:
 	if not grid.owned_tiles.has(cell) or not can_place_vein(cell):
 		return false
-	var dictionary: Dictionary = brass_veins if kind == "brass" else coal_veins
+	var dictionary: Dictionary = veins_for(kind)
 	dictionary[cell] = {"direction": direction, "progress": 0, "level": 1}
 	changed.emit()
 	return true
 
 func hardness(kind: String) -> int:
-	return BRASS_CLICKS if kind == "brass" else COAL_CLICKS
+	return 9 if kind == "iron" else (BRASS_CLICKS if kind == "brass" else COAL_CLICKS)
 
 func mine(cell: Vector2i) -> bool:
 	var kind: String = vein_at(cell)
 	if kind == "":
 		return false
-	var dictionary: Dictionary = brass_veins if kind == "brass" else coal_veins
+	var dictionary: Dictionary = veins_for(kind)
 	var vein: Dictionary = dictionary[cell]
 	var progress: int = int(vein["progress"]) + 1
 	if progress >= hardness(kind):
@@ -180,7 +191,7 @@ func move_vein(source: Vector2i, destination: Vector2i, direction: int) -> void:
 	var kind: String = vein_at(source)
 	if kind == "" or (destination != source and not can_place_vein(destination)):
 		return
-	var dictionary: Dictionary = brass_veins if kind == "brass" else coal_veins
+	var dictionary: Dictionary = veins_for(kind)
 	var vein: Dictionary = dictionary[source].duplicate(true)
 	vein["direction"] = direction
 	dictionary.erase(source)

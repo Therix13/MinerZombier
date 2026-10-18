@@ -107,7 +107,7 @@ func run_checks() -> void:
 	check(game.economy.coins == 0 and not compactors.machines.has(a) and compactors.placing, "Funds are rechecked at placement if money changes after selection")
 	game.economy.add(cash)
 	await place_at(a)
-	check(compactors.machines.has(a) and game.economy.coins == cash - 300 and not mover.placement_active(), "A successful placement charges exactly once and ends selection")
+	check(game.get_node("Construction").plans.has(a) and not compactors.machines.has(a) and game.economy.coins == cash - 300 and not mover.placement_active(), "A successful placement charges exactly once and ends selection")
 	await key(KEY_ESCAPE)
 	check(display.menu_open and paused, "Idle ESC still pauses")
 	await key(KEY_ESCAPE)
@@ -123,7 +123,7 @@ func run_checks() -> void:
 	await shift(true)
 	await place_at(a)
 	await shift(false)
-	check(not mover.placement_active() and game.economy.coins == 0 and game.conveyors.belts.has(a), "Running out of money ends repetition without removing the paid construction")
+	check(not mover.placement_active() and game.economy.coins == 0 and game.get_node("Construction").plans.has(a), "Running out of money ends repetition without removing the paid construction")
 	game.economy.add(balance)
 	clear_items()
 	game.cycle.free_launcher_available = true

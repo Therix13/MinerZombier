@@ -80,16 +80,10 @@ func _draw() -> void:
 				var rhythm: Node = get_parent().get_node_or_null("WorkshopRhythm")
 				if rhythm != null: center = rhythm.nugget_position(cell, kind, center)
 				draw_nugget(center, kind, amount)
-	for cell in mining.brass_veins:
-		if holding_object and dragging_object and held_object_type == "vein" and cell == held_object_cell:
-			continue
-		var vein: Dictionary = mining.brass_veins[cell]
-		draw_vein(grid.get_cell_rect(cell).get_center(), "brass", vein)
-	for cell in mining.coal_veins:
-		if holding_object and dragging_object and held_object_type == "vein" and cell == held_object_cell:
-			continue
-		var vein: Dictionary = mining.coal_veins[cell]
-		draw_vein(grid.get_cell_rect(cell).get_center(), "coal", vein)
+	for material: String in ["coal", "brass", "iron"]:
+		for cell: Vector2i in mining.veins_for(material):
+			if holding_object and dragging_object and held_object_type == "vein" and cell == held_object_cell: continue
+			draw_vein(grid.get_cell_rect(cell).get_center(), material, mining.veins_for(material)[cell])
 	for cell in launchers.launchers:
 		if holding_object and dragging_object and held_object_type == "launcher" and cell == held_object_cell:
 			continue
@@ -136,7 +130,7 @@ func _draw() -> void:
 			draw_rect(grid.get_cell_rect(destination).grow(-2.0), Color("#ffe18a") if valid else Color("#df7770"), false, 3.0)
 		if held_object_type == "vein" and mining.vein_at(held_object_cell) != "":
 			var kind: String = mining.vein_at(held_object_cell)
-			var vein: Dictionary = mining.brass_veins[held_object_cell] if kind == "brass" else mining.coal_veins[held_object_cell]
+			var vein: Dictionary = mining.veins_for(kind)[held_object_cell]
 			var preview_data: Dictionary = vein.duplicate()
 			preview_data["direction"] = placement_direction
 			draw_vein(drag_world_position, kind, preview_data, true)
@@ -154,6 +148,9 @@ func _draw() -> void:
 			if swap_bundle and conveyors.belts.has(held_object_cell):
 				draw_conveyor(drag_world_position, conveyors.belt_direction(held_object_cell), true, conveyors.belt_shape(held_object_cell))
 			draw_nugget(drag_world_position, mining.nugget_type(held_object_cell), 1)
+	if is_instance_valid(interactions) and interactions.placing_iron and interactions.phase_allows():
+		draw_iron_vein(grid.get_cell_rect(hovered_cell).get_center(), placement_direction, 0)
+		draw_rect(grid.get_cell_rect(hovered_cell).grow(-1), Color("#f0c777") if mining.can_place_vein(hovered_cell) else Color("#df7770"), false, 2)
 	if is_instance_valid(interactions) and not interactions.placing_resource.is_empty() and interactions.phase_allows():
 		var valid: bool = mining.can_move_nugget(hovered_cell)
 		draw_rect(grid.get_cell_rect(hovered_cell).grow(-2), Color("#ffe18a") if valid else Color("#df7770"), false, 2)
@@ -161,11 +158,30 @@ func _draw() -> void:
 
 func draw_nugget(center: Vector2, kind: String, amount: int) -> void:
 	if not rasterizing and amount == 1 and ArtAtlas.paint(self, "ore:" + kind, center): return
-	if "_ingot" in kind: draw_ingot(center, kind, amount)
+	if kind.begins_with("iron"):
+		if "_ingot" in kind: draw_ingot(center, kind, amount)
+		else: draw_iron_nugget(center, kind, amount)
+	elif "_ingot" in kind: draw_ingot(center, kind, amount)
 	elif mining.ore_level(kind) >= 3: draw_cluster_nugget(center, kind, amount)
 	elif mining.ore_level(kind) == 2: draw_refined_nugget(center, kind, amount)
 	elif kind.begins_with("brass"): draw_brass_nugget(center, amount)
 	else: draw_coal_nugget(center, amount)
+
+func draw_iron_nugget(center: Vector2, kind: String, amount: int) -> void:
+	var level: int = mining.ore_level(kind)
+	var offsets: Array[Vector2] = [Vector2.ZERO]
+	if level == 2: offsets = [Vector2(-4, 2), Vector2(5, -3)]
+	elif level == 3: offsets = [Vector2(-8, 4), Vector2(8, 4), Vector2(0, -6)]
+	elif level == 4: offsets = [Vector2(-8, 6), Vector2(9, 5), Vector2(-6, -7), Vector2(8, -8)]
+	var radius: float = 12 if level == 1 else 10
+	for offset: Vector2 in offsets:
+		var at: Vector2 = center + offset
+		var points := PackedVector2Array([at + Vector2(-radius, 0), at + Vector2(-radius * 0.6, -radius), at + Vector2(radius * 0.6, -radius * 0.8), at + Vector2(radius, 0), at + Vector2(radius * 0.5, radius), at + Vector2(-radius * 0.6, radius * 0.8)])
+		draw_colored_polygon(points, Color("#73858e"))
+		draw_colored_polygon(PackedVector2Array([points[0], points[1], points[2], at]), Color("#b4c2ca"))
+		points.append(points[0])
+		draw_polyline(points, Color("#35454f"), 1.5)
+	if amount > 1: draw_string(ThemeDB.fallback_font, center + Vector2(12, 20), str(amount), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#ffdb85"))
 
 func draw_ingot(center: Vector2, kind: String, amount: int) -> void:
 	var level: int = mining.ore_level(kind)
@@ -176,18 +192,18 @@ func draw_ingot(center: Vector2, kind: String, amount: int) -> void:
 		outline = PackedVector2Array([center + Vector2(-w, -h + 3), center + Vector2(-2, -h), center + Vector2(w, -h + 3), center + Vector2(w, h - 2), center + Vector2(1, h + 2), center + Vector2(-w, h - 2)])
 	else:
 		outline = PackedVector2Array([center + Vector2(-w + 4, -h), center + Vector2(w - 4, -h), center + Vector2(w, h - 2), center + Vector2(w - 2, h), center + Vector2(-w + 2, h), center + Vector2(-w, h - 2)])
-	draw_colored_polygon(outline, Color("#c47739"))
-	draw_colored_polygon(PackedVector2Array([center + Vector2(-w + 4, -h), center + Vector2(w - 4, -h), center + Vector2(w - 1, -h + 4), center + Vector2(-w + 1, -h + 4)]), Color("#f4b67a"))
-	draw_colored_polygon(PackedVector2Array([center + Vector2(w - 5, -h + 4), center + Vector2(w - 1, -h + 2), center + Vector2(w - 1, h - 2), center + Vector2(w - 5, h)]), Color("#985526"))
+	draw_colored_polygon(outline, (Color("#8196a0") if kind.begins_with("iron") else Color("#c47739")))
+	draw_colored_polygon(PackedVector2Array([center + Vector2(-w + 4, -h), center + Vector2(w - 4, -h), center + Vector2(w - 1, -h + 4), center + Vector2(-w + 1, -h + 4)]), (Color("#d2e2e8") if kind.begins_with("iron") else Color("#f4b67a")))
+	draw_colored_polygon(PackedVector2Array([center + Vector2(w - 5, -h + 4), center + Vector2(w - 1, -h + 2), center + Vector2(w - 1, h - 2), center + Vector2(w - 5, h)]), (Color("#506571") if kind.begins_with("iron") else Color("#985526")))
 	if level == 4:
-		draw_colored_polygon(PackedVector2Array([center + Vector2(-w, -h + 3), center + Vector2(-2, -h), center + Vector2(w, -h + 3), center + Vector2(1, -h + 8)]), Color("#f3b178"))
-		draw_colored_polygon(PackedVector2Array([center + Vector2(1, -h + 8), center + Vector2(w, -h + 3), center + Vector2(w, h - 2), center + Vector2(1, h + 2)]), Color("#ab622f"))
-		draw_circle(center + Vector2(8, 1), 1, Color("#bd7538"))
+		draw_colored_polygon(PackedVector2Array([center + Vector2(-w, -h + 3), center + Vector2(-2, -h), center + Vector2(w, -h + 3), center + Vector2(1, -h + 8)]), (Color("#c6d8e1") if kind.begins_with("iron") else Color("#f3b178")))
+		draw_colored_polygon(PackedVector2Array([center + Vector2(1, -h + 8), center + Vector2(w, -h + 3), center + Vector2(w, h - 2), center + Vector2(1, h + 2)]), (Color("#607a89") if kind.begins_with("iron") else Color("#ab622f")))
+		draw_circle(center + Vector2(8, 1), 1, (Color("#8da7b4") if kind.begins_with("iron") else Color("#bd7538")))
 	var closed: PackedVector2Array = outline.duplicate()
 	closed.append(outline[0])
-	draw_polyline(closed, Color("#2e2014"), 2.5, true)
-	draw_line(center + Vector2(-w + 7, -h + 5), center + Vector2(-w + 4, h - 3), Color("#ffd9a1"), 2, true)
-	draw_line(center + Vector2(-w + 10, -h + 5), center + Vector2(-w + 7, h - 3), Color("#e99b59"), 1, true)
+	draw_polyline(closed, (Color("#273944") if kind.begins_with("iron") else Color("#2e2014")), 2.5, true)
+	draw_line(center + Vector2(-w + 7, -h + 5), center + Vector2(-w + 4, h - 3), (Color("#e4f3fa") if kind.begins_with("iron") else Color("#ffd9a1")), 2, true)
+	draw_line(center + Vector2(-w + 10, -h + 5), center + Vector2(-w + 7, h - 3), (Color("#afc6d1") if kind.begins_with("iron") else Color("#e99b59")), 1, true)
 	if amount > 1: draw_string(ThemeDB.fallback_font, center + Vector2(12, 20), str(amount), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#ffdb85"))
 
 func draw_cluster_nugget(center: Vector2, kind: String, amount: int) -> void:
@@ -242,7 +258,8 @@ func preview_allowed(kind: String) -> bool:
 	return tutorial == null or tutorial.allows_world_press(hovered_cell, kind)
 
 func draw_vein(center: Vector2, kind: String, data: Dictionary, preview: bool = false) -> void:
-	if kind == "brass": draw_brass_vein(center, int(data["direction"]), int(data["progress"]), preview)
+	if kind == "iron": draw_iron_vein(center, int(data["direction"]), int(data["progress"]))
+	elif kind == "brass": draw_brass_vein(center, int(data["direction"]), int(data["progress"]), preview)
 	else: draw_coal_vein(center, int(data["direction"]), int(data["progress"]), preview)
 	var level: int = clampi(int(data.get("level", 1)), 1, 4)
 	if level == 1: return
@@ -545,3 +562,16 @@ class GroundCanvas extends Node2D:
 
 static func draw_grid_lines(canvas: Node2D, bounds: Rect2, tile_size: float, origin: Vector2) -> void:
 	GroundCanvas.draw_grid_lines(canvas, bounds, tile_size, origin)
+
+func draw_iron_vein(center: Vector2, direction: int, progress: int) -> void:
+	draw_rect(Rect2(center - Vector2(21,21), Vector2(42,42)), Color("#29353c"))
+	draw_rect(Rect2(center - Vector2(21,21), Vector2(42,42)), Color("#95a7ae"), false, 2)
+	for offset: Vector2 in [Vector2(-8,-7), Vector2(8,-7), Vector2(-7,8), Vector2(9,8)]:
+		draw_iron_nugget(center + offset, "iron", 1)
+	var outward: Vector2 = Vector2(mining.DIRECTIONS[posmod(direction,4)])
+	var side := Vector2(-outward.y,outward.x)
+	var tip: Vector2 = center + outward * 23
+	draw_line(center, tip - outward * 4, Color("#f7d57b"), 3)
+	draw_colored_polygon(PackedVector2Array([tip,tip - outward * 10 + side * 6,tip - outward * 10 - side * 6]),Color("#f7d57b"))
+	if progress > 0:
+		draw_rect(Rect2(center + Vector2(-18,18),Vector2(36.0 * progress / 9,2)),Color("#edc16c"))

@@ -12,6 +12,7 @@ const POINTS_PER_NIGHT: int = 1
 const ZOMBIE_EXPERIENCE: int = 25
 const SALE_EXPERIENCE := {"coal": 1, "brass": 2, "coal_2": 2, "brass_2": 4, "coal_3": 4, "brass_3": 8, "coal_4": 8, "brass_4": 16, "brass_ingot": 16, "brass_ingot_2": 32, "brass_ingot_3": 64, "brass_ingot_4": 128}
 const RESEARCHES := {
+	"iron": {"name": "Hierro", "branch": "MINERÍA", "cost": 1, "level": 4, "requires": ["furnace"], "description": "Desbloquea vetas de hierro y sus lingotes."},
 	"drill": {
 		"name": "Taladro", "branch": "MINERÍA", "cost": 1, "level": 2,
 		"requires": [], "description": "Desbloquea el taladro automático en la tienda.",
@@ -38,11 +39,11 @@ const RESEARCHES := {
 	},
 	"furnace": {
 		"name": "Horno", "branch": "PROCESAMIENTO", "cost": 1, "level": 3,
-		"requires": ["drill"], "description": "Funde latón de Nv. 4 en lingotes usando carbón de Nv. 4.",
+		"requires": ["drill"], "description": "Funde latón o hierro de Nv. 4 en lingotes usando carbón de Nv. 4.",
 	},
 }
 const BASE_ITEMS := ["coal", "launcher", "defense_platforms"]
-const ITEM_RESEARCH := {"straight": "straight_belt", "drill": "drill", "brass": "brass", "corner": "curved_belts", "corner_right": "curved_belts", "corner_left": "curved_belts", "junction": "junction_belt", "compactor": "compactor", "furnace": "furnace"}
+const ITEM_RESEARCH := {"iron": "iron", "straight": "straight_belt", "drill": "drill", "brass": "brass", "corner": "curved_belts", "corner_right": "curved_belts", "corner_left": "curved_belts", "junction": "junction_belt", "compactor": "compactor", "furnace": "furnace"}
 # Older scenes can still refer to these names. They now resolve item unlocks.
 const TECHNOLOGIES := RESEARCHES
 
@@ -76,7 +77,7 @@ func add_experience(amount: int) -> void:
 		level_up.emit(gained_level)
 
 func award_sale(kind: String) -> void:
-	add_experience(int(SALE_EXPERIENCE.get(kind, 0)))
+	add_experience(int(SALE_EXPERIENCE.get(kind.replace("iron", "brass"), 0)))
 
 func award_night() -> void:
 	research_points += POINTS_PER_NIGHT

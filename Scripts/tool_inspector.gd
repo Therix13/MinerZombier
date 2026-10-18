@@ -11,6 +11,7 @@ var cell: Vector2i
 var last_contents: String = ""
 var withdraw_buttons: Dictionary = {}
 var withdrawal_blocked: bool = false
+var cancel_plan: Button
 
 func _ready() -> void:
 	game = get_parent() as Node2D
@@ -54,6 +55,13 @@ func _ready() -> void:
 	contents.add_theme_constant_override("h_separation", 6)
 	contents.add_theme_constant_override("v_separation", 6)
 	column.add_child(contents)
+	cancel_plan = game.get("shop").create_button("Cancelar plano")
+	cancel_plan.pressed.connect(func():
+		if game.get_node("Construction").cancel(cell): close_inspector()
+		else: status.text = "Sin espacio para devolver materiales."
+	)
+	column.add_child(cancel_plan)
+	cancel_plan.hide()
 	overlay.hide()
 	update_layout()
 	get_viewport().size_changed.connect(update_layout)
@@ -72,7 +80,8 @@ func open_tool(tool_kind: String, at: Vector2i) -> void:
 	kind = tool_kind
 	cell = at
 	if not exists(): return
-	heading.text = "CONTENIDO"
+	heading.text = "CONSTRUCCIÓN" if kind == "blueprint" else "CONTENIDO"
+	cancel_plan.visible = kind == "blueprint"
 	last_contents = ""
 	withdrawal_blocked = false
 	update_layout()
@@ -90,6 +99,7 @@ func exists() -> bool:
 func inventory() -> Dictionary:
 	var items: Array = []
 	match kind:
+		"blueprint": return game.get_node("Construction").plans[cell]["delivered"].duplicate()
 		"furnace": return game.get_node("Furnaces").stored_items(cell)
 		"launcher": items = game.get("launchers").launchers[cell]["ammo"]
 		"compactor":
@@ -103,8 +113,14 @@ func refresh() -> void:
 	if not exists():
 		close_inspector()
 		return
+	cancel_plan.disabled = game.get("cycle").is_night
 	var items: Dictionary = inventory()
 	match kind:
+		"blueprint":
+			var plan: Dictionary = game.get_node("Construction").plans[cell]
+			status.text = "Plano: %s\nEntrega los recursos aquí." % {"furnace": "Horno", "drill": "Taladro", "compactor": "Compactador"}.get(plan["item"], "Cinta transportadora")
+			for material: String in game.get_node("Construction").RECIPES[plan["item"]]:
+				items[material] = int(plan["delivered"].get(material, 0))
 		"furnace":
 			status.text = "Horno · Nv. 1"
 			var data: Dictionary = game.get_node("Furnaces").machines[cell]
@@ -138,13 +154,18 @@ func refresh() -> void:
 		var button := make_slot()
 		button.tooltip_text = game.get("shop").RESOURCE_LABELS.get(item, item) + "\nRetirar una unidad."
 		var art: Control = game.get("shop").create_item_preview("ore:" + item)
-		fill_slot(button, art, str(items[item]))
-		button.pressed.connect(withdraw.bind(item))
+		var count_label: Label = fill_slot(button, art, str(items[item]))
+		if kind == "blueprint":
+			var plan: Dictionary = game.get_node("Construction").plans[cell]
+			button.disabled = true
+			count_label.text = "%d / %d" % [items[item], game.get_node("Construction").RECIPES[plan["item"]][item]]
+			button.tooltip_text = game.get("shop").RESOURCE_LABELS.get(item, item)
+		else: button.pressed.connect(withdraw.bind(item))
 		contents.add_child(button)
 		withdraw_buttons[item] = button
 	if items.is_empty():
 		var empty := make_slot()
-		empty.tooltip_text = "Entrada: pepita de latón Nv. 4." if kind == "furnace" else "Sin materiales almacenados."
+		empty.tooltip_text = "Entrada: latón o hierro Nv. 4." if kind == "furnace" else "Sin materiales almacenados."
 		var tray := SlotSymbol.new()
 		tray.custom_minimum_size = Vector2(48, 48)
 		fill_slot(empty, tray, "—")
@@ -182,6 +203,7 @@ func fill_slot(slot: Button, art: Control, value: String) -> Label:
 	return count
 
 func withdraw(item: String) -> bool:
+	if kind == "blueprint": return false
 	if not is_open() or not exists() or not inventory().has(item) or get_tree().paused or game.get("cycle").defeated or game.get("cycle").is_guided_tutorial_active(): return false
 	var mining: RefCounted = game.get("mining")
 	var candidates: Array = game.get("grid").owned_tiles.keys()

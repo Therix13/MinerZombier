@@ -1,0 +1,106 @@
+extends Node2D
+
+signal changed
+signal completed(cell: Vector2i)
+
+const ArtAtlas = preload("res://Scripts/art_atlas.gd")
+const RECIPES := {
+	"furnace": {"coal_4": 2},
+	"straight": {"brass_ingot": 1},
+	"corner_right": {"brass_ingot": 1},
+	"corner_left": {"brass_ingot": 1},
+	"junction": {"brass_ingot": 1},
+	"compactor": {"iron_ingot_4": 1, "iron_ingot": 2},
+	"drill": {"brass_ingot_3": 2, "brass_ingot": 2},
+}
+var plans: Dictionary = {}
+var game: Node2D
+var mining: RefCounted
+
+func _ready() -> void:
+	game = get_parent()
+	mining = game.get("mining")
+	mining.construction = self
+	changed.connect(queue_redraw)
+	changed.connect(game.redraw_world)
+
+func _exit_tree() -> void:
+	if mining != null and mining.construction == self: mining.construction = null
+
+func has_recipe(item: String) -> bool:
+	return RECIPES.has(item)
+
+func place(cell: Vector2i, item: String, direction: int, price: int) -> bool:
+	if not has_recipe(item) or not game.get_node("WorldInteractions").can_place_item(cell, item): return false
+	plans[cell] = {"item": item, "direction": posmod(direction, 4), "paid": maxi(price, 0), "delivered": {}}
+	changed.emit()
+	return true
+
+func can_receive(cell: Vector2i, kind: String) -> bool:
+	if not plans.has(cell): return false
+	var data: Dictionary = plans[cell]
+	return int(data["delivered"].get(kind, 0)) < int(RECIPES[data["item"]].get(kind, 0))
+
+func receive(cell: Vector2i, kind: String) -> bool:
+	if not can_receive(cell, kind): return false
+	var data: Dictionary = plans[cell]
+	data["delivered"][kind] = int(data["delivered"].get(kind, 0)) + 1
+	for material: String in RECIPES[data["item"]]:
+		if int(data["delivered"].get(material, 0)) < int(RECIPES[data["item"]][material]):
+			changed.emit()
+			return true
+	plans.erase(cell)
+	game.get_node("WorldInteractions").build_selected(cell, data["item"], int(data["direction"]))
+	completed.emit(cell)
+	changed.emit()
+	return true
+
+func recipe_text(item: String) -> String:
+	if not has_recipe(item): return ""
+	var text: String = "Plano: entrega materiales para construir."
+	for material: String in RECIPES[item]:
+		text += "\n%d × %s" % [RECIPES[item][material], game.get("shop").RESOURCE_LABELS.get(material, material)]
+	return text
+
+func cancel(cell: Vector2i) -> bool:
+	if not plans.has(cell) or game.get("cycle").is_night: return false
+	var data: Dictionary = plans[cell]
+	var free: Array[Vector2i] = [cell]
+	for at: Vector2i in game.get("grid").owned_tiles:
+		if at != cell and at != game.get("grid").sale_cell and mining.can_move_nugget(at): free.append(at)
+	var count: int = 0
+	for amount: int in data["delivered"].values(): count += amount
+	if count > free.size(): return false
+	plans.erase(cell)
+	for material: String in data["delivered"]:
+		for index in range(int(data["delivered"][material])):
+			mining.items_for(material)[free.pop_front()] = 1
+	game.get("economy").add(int(data["paid"]))
+	mining.changed.emit()
+	changed.emit()
+	return true
+
+func _draw() -> void:
+	if game == null: return
+	var grid: RefCounted = game.get("grid")
+	for cell: Vector2i in plans:
+		var rect: Rect2 = grid.get_cell_rect(cell).grow(-2)
+		var center: Vector2 = rect.get_center()
+		draw_rect(rect, Color("#224b7099"))
+		draw_rect(rect, Color("#8ed7fa"), false, 1.5)
+		for offset in [-10, 0, 10]:
+			draw_line(center + Vector2(-20, offset), center + Vector2(20, offset), Color("#84cbf33a"), 1)
+			draw_line(center + Vector2(offset, -20), center + Vector2(offset, 20), Color("#84cbf33a"), 1)
+		var item: String = plans[cell]["item"]
+		var direction: int = int(plans[cell]["direction"])
+		var key: String = "%s:%d" % [item, direction]
+		if item == "furnace": key = "furnace:%d:0" % direction
+		elif item in ["straight", "corner_right", "corner_left", "junction"]: key = "belt:%s:%d" % [item,direction]
+		if ArtAtlas.prepare() and ArtAtlas.regions.has(key):
+			draw_texture_rect_region(ArtAtlas.texture, Rect2(center - Vector2(28,28), Vector2(56,56)), ArtAtlas.regions[key], Color(0.55,0.8,1,0.65))
+		var total: int = 0
+		var delivered: int = 0
+		for material: String in RECIPES[item]:
+			total += int(RECIPES[item][material])
+			delivered += int(plans[cell]["delivered"].get(material, 0))
+		draw_string(ThemeDB.fallback_font, center + Vector2(-12, 19), "%d/%d" % [delivered, total], HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#c4edff"))

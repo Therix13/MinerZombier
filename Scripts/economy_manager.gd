@@ -12,12 +12,14 @@ const DEFENSE_TILE_PRICE := 100
 const COAL_SELL_PRICE := 5
 const BRASS_VEIN_PRICE := 150
 const BRASS_SELL_PRICE := 7
+const IRON_VEIN_PRICE := 200
+const IRON_SELL_PRICE := 9
 
 var coins: int = START_COINS
 var developer_mode: bool = false
 
 func sale_value(kind: String) -> int:
-	var base: int = BRASS_SELL_PRICE if kind.begins_with("brass") else COAL_SELL_PRICE
+	var base: int = IRON_SELL_PRICE if kind.begins_with("iron") else (BRASS_SELL_PRICE if kind.begins_with("brass") else COAL_SELL_PRICE)
 	# A level-one ingot preserves the value of its level-four ore input.
 	var suffix: String = kind.get_slice("_", kind.get_slice_count("_") - 1)
 	var level: int = int(suffix) if suffix.is_valid_int() else 1

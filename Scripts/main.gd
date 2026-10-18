@@ -334,7 +334,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			held_object_type = "nugget"
 		elif mining.vein_at(cell) != "":
 			held_object_type = "vein"
-			var vein: Dictionary = mining.brass_veins[cell] if mining.vein_at(cell) == "brass" else mining.coal_veins[cell]
+			var vein: Dictionary = mining.veins_for(mining.vein_at(cell))[cell]
 			placement_direction = int(vein["direction"])
 		elif drills.drills.has(cell):
 			held_object_type = "drill"

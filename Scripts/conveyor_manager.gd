@@ -104,13 +104,16 @@ func advance(delta: float) -> void:
 func tick() -> void:
 	var requests: Dictionary = {}
 	var sales: Array[Dictionary] = []
+	var construction_deliveries: Array[Dictionary] = []
 	for key in belts:
 		var source: Vector2i = key
 		if mining.nuggets_at(source) == 0:
 			continue
 		var destination: Vector2i = source + DIRECTIONS[belt_direction(source)]
 		var kind: String = mining.nugget_type(source)
-		if mining.occupied_by_furnace(destination) and mining.furnaces.can_receive(destination, kind):
+		if is_instance_valid(mining.construction) and mining.construction.can_receive(destination, kind):
+			construction_deliveries.append({"source": source, "destination": destination, "kind": kind})
+		elif mining.occupied_by_furnace(destination) and mining.furnaces.can_receive(destination, kind):
 			if not requests.has(destination): requests[destination] = []
 			requests[destination].append({"source": source, "kind": kind})
 		elif mining.occupied_by_compactor(destination) and mining.compactors.can_receive(destination, kind):
@@ -161,7 +164,11 @@ func tick() -> void:
 					break
 			last_junction_entry[destination] = input_index(destination, selected["source"])
 		transfers.append({"source": selected["source"], "destination": destination, "kind": selected["kind"]})
-	if transfers.is_empty() and sales.is_empty():
+	for delivery: Dictionary in construction_deliveries:
+		if mining.construction.receive(delivery["destination"], delivery["kind"]):
+			mining.remove_one_nugget(delivery["source"], delivery["kind"])
+			transported.emit(delivery["source"], delivery["destination"], delivery["kind"])
+	if transfers.is_empty() and sales.is_empty() and construction_deliveries.is_empty():
 		return
 	for transfer in transfers:
 		mining.remove_one_nugget(transfer["source"], transfer["kind"])
