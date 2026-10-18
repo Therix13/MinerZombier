@@ -111,7 +111,7 @@ func run_checks() -> void:
 	check(not mover.drop("belt", a, left) and mover.cell_data(a) == before and mover.cell_data(left) == right_data, "Invalid platform swaps preserve both buildings")
 	check(mover.drop("nugget", a, left) and game.launchers.launchers[left]["ammo"].size() == 2 and game.conveyors.belts.has(a) and game.mining.nuggets_at(a) == 0, "Loading ammunition still consumes ore without moving its belt")
 	put(a, {"coal": 1})
-	check(mover.drop("nugget", a, game.grid.sale_cell) and game.economy.coins == coins + 5 and game.progression.total_experience == 2, "Selling still consumes one nugget and awards the normal rewards")
+	check(mover.drop("nugget", a, game.grid.sale_cell) and game.economy.coins == coins + 5 and game.progression.total_experience == 1, "Selling still consumes one nugget and awards the normal rewards")
 	clear_items()
 	put(a, {"coal": 1})
 	put(b, {"brass": 1})

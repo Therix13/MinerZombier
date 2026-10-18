@@ -9,12 +9,19 @@ var resupply_step: int = -1
 var resupply_taught: bool = false
 var last_transitioning: bool = false
 var pointer: GuidePointer
+var click_mouse := StyleBoxFlat.new()
+var click_button := StyleBoxFlat.new()
 
 func _ready() -> void:
 	game = get_parent() as Node2D
 	cycle = game.get("cycle")
 	game.get("renderer").tutorial = cycle
 	z_index = 1000
+	click_mouse.bg_color = Color("#192920")
+	click_mouse.border_color = Color("#f0c777")
+	click_mouse.set_border_width_all(1)
+	click_mouse.set_corner_radius_all(7)
+	click_button.set_corner_radius_all(3)
 	pointer = GuidePointer.new()
 	pointer.name = "TutorialPointer"
 	game.get("shop").add_child(pointer)
@@ -220,6 +227,8 @@ func _draw() -> void:
 			color = Color("#b6d98e")
 		draw_rect(rect, Color(color, 0.12))
 		draw_rect(rect, Color(color, glow), false, 2.0)
+	if cells.size() == 1 and cycle.mining.vein_at(cells[0]) != "" and (not lesson or cycle.tutorial_step in [1, 5]):
+		draw_mining_click(cells[0])
 	if cells.size() == 2 and (not lesson or cycle.tutorial_step in [1, 5]):
 		var source: Vector2 = cycle.grid.get_cell_rect(cells[0]).get_center()
 		var destination: Vector2 = cycle.grid.get_cell_rect(cells[1]).get_center()
@@ -229,6 +238,20 @@ func _draw() -> void:
 		draw_line(source + direction * 15.0, end, color, 1.5, true)
 		draw_line(end, end - direction.rotated(0.55) * 8.0, color, 1.5, true)
 		draw_line(end, end - direction.rotated(-0.55) * 8.0, color, 1.5, true)
+
+func draw_mining_click(cell: Vector2i) -> void:
+	var rect: Rect2 = cycle.grid.get_cell_rect(cell)
+	var press: float = 0.5 + 0.5 * sin(pulse * 5.5)
+	var origin: Vector2 = Vector2(rect.get_center().x, rect.position.y - 15.0 + 1.5 * sin(pulse * 3.0) + press)
+	draw_style_box(click_mouse, Rect2(origin - Vector2(7, 10), Vector2(14, 20)))
+	click_button.bg_color = Color("#64734c").lerp(Color("#f0c777"), press)
+	draw_style_box(click_button, Rect2(origin + Vector2(-5.5, -8.5), Vector2(5, 8)))
+	draw_line(origin + Vector2(0, -8.5), origin + Vector2(0, -1), Color("#f0c777"), 0.8, true)
+	draw_line(origin + Vector2(-5.5, 0), origin + Vector2(5.5, 0), Color("#f0c777"), 0.8, true)
+	var flash := Color(0.94, 0.78, 0.47, press)
+	draw_line(origin + Vector2(-10, -7), origin + Vector2(-14, -9), flash, 1.0, true)
+	draw_line(origin + Vector2(-7, -12), origin + Vector2(-9, -16), flash, 1.0, true)
+	draw_line(origin + Vector2(-12, -2), origin + Vector2(-16, -2), flash, 1.0, true)
 
 class GuidePointer extends Control:
 	var target: Control

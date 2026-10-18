@@ -160,9 +160,9 @@ func _process(_delta: float) -> void:
 
 func build_progression_panel() -> void:
 	progression_panel = PanelContainer.new()
-	progression_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	progression_panel.offset_left = -180.0
-	progression_panel.offset_right = 180.0
+	progression_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	progression_panel.offset_left = 20.0
+	progression_panel.offset_right = 220.0
 	progression_panel.offset_top = -58.0
 	progression_panel.offset_bottom = -20.0
 	progression_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -199,7 +199,7 @@ func update_progression() -> void:
 	level_label.text = "NIVEL %d" % progression.level
 	experience_bar.max_value = progression.experience_to_next_level()
 	experience_bar.value = progression.experience
-	experience_bar.tooltip_text = "EXP %d / %d\nGana EXP vendiendo minerales y derrotando zombis." % [progression.experience, progression.experience_to_next_level()]
+	experience_bar.tooltip_text = "EXP %d / %d\nZombi +%d · venta de carbón +%d · venta de latón +%d." % [progression.experience, progression.experience_to_next_level(), progression.ZOMBIE_EXPERIENCE, progression.SALE_EXPERIENCE["coal"], progression.SALE_EXPERIENCE["brass"]]
 	progression_panel.visible = not shop_open and not shop_animating
 	refresh_research_buttons()
 	refresh_item_buttons()
@@ -216,7 +216,7 @@ func build_research_content() -> void:
 	if progression == null:
 		return
 	research_summary = create_label("", 17, Color("#d6edb4"))
-	research_summary.tooltip_text = "Cada nivel otorga 1 punto de investigación.\nEXP: zombis +10 · carbón vendido +2 · latón vendido +3."
+	research_summary.tooltip_text = "Cada nivel otorga 1 punto de investigación.\nEXP: zombi +%d · carbón vendido +%d · latón vendido +%d." % [progression.ZOMBIE_EXPERIENCE, progression.SALE_EXPERIENCE["coal"], progression.SALE_EXPERIENCE["brass"]]
 	shop_content.add_child(research_summary)
 	var previous_branch: String = ""
 	var row: HBoxContainer

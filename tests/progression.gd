@@ -22,15 +22,22 @@ func settle() -> void:
 
 func check_level_rules() -> void:
 	var player: RefCounted = ProgressionScript.new()
+	var curve: Array[int] = []
+	for value in range(1, 6):
+		player.level = value
+		curve.append(player.experience_to_next_level())
+	check(curve == [50, 80, 128, 205, 328], "Level requirements follow the exponential curve")
+	player.level = 1
+	check(ProgressionScript.ZOMBIE_EXPERIENCE >= 12 * ProgressionScript.SALE_EXPERIENCE["brass"], "Zombie kills dominate the small mineral-sale rewards")
 	var levels: Array[int] = []
 	player.level_up.connect(func(value: int) -> void: levels.append(value))
 	player.add_experience(-50)
 	player.award_sale("unknown")
 	check(player.total_experience == 0, "Invalid rewards do not change EXP")
-	player.add_experience(24)
+	player.add_experience(49)
 	check(player.level == 1 and player.research_points == 0, "No early level or research point")
 	check(not player.research("drill"), "Minimum level is required for research")
-	player.add_experience(96)
+	player.add_experience(209)
 	check(player.level == 4 and player.experience == 0 and player.research_points == 3 and levels == [2, 3, 4], "Large rewards grant each level and its research point")
 	check(not player.research("unknown") and not player.research("mining_i"), "Unknown and removed global technologies spend no points")
 	check(not player.research("junction_belt"), "Unlocks require their prerequisite")
@@ -39,7 +46,7 @@ func check_level_rules() -> void:
 	check(not player.research("curved_belts") and player.research_points == 1, "Duplicate research is refused")
 	check(player.is_item_unlocked("corner_right") and player.is_item_unlocked("corner_left"), "One curved-belt research unlocks both directions")
 	check(not player.research("junction_belt"), "Advanced conveyors refuse an unaffordable unlock")
-	player.add_experience(70)
+	player.add_experience(205)
 	check(player.research("junction_belt") and player.research_points == 0 and player.is_item_unlocked("junction"), "Advanced unlock costs two points and unlocks the T belt")
 	check(not player.research("drill") and not player.is_item_unlocked("drill"), "Insufficient points leave an item locked")
 	check(player.is_item_unlocked("coal") and player.is_item_unlocked("launcher") and not player.is_item_unlocked("unknown"), "Tutorial items stay available and unknown items stay locked")
@@ -73,27 +80,31 @@ func run_checks() -> void:
 	for index in range(7): mining.mine(Vector2i(15, 1))
 	check(player.total_experience == 0, "Mining alone does not duplicate sale EXP")
 	mining.move_nugget(Vector2i(15, 0), game.grid.sale_cell)
-	check(player.total_experience == 2, "Manual coal sale awards EXP")
+	check(player.total_experience == 1, "Manual coal sale awards a small EXP reward")
 	belts.place(Vector2i(15, 0), 0)
 	for index in range(7): mining.mine(Vector2i(15, 1))
 	belts.advance(4.0)
-	check(player.total_experience == 4, "Conveyor sale awards the same EXP")
+	check(player.total_experience == 2, "Conveyor sale awards the same small EXP reward")
 	mining.place_vein(Vector2i(14, 1), 0, "brass")
 	for index in range(7): mining.mine(Vector2i(14, 1))
 	mining.move_nugget(Vector2i(14, 0), game.grid.sale_cell)
-	check(player.total_experience == 7, "Brass sales retain their EXP reward")
+	check(player.total_experience == 4, "Brass sales retain a small EXP reward")
 	manager.start_wave(1)
 	var enemy: Node = get_nodes_in_group("zombies")[0]
 	enemy.take_damage(0.25)
-	check(player.total_experience == 7, "Nonlethal hits do not award kill EXP")
+	check(player.total_experience == 4, "Nonlethal hits do not award kill EXP")
 	enemy.take_damage(100.0)
 	enemy.take_damage(100.0)
-	check(player.total_experience == 17, "A kill awards EXP exactly once")
+	check(player.total_experience == 29, "A kill awards its larger EXP reward exactly once")
 	manager.spawn_zombie()
 	get_nodes_in_group("zombies")[0].take_damage(100.0)
-	check(player.level == 2 and player.experience == 2 and player.research_points == 1, "Sales and kills level up and award research points")
+	check(player.level == 2 and player.experience == 4 and player.research_points == 1, "Zombie kills provide the level and research point")
 	manager._process(0.01)
-	check(shop.level_label.text.contains("NIVEL 2") and shop.experience_bar.value == 2, "Subtle XP HUD shows the new level")
+	check(shop.level_label.text.contains("NIVEL 2") and shop.experience_bar.value == 4, "Subtle XP HUD shows the new level")
+	var panel: Control = shop.progression_panel
+	var hud: Rect2 = panel.get_global_transform_with_canvas() * Rect2(Vector2.ZERO, panel.size)
+	var factor: float = game.ui_layer.scale.x
+	check(is_equal_approx(hud.position.x, 20.0 * factor) and is_equal_approx(hud.size.x, 200.0 * factor) and is_equal_approx(hud.end.y, root.get_visible_rect().size.y - 20.0 * factor), "The short XP bar sits at the bottom left")
 	shop.open_shop()
 	await create_timer(0.4).timeout
 	shop.open_category("BASE")
@@ -113,7 +124,7 @@ func run_checks() -> void:
 	check(shop.research_buttons["drill"].disabled and shop.research_buttons["drill"].tooltip_text.contains("Desbloqueado"), "Unlocked cards show their completed state")
 	check(mining.mining_clicks == 7 and game.drills.drill_interval == 0.6 and belts.move_interval == 4.0 and game.launchers.damage_multiplier == 0.5, "Research does not change global construction statistics")
 	var button_id: int = shop.research_buttons["drill"].get_instance_id()
-	player.add_experience(40)
+	player.add_experience(76)
 	game.economy.add(1)
 	check(shop.research_buttons["drill"].get_instance_id() == button_id, "EXP and coin changes preserve research controls")
 	shop.research_buttons["brass"].pressed.emit()
@@ -127,7 +138,7 @@ func run_checks() -> void:
 	shop.open_shop()
 	await create_timer(0.4).timeout
 	shop.open_category("INVESTIGACIÓN")
-	player.add_experience(1000)
+	player.add_experience(1500)
 	var points: int = player.research_points
 	shop.research_buttons["junction_belt"].pressed.emit()
 	check(not player.has_research("junction_belt") and player.research_points == points, "Button events cannot bypass item prerequisites")

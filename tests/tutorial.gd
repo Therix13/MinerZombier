@@ -254,7 +254,7 @@ func run_checks() -> void:
 	game.call("buy_brass_vein")
 	await settle()
 	check(not game.get("placing_brass"), "Advanced purchases still require their item research after the tutorial")
-	game.get("progression").add_experience(100)
+	game.get("progression").add_experience(225)
 	game.call("research_technology", "drill")
 	game.call("research_technology", "brass")
 	game.call("buy_brass_vein")

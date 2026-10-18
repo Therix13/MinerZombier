@@ -5,11 +5,11 @@ signal level_up(new_level: int)
 signal technology_unlocked(technology_id: String)
 signal research_unlocked(research_id: String)
 
-const BASE_LEVEL_EXPERIENCE: int = 25
-const LEVEL_EXPERIENCE_STEP: int = 15
+const BASE_LEVEL_EXPERIENCE: int = 50
+const LEVEL_EXPERIENCE_GROWTH: float = 1.6
 const POINTS_PER_LEVEL: int = 1
-const ZOMBIE_EXPERIENCE: int = 10
-const SALE_EXPERIENCE := {"coal": 2, "brass": 3}
+const ZOMBIE_EXPERIENCE: int = 25
+const SALE_EXPERIENCE := {"coal": 1, "brass": 2}
 const RESEARCHES := {
 	"drill": {
 		"name": "Taladro", "branch": "MINERÍA", "cost": 1, "level": 2,
@@ -44,7 +44,7 @@ var research_points: int = 0
 var unlocked: Dictionary = {}
 
 func experience_to_next_level() -> int:
-	return BASE_LEVEL_EXPERIENCE + (level - 1) * LEVEL_EXPERIENCE_STEP
+	return roundi(BASE_LEVEL_EXPERIENCE * pow(LEVEL_EXPERIENCE_GROWTH, level - 1))
 
 func add_experience(amount: int) -> void:
 	if amount <= 0:

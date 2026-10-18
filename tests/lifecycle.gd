@@ -56,7 +56,7 @@ func run_checks() -> void:
 	check_first_automated_sale(game)
 	for iteration in range(3):
 		game.get("cycle").day = 2
-		game.get("progression").add_experience(120)
+		game.get("progression").add_experience(260)
 		game.call("research_technology", "drill")
 		game.call("research_technology", "brass")
 		var refs: Array[WeakRef] = manager_refs(game)
