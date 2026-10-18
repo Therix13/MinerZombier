@@ -22,7 +22,8 @@ func run_checks() -> void:
 	var inspector: CanvasLayer = game.get_node("ToolInspector")
 	var a := Vector2i(14,1)
 	var c := Vector2i(15,1)
-	var out := Vector2i(16,1)
+	var out := Vector2i(16,0)
+	var out2 := Vector2i(16,2)
 	check(not game.progression.is_item_unlocked("saw"),"Sierra respects research locks")
 	game.progression.level = 3
 	game.progression.research_points = 3
@@ -34,8 +35,8 @@ func run_checks() -> void:
 	await key(KEY_R)
 	check(game.placement_direction == 2,"R rotates the preview")
 	check(mover.place_selected(c) and game.get_node("Construction").plans.has(c) and not saw.machines.has(c),"Placement creates an inactive blueprint")
-	game.get_node("Construction").receive(c,"brass_ingot")
-	game.get_node("Construction").receive(c,"brass_ingot")
+	game.get_node("Construction").receive(c,"iron_3")
+	game.get_node("Construction").receive(c,"iron")
 	check(saw.machines.has(c) and saw.machines[c]["direction"] == 2 and game.economy.coins == cash - saw.PRICE,"A completed blueprint becomes a Sierra with its chosen outlet")
 	clear_items()
 	for material in ["coal","brass","iron","brass_ingot","iron_ingot"]:
@@ -51,6 +52,7 @@ func run_checks() -> void:
 			saw.process_cutting(3.9)
 			check(saw.stored_items(c) == {input:1} and game.mining.nuggets_at(out) == 0,"A four-second cut cannot finish early")
 			game.mining.items_for("coal")[out] = 1
+			game.mining.items_for("coal")[out2] = 1
 			saw.process_cutting(0.1)
 			check(saw.stored_items(c) == {output:2} and not saw.can_receive(c,input),"The blocked output preserves exactly two %s" % output)
 			saw.process_cutting(100)
@@ -60,7 +62,17 @@ func run_checks() -> void:
 			check(game.mining.nugget_type(out) == output and game.mining.nuggets_at(out) == 1 and saw.stored_items(c) == {output:1},"First product exits without stacking on the grid")
 			game.mining.remove_one_nugget(out,output)
 			saw.process_cutting(0)
-			check(game.mining.nugget_type(out) == output and saw.stored_items(c).is_empty() and saw.can_receive(c,input),"Second product exits and unlocks the next cut")
+			check(game.mining.nuggets_at(out) == 0 and saw.stored_items(c) == {output:1},"An emitted outlet cannot emit twice while the other side waits")
+			game.mining.remove_one_nugget(out2,"coal")
+			saw.process_cutting(0)
+			check(game.mining.nugget_type(out2) == output and game.mining.nuggets_at(out) == 0 and saw.stored_items(c).is_empty() and saw.can_receive(c,input),"Second product exits and unlocks the next cut")
+	for direction in range(4):
+		clear_items()
+		saw.place(c,direction)
+		saw.receive(c,"iron_ingot_4")
+		saw.process_cutting(4)
+		var destinations: Array[Vector2i] = saw.outlet_cells(c,direction)
+		check(game.mining.nugget_type(destinations[0]) == "iron_ingot_3" and game.mining.nugget_type(destinations[1]) == "iron_ingot_3" and saw.stored_items(c).is_empty(),"Both diagonal outlets emit simultaneously for orientation " + str(direction))
 	clear_items()
 	saw.place(c,1)
 	for kind: String in ["coal","brass","iron","brass_ingot","iron_ingot","coal_ingot_2","coal_5",""]:
@@ -76,6 +88,7 @@ func run_checks() -> void:
 	game.conveyors.tick()
 	check(saw.stored_items(c) == {"brass_3":1} and game.mining.nugget_type(c+Vector2i.UP) == "iron_4","Two incoming belts cannot overfill or lose a second input")
 	game.conveyors.place(out,3)
+	game.mining.items_for("coal")[out2] = 1
 	saw.process_cutting(4)
 	check(saw.stored_items(c) == {"brass_2":2} and game.mining.nuggets_at(out) == 0,"A belt facing the wrong way blocks the output safely")
 	game.conveyors.belts[out]["direction"] = 1
@@ -99,9 +112,21 @@ func run_checks() -> void:
 	saw.place(c,1)
 	saw.receive(c,"coal_3")
 	game.mining.items_for("coal")[out] = 1
+	game.mining.items_for("coal")[out2] = 1
 	saw.process_cutting(4)
 	cash = game.economy.coins
 	check(mover.sell("saw",c) and game.economy.coins == cash + saw.PRICE/2 and game.mining.items_for("coal_2").get(c,0) == 2,"Selling pays half the tool price and preserves both pending products")
+	clear_items()
+	saw.place(c,1)
+	saw.receive(c,"iron_ingot_3")
+	game.mining.items_for("coal")[out] = 1
+	game.mining.items_for("coal")[out2] = 1
+	saw.process_cutting(4)
+	check(saw.remove_material(c,"iron_ingot_2") and saw.stored_items(c) == {"iron_ingot_2":1},"Withdrawing a product clears exactly one pending outlet")
+	game.mining.remove_one_nugget(out,"coal")
+	game.mining.remove_one_nugget(out2,"coal")
+	saw.process_cutting(0)
+	check(game.mining.nuggets_at(out) + game.mining.nuggets_at(out2) == 1 and saw.stored_items(c).is_empty(),"Only the remaining product emits after withdrawal")
 	clear_items()
 	saw.place(c,1)
 	saw.receive(c,"brass_4")

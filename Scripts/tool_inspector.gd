@@ -170,7 +170,7 @@ func refresh() -> void:
 		withdraw_buttons[item] = button
 	if items.is_empty():
 		var empty := make_slot()
-		empty.tooltip_text = "Entrada: latón o hierro Nv. 4." if kind == "furnace" else ("Entrada: pepitas o lingotes de nivel 2–4." if kind == "saw" else "Sin materiales almacenados.")
+		empty.tooltip_text = "Entrada: latón o hierro Nv. 4." if kind == "furnace" else ("Entrada: pepitas o lingotes de nivel 2–4. Salidas: dos casillas diagonales delanteras." if kind == "saw" else "Sin materiales almacenados.")
 		var tray := SlotSymbol.new()
 		tray.custom_minimum_size = Vector2(48, 48)
 		fill_slot(empty, tray, "—")

@@ -28,7 +28,7 @@ func can_place(cell: Vector2i) -> bool:
 
 func place(cell: Vector2i, direction: int = 1) -> bool:
 	if not can_place(cell): return false
-	machines[cell] = {"direction": posmod(direction,4), "input": "", "output": "", "count": 0, "elapsed": 0.0}
+	machines[cell] = {"direction": posmod(direction,4), "input": "", "output": "", "count": 0, "pending": [false,false], "elapsed": 0.0}
 	changed.emit()
 	return true
 
@@ -63,6 +63,11 @@ func remove_material(cell: Vector2i, kind: String) -> bool:
 		data["input"] = ""
 		data["elapsed"] = 0.0
 	elif data["output"] == kind and int(data["count"]) > 0:
+		ensure_pending(data)
+		for index in range(2):
+			if data["pending"][index]:
+				data["pending"][index] = false
+				break
 		data["count"] = int(data["count"]) - 1
 		if int(data["count"]) == 0: data["output"] = ""
 	else: return false
@@ -79,23 +84,43 @@ func process_cutting(delta: float) -> void:
 			data["output"] = lower_tier(data["input"])
 			data["input"] = ""
 			data["count"] = 2
+			data["pending"] = [true,true]
 			data["elapsed"] = 0.0
 			cut.emit(cell)
 			changed.emit()
 		if int(data["count"]) > 0: try_output(cell)
 
+static func outlet_cells(cell: Vector2i, direction: int) -> Array[Vector2i]:
+	var forward: Vector2i = DIRECTIONS[posmod(direction,4)]
+	var side := Vector2i(-forward.y,forward.x)
+	return [cell + forward - side,cell + forward + side]
+
+func ensure_pending(data: Dictionary) -> void:
+	# Preserve outputs in machines created before the two-outlet update.
+	if not data.has("pending"): data["pending"] = [int(data["count"]) == 2,int(data["count"]) > 0]
+
 func try_output(cell: Vector2i) -> void:
 	var data: Dictionary = machines[cell]
 	if int(data["count"]) <= 0: return
-	var destination: Vector2i = cell + DIRECTIONS[int(data["direction"])]
+	ensure_pending(data)
+	var destinations: Array[Vector2i] = outlet_cells(cell,int(data["direction"]))
 	var belts: RefCounted = game.get("conveyors")
-	if destination == grid.sale_cell or not mining.can_move_nugget(destination): return
-	if belts.belts.has(destination) and not belts.accepts_from(destination,cell): return
-	mining.items_for(data["output"])[destination] = 1
-	data["count"] = int(data["count"]) - 1
+	var forward: Vector2i = DIRECTIONS[int(data["direction"])]
+	var emitted: bool = false
+	for index in range(2):
+		if not data["pending"][index]: continue
+		var destination: Vector2i = destinations[index]
+		if destination == grid.sale_cell or not mining.can_move_nugget(destination): continue
+		# Diagonal outlets enter belts along the machine's forward axis.
+		if belts.belts.has(destination) and not belts.accepts_from(destination,destination - forward): continue
+		mining.items_for(data["output"])[destination] = 1
+		data["pending"][index] = false
+		data["count"] = int(data["count"]) - 1
+		emitted = true
 	if int(data["count"]) == 0: data["output"] = ""
-	mining.changed.emit()
-	changed.emit()
+	if emitted:
+		mining.changed.emit()
+		changed.emit()
 
 func _process(delta: float) -> void:
 	if not game.get("cycle").defeated: process_cutting(delta)
@@ -147,8 +172,12 @@ static func draw_machine(canvas: Node2D, center: Vector2, data: Dictionary) -> v
 	canvas.draw_set_transform(Vector2.ZERO)
 	var outward: Vector2 = Vector2(DIRECTIONS[posmod(int(data.get("direction",1)),4)])
 	var side := Vector2(-outward.y,outward.x)
-	var tip: Vector2 = center + outward * 22
-	canvas.draw_colored_polygon(PackedVector2Array([tip,tip-outward*8+side*5,tip-outward*8-side*5]),Color("#ffe084"))
+	for sign_value in [-1,1]:
+		var arrow: Vector2 = (outward + side * sign_value).normalized()
+		var flank := Vector2(-arrow.y,arrow.x)
+		var tip: Vector2 = center + arrow * 27
+		canvas.draw_line(center + arrow * 13,tip - arrow * 5,Color("#ffe084"),3)
+		canvas.draw_colored_polygon(PackedVector2Array([tip,tip-arrow*9+flank*5,tip-arrow*9-flank*5]),Color("#ffe084"))
 	if active:
 		canvas.draw_rect(Rect2(center+Vector2(-16,17),Vector2(32,3)),Color("#273239"))
 		canvas.draw_rect(Rect2(center+Vector2(-16,17),Vector2(32*float(data.get("elapsed",0))/PROCESS_TIME,3)),Color("#eed083"))

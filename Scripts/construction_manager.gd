@@ -5,12 +5,12 @@ signal completed(cell: Vector2i)
 
 const ArtAtlas = preload("res://Scripts/art_atlas.gd")
 const RECIPES := {
-	"saw": {"brass_ingot": 2},
+	"saw": {"iron_3": 1, "iron": 1},
 	"furnace": {"coal_4": 2},
-	"straight": {"brass_ingot": 1},
-	"corner_right": {"brass_ingot": 1},
-	"corner_left": {"brass_ingot": 1},
-	"junction": {"brass_ingot": 1},
+	"straight": {"brass_3": 1},
+	"corner_right": {"brass_3": 1},
+	"corner_left": {"brass_3": 1},
+	"junction": {"brass_3": 1},
 	"compactor": {"iron_ingot_4": 1, "iron_ingot": 2},
 	"drill": {"brass_ingot_3": 2, "brass_ingot": 2},
 }
