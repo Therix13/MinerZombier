@@ -15,6 +15,7 @@ var drills: RefCounted
 var conveyors: RefCounted
 var compactors: Node2D
 var furnaces: Node2D
+var saws: Node2D
 var grid: RefCounted
 var mining_clicks: int = COAL_CLICKS
 var drop_random := RandomNumberGenerator.new()
@@ -42,6 +43,7 @@ func dispose() -> void:
 	conveyors = null
 	compactors = null
 	furnaces = null
+	saws = null
 	grid = null
 	construction = null
 
@@ -133,8 +135,11 @@ func occupied_by_compactor(cell: Vector2i) -> bool:
 func occupied_by_furnace(cell: Vector2i) -> bool:
 	return is_instance_valid(furnaces) and furnaces.machines.has(cell)
 
+func occupied_by_saw(cell: Vector2i) -> bool:
+	return is_instance_valid(saws) and saws.machines.has(cell)
+
 func occupied_by_machine(cell: Vector2i) -> bool:
-	return occupied_by_compactor(cell) or occupied_by_furnace(cell) or (is_instance_valid(construction) and construction.plans.has(cell))
+	return occupied_by_saw(cell) or occupied_by_compactor(cell) or occupied_by_furnace(cell) or (is_instance_valid(construction) and construction.plans.has(cell))
 
 func nugget_type(cell: Vector2i) -> String:
 	var inventories: Dictionary = nugget_stores()

@@ -100,6 +100,7 @@ func inventory() -> Dictionary:
 	var items: Array = []
 	match kind:
 		"blueprint": return game.get_node("Construction").plans[cell]["delivered"].duplicate()
+		"saw": return game.get_node("Saws").stored_items(cell)
 		"furnace": return game.get_node("Furnaces").stored_items(cell)
 		"launcher": items = game.get("launchers").launchers[cell]["ammo"]
 		"compactor":
@@ -118,7 +119,7 @@ func refresh() -> void:
 	match kind:
 		"blueprint":
 			var plan: Dictionary = game.get_node("Construction").plans[cell]
-			status.text = "Plano: %s\nEntrega los recursos aquí." % {"furnace": "Horno", "drill": "Taladro", "compactor": "Compactador"}.get(plan["item"], "Cinta transportadora")
+			status.text = "Plano: %s\nEntrega los recursos aquí." % {"furnace": "Horno", "drill": "Taladro", "compactor": "Compactador", "saw": "Sierra"}.get(plan["item"], "Cinta transportadora")
 			for material: String in game.get_node("Construction").RECIPES[plan["item"]]:
 				items[material] = int(plan["delivered"].get(material, 0))
 		"furnace":
@@ -127,6 +128,10 @@ func refresh() -> void:
 			if not str(data.get("input", "")).is_empty():
 				status.text += " · %.1f / 4 s" % float(data.get("elapsed", 0.0)) if data.get("burning", false) else " · Sin combustible"
 			if heat_label != null: heat_label.text = "%d / 40" % int(game.get_node("Furnaces").machines[cell]["fuel"])
+		"saw":
+			var data: Dictionary = game.get_node("Saws").machines[cell]
+			status.text = "Sierra · 1 → 2"
+			if not str(data["input"]).is_empty(): status.text += " · %.1f / 4 s" % float(data["elapsed"])
 		"compactor":
 			var data: Dictionary = game.get_node("Compactors").machines[cell]
 			status.text = "Compactador"
@@ -165,7 +170,7 @@ func refresh() -> void:
 		withdraw_buttons[item] = button
 	if items.is_empty():
 		var empty := make_slot()
-		empty.tooltip_text = "Entrada: latón o hierro Nv. 4." if kind == "furnace" else "Sin materiales almacenados."
+		empty.tooltip_text = "Entrada: latón o hierro Nv. 4." if kind == "furnace" else ("Entrada: pepitas de nivel 2–4." if kind == "saw" else "Sin materiales almacenados.")
 		var tray := SlotSymbol.new()
 		tray.custom_minimum_size = Vector2(48, 48)
 		fill_slot(empty, tray, "—")
@@ -219,6 +224,8 @@ func withdraw(item: String) -> bool:
 		return false
 	withdrawal_blocked = false
 	match kind:
+		"saw":
+			if not game.get_node("Saws").remove_material(cell,item): return false
 		"furnace":
 			if not game.get_node("Furnaces").remove_material(cell, item): return false
 		"compactor":

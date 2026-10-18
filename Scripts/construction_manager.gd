@@ -5,6 +5,7 @@ signal completed(cell: Vector2i)
 
 const ArtAtlas = preload("res://Scripts/art_atlas.gd")
 const RECIPES := {
+	"saw": {"brass_ingot": 2},
 	"furnace": {"coal_4": 2},
 	"straight": {"brass_ingot": 1},
 	"corner_right": {"brass_ingot": 1},
@@ -96,7 +97,10 @@ func _draw() -> void:
 		var key: String = "%s:%d" % [item, direction]
 		if item == "furnace": key = "furnace:%d:0" % direction
 		elif item in ["straight", "corner_right", "corner_left", "junction"]: key = "belt:%s:%d" % [item,direction]
-		if ArtAtlas.prepare() and ArtAtlas.regions.has(key):
+		if item == "saw":
+			preload("res://Scripts/saw_manager.gd").draw_machine(self,center,{"direction":direction})
+			draw_rect(rect,Color("#4d9bde88"))
+		elif ArtAtlas.prepare() and ArtAtlas.regions.has(key):
 			draw_texture_rect_region(ArtAtlas.texture, Rect2(center - Vector2(28,28), Vector2(56,56)), ArtAtlas.regions[key], Color(0.55,0.8,1,0.65))
 		var total: int = 0
 		var delivered: int = 0

@@ -113,6 +113,9 @@ func tick() -> void:
 		var kind: String = mining.nugget_type(source)
 		if is_instance_valid(mining.construction) and mining.construction.can_receive(destination, kind):
 			construction_deliveries.append({"source": source, "destination": destination, "kind": kind})
+		elif mining.occupied_by_saw(destination) and mining.saws.can_receive(destination,kind):
+			if not requests.has(destination): requests[destination] = []
+			requests[destination].append({"source":source,"kind":kind})
 		elif mining.occupied_by_furnace(destination) and mining.furnaces.can_receive(destination, kind):
 			if not requests.has(destination): requests[destination] = []
 			requests[destination].append({"source": source, "kind": kind})
@@ -178,6 +181,9 @@ func tick() -> void:
 		transported.emit(transfer["source"], transfer.get("destination", grid.sale_cell), transfer["kind"])
 		sale_completed.emit(transfer["kind"])
 	for transfer in transfers:
+		if mining.occupied_by_saw(transfer["destination"]):
+			mining.saws.receive(transfer["destination"],transfer["kind"])
+			continue
 		if mining.occupied_by_furnace(transfer["destination"]):
 			mining.furnaces.receive(transfer["destination"], transfer["kind"])
 			continue

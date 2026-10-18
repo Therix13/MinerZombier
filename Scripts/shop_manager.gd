@@ -1,6 +1,7 @@
 extends Control
 
 signal expansion_requested
+signal saw_requested
 signal brass_vein_requested
 signal coal_vein_requested
 signal left_corner_conveyor_requested
@@ -34,12 +35,13 @@ const ANIMATION_TIME := 0.3
 const CATEGORIES := ["EXPANSION", "VETAS", "HERRAMIENTAS", "AUTOMATIZACIÓN", "DEFENSA", "INVESTIGACIÓN"]
 const ITEM_CATEGORIES := {
 	"VETAS": ["coal", "brass", "iron"],
-	"HERRAMIENTAS": ["drill", "compactor", "furnace"],
+	"HERRAMIENTAS": ["drill", "compactor", "furnace", "saw"],
 	"AUTOMATIZACIÓN": ["straight", "corner_right", "corner_left", "junction"],
 }
 const RESOURCE_LABELS := {"iron": "HIERRO · NIVEL 1", "iron_2": "HIERRO · NIVEL 2", "iron_3": "HIERRO · NIVEL 3", "iron_4": "HIERRO · NIVEL 4", "iron_ingot": "LINGOTE DE HIERRO · NIVEL 1", "iron_ingot_2": "LINGOTE DE HIERRO · NIVEL 2", "iron_ingot_3": "LINGOTE DE HIERRO · NIVEL 3", "iron_ingot_4": "LINGOTE DE HIERRO · NIVEL 4", "coal": "CARBÓN · NIVEL 1", "brass": "LATÓN · NIVEL 1", "coal_2": "CARBÓN · NIVEL 2", "brass_2": "LATÓN · NIVEL 2", "coal_3": "CARBÓN · NIVEL 3", "brass_3": "LATÓN · NIVEL 3", "coal_4": "CARBÓN · NIVEL 4", "brass_4": "LATÓN · NIVEL 4", "brass_ingot": "LINGOTE DE LATÓN · NIVEL 1", "brass_ingot_2": "LINGOTE DE LATÓN · NIVEL 2", "brass_ingot_3": "LINGOTE DE LATÓN · NIVEL 3", "brass_ingot_4": "LINGOTE DE LATÓN · NIVEL 4"}
 const CATEGORY_ART := {"EXPANSION": "expansion", "VETAS": "coal", "HERRAMIENTAS": "drill", "AUTOMATIZACIÓN": "junction", "DEFENSA": "launcher", "INVESTIGACIÓN": "research", "RECURSOS": "resources"}
 const RESEARCH_VIEW := {
+	"saw": ["saw", "Sierra", "1 → 2"],
 	"iron": ["iron", "Hierro", "Nueva veta"],
 	"drill": ["drill", "Taladro", "Automático"],
 	"brass": ["ore", "Latón", "Nueva veta"],
@@ -121,6 +123,10 @@ func ensure_interactions() -> void:
 		var compactors := CompactorScript.new()
 		compactors.name = "Compactors"
 		game.add_child(compactors)
+	if not game.has_node("Saws"):
+		var saws := preload("res://Scripts/saw_manager.gd").new()
+		saws.name = "Saws"
+		game.add_child(saws)
 	if not game.has_node("Construction"):
 		var construction := preload("res://Scripts/construction_manager.gd").new()
 		construction.name = "Construction"
@@ -285,7 +291,7 @@ func update_progression() -> void:
 
 func visible_shop_items(category: String = "") -> Array[String]:
 	var result: Array[String] = []
-	for item: String in ["coal", "brass", "iron", "straight", "corner_right", "corner_left", "junction", "drill", "compactor", "furnace"]:
+	for item: String in ["coal", "brass", "iron", "straight", "corner_right", "corner_left", "junction", "drill", "compactor", "furnace", "saw"]:
 		if not category.is_empty() and item not in ITEM_CATEGORIES.get(category, []): continue
 		if progression == null or progression.is_item_unlocked(item): result.append(item)
 	return result
@@ -749,7 +755,7 @@ func create_art_button(kind: String, description: String, price: int = -1) -> Bu
 	row.add_child(art)
 	var short_names := {"ore:iron": "Hierro · Nv. 1", "ore:iron_2": "Hierro · Nv. 2", "ore:iron_3": "Hierro · Nv. 3", "ore:iron_4": "Hierro · Nv. 4", "ore:iron_ingot": "Ling. hierro · Nv. 1", "ore:iron_ingot_2": "Ling. hierro · Nv. 2", "ore:iron_ingot_3": "Ling. hierro · Nv. 3", "ore:iron_ingot_4": "Ling. hierro · Nv. 4",
 		"expansion": "Ampliar base", "coal": "Carbón", "brass": "Latón", "iron": "Hierro",
-		"drill": "Taladro", "compactor": "Compactador", "furnace": "Horno", "straight": "Cinta recta",
+		"saw": "Sierra", "drill": "Taladro", "compactor": "Compactador", "furnace": "Horno", "straight": "Cinta recta",
 		"corner_right": "Cinta L derecha", "corner_left": "Cinta L izquierda",
 		"junction": "Cinta en T", "platform": "Plataformas", "launcher": "Lanzapepitas",
 		"ore:coal": "Carbón · Nv. 1", "ore:brass": "Latón · Nv. 1",
@@ -1031,6 +1037,7 @@ func open_category(category: String) -> void:
 			add_item_button("TALADRO AUTOMÁTICO · 200", economy.DRILL_PRICE, "drill", drill_requested)
 			add_item_button("COMPACTADOR · 300", CompactorScript.PRICE, "compactor", compactor_requested)
 			add_item_button("HORNO · 350", FurnaceScript.PRICE, "furnace", furnace_requested)
+			add_item_button("SIERRA · 250", preload("res://Scripts/saw_manager.gd").PRICE, "saw", saw_requested)
 		"AUTOMATIZACIÓN":
 			add_item_button("CINTA RECTA · 50", economy.CONVEYOR_PRICE, "straight", conveyor_requested)
 			add_item_button("CINTA EN L DERECHA · 50", economy.CONVEYOR_PRICE, "corner_right", corner_conveyor_requested)
@@ -1305,6 +1312,7 @@ class ItemArt extends "res://Scripts/world_renderer.gd":
 
 	func _draw() -> void:
 		match kind:
+			"saw": preload("res://Scripts/saw_manager.gd").draw_machine(self,Vector2.ZERO,{"direction":1})
 			"coal": draw_coal_vein(Vector2.ZERO, 1, 0, false)
 			"iron": draw_vein(Vector2.ZERO, "iron", {"level": 1, "direction": 1, "progress": 0})
 			"brass": draw_brass_vein(Vector2.ZERO, 1, 0, false)
