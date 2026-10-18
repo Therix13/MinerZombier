@@ -48,10 +48,21 @@ func run_checks() -> void:
 	game.grid.expand()
 	game.grid.purchase_defense_platforms()
 	game.progression.add_experience(10000)
-	for id in ["drill", "straight_belt", "brass", "curved_belts", "junction", "compactor"]: game.research_technology(id)
+	for id in ["drill", "straight_belt", "brass", "curved_belts", "junction_belt", "compactor"]: game.research_technology(id)
 	game.economy.add(10000)
 	game.cycle.free_launcher_available = false
 	await settle()
+	shop.open_shop()
+	await wait_shop()
+	check(shop.category_buttons.has("VETAS") and shop.category_buttons.has("HERRAMIENTAS") and shop.category_buttons.has("AUTOMATIZACIÓN") and not shop.category_buttons.has("BASE"), "The shop replaces Base with veins, tools, and automation categories")
+	for category: String in {"VETAS": ["coal", "brass"], "HERRAMIENTAS": ["drill", "compactor"], "AUTOMATIZACIÓN": ["straight", "corner_right", "corner_left", "junction"]}:
+		shop.open_category(category)
+		check(shop.item_buttons.keys() == shop.visible_shop_items(category), category + " contains only its researched items")
+		if category == "VETAS": check(shop.item_buttons.keys() == ["coal", "brass"], "All veins are grouped together")
+		if category == "HERRAMIENTAS": check(shop.item_buttons.keys() == ["drill", "compactor"], "Drills and compactors are grouped as tools")
+		if category == "AUTOMATIZACIÓN": check(shop.item_buttons.keys() == ["straight", "corner_right", "corner_left", "junction"], "Every conveyor shape is grouped under automation")
+	shop.close_shop()
+	await wait_shop()
 	var a := Vector2i(14, 1)
 	var b := Vector2i(16, 1)
 	var left: Vector2i = game.grid.defense_cell("left")
@@ -82,7 +93,7 @@ func run_checks() -> void:
 	if DisplayServer.get_name() != "headless" and "--capture" in args:
 		await RenderingServer.frame_post_draw
 		root.get_texture().get_image().save_png("/workspace/.onboarding/display-test/shop-money.png")
-	shop.open_category("BASE")
+	shop.open_category("HERRAMIENTAS")
 	await settle()
 	shop.shop_scroll.ensure_control_visible(shop.item_buttons["drill"]["button"])
 	await settle()

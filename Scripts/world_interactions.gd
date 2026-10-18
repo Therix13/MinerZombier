@@ -70,7 +70,6 @@ func can_drop(kind: String, source: Vector2i, destination: Vector2i) -> bool:
 	if destination == grid.sale_cell and kind != "nugget": return can_sell(kind, source)
 	if kind == "belt" and loaded_belt(source):
 		return false
-	if kind == "compactor" and loaded_compactor(source) and source != destination: return false
 	if kind == "nugget" and game.get("mining").occupied_by_compactor(destination):
 		return game.get_node("Compactors").can_receive(destination, game.get("mining").nugget_type(source))
 	if game.get("cycle").is_night:
@@ -84,15 +83,12 @@ func can_drop(kind: String, source: Vector2i, destination: Vector2i) -> bool:
 		if game.get("mining").can_move_nugget(destination):
 			return true
 	# Swapping another object must not move a loaded conveyor indirectly.
-	if loaded_belt(source) or loaded_belt(destination) or loaded_compactor(source) or loaded_compactor(destination):
+	if loaded_belt(source) or loaded_belt(destination):
 		return false
 	return can_hold(destination, cell_data(source)) and can_hold(source, cell_data(destination))
 
 func loaded_belt(cell: Vector2i) -> bool:
 	return game.get("conveyors").belts.has(cell) and game.get("mining").nuggets_at(cell) > 0
-
-func loaded_compactor(cell: Vector2i) -> bool:
-	return game.get("mining").occupied_by_compactor(cell) and int(game.get_node("Compactors").machines[cell]["count"]) > 0
 
 func resale_value(kind: String, source: Vector2i) -> int:
 	var economy: RefCounted = game.get("economy")

@@ -107,7 +107,7 @@ func run_checks() -> void:
 	check(is_equal_approx(hud.position.x, 20.0 * factor) and is_equal_approx(hud.size.x, 200.0 * factor) and is_equal_approx(hud.end.y, root.get_visible_rect().size.y - 20.0 * factor), "The short XP bar sits at the bottom left")
 	shop.open_shop()
 	await create_timer(0.4).timeout
-	shop.open_category("BASE")
+	shop.open_category("VETAS")
 	check(not shop.item_buttons["coal"]["button"].disabled and not shop.item_buttons.has("straight"), "Coal is available while unresearched conveyors stay absent")
 	check(not shop.item_buttons.has("drill") and not shop.item_buttons.has("brass") and not shop.item_buttons.has("corner_left") and not shop.item_buttons.has("junction"), "Unresearched items have no store controls")
 	var locked_coins: int = game.economy.coins
@@ -131,8 +131,10 @@ func run_checks() -> void:
 	check(shop.research_buttons["drill"].get_instance_id() == button_id, "EXP without a level threshold and coin changes preserve research controls")
 	shop.research_buttons["brass"].pressed.emit()
 	check(player.has_research("brass") and player.research_points == 0, "The next level and prerequisite unlock the new mineral")
-	shop.open_category("BASE")
-	check(not shop.item_buttons["drill"]["button"].disabled and not shop.item_buttons["brass"]["button"].disabled, "Unlocked items become purchasable without reopening the game")
+	shop.open_category("VETAS")
+	check(not shop.item_buttons["brass"]["button"].disabled, "Unlocked veins appear in the veins category")
+	shop.open_category("HERRAMIENTAS")
+	check(not shop.item_buttons["drill"]["button"].disabled, "Unlocked tools appear in the tools category")
 	shop.item_buttons["drill"]["button"].pressed.emit()
 	check(game.placing_drill and game.economy.coins == before_coins + 1, "Selecting an unlocked store item leaves coins available until placement")
 	game.cancel_placement()

@@ -174,7 +174,7 @@ func run_checks() -> void:
 	check(not paused, "ESC resumes the guided game")
 	shop._on_cycle_action()
 	check(not game.placing_coal and game.economy.coins == 500 and not shop.cycle_action.visible, "The tutorial card cannot purchase an item directly")
-	await purchase_route("BASE", "coal")
+	await purchase_route("VETAS", "coal")
 	check(game.get("placing_coal") and game.get("economy").coins == 500, "The real store selects a coal vein without charging")
 	if not game.get("placing_coal"):
 		quit(1)
@@ -253,7 +253,7 @@ func run_checks() -> void:
 	check(guide.pointer.target == shop.category_buttons["INVESTIGACIÓN"] and not shop.category_buttons["INVESTIGACIÓN"].disabled, "The guide marks the research category")
 	for category: String in shop.category_buttons:
 		if category != "INVESTIGACIÓN": check(shop.category_buttons[category].disabled, "Day two locks unrelated category: " + category)
-	shop.open_category("BASE")
+	shop.open_category("VETAS")
 	check(shop.shop_title.text == "TIENDA", "Direct category calls cannot skip the research lesson")
 	await click_control(shop.category_buttons["INVESTIGACIÓN"])
 	check(not shop.research_buttons["drill"].disabled and not shop.research_buttons["straight_belt"].disabled, "Both starting research choices are available without forcing a particular item")

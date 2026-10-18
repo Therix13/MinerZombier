@@ -28,7 +28,12 @@ const PANEL_WIDTH := 340.0
 const TOGGLE_SIZE := 58.0
 const MONEY_BOX_WIDTH := 148.0
 const ANIMATION_TIME := 0.3
-const CATEGORIES := ["EXPANSION", "BASE", "DEFENSA", "INVESTIGACIÓN"]
+const CATEGORIES := ["EXPANSION", "VETAS", "HERRAMIENTAS", "AUTOMATIZACIÓN", "DEFENSA", "INVESTIGACIÓN"]
+const ITEM_CATEGORIES := {
+	"VETAS": ["coal", "brass"],
+	"HERRAMIENTAS": ["drill", "compactor"],
+	"AUTOMATIZACIÓN": ["straight", "corner_right", "corner_left", "junction"],
+}
 const RESEARCH_VIEW := {
 	"drill": ["drill", "Taladro", "Automático"],
 	"brass": ["ore", "Latón", "Nueva veta"],
@@ -235,14 +240,15 @@ func update_progression() -> void:
 		announce_researches(new_ids)
 	if shop_open and shop_title.text == "INVESTIGACIÓN" and research_buttons.keys() != progression.visible_researches():
 		rebuild_catalog()
-	elif shop_open and shop_title.text == "BASE" and item_buttons.keys() != visible_shop_items():
+	elif shop_open and shop_title.text in ITEM_CATEGORIES and item_buttons.keys() != visible_shop_items(shop_title.text):
 		rebuild_catalog()
 	refresh_research_buttons()
 	refresh_item_buttons()
 
-func visible_shop_items() -> Array[String]:
+func visible_shop_items(category: String = "") -> Array[String]:
 	var result: Array[String] = []
 	for item: String in ["coal", "brass", "straight", "corner_right", "corner_left", "junction", "drill", "compactor"]:
+		if not category.is_empty() and item not in ITEM_CATEGORIES.get(category, []): continue
 		if progression == null or progression.is_item_unlocked(item): result.append(item)
 	return result
 
@@ -611,7 +617,7 @@ func tutorial_purchase() -> Dictionary:
 	match cycle.tutorial_step:
 		0:
 			if not game.get("placing_coal"):
-				return {"category": "BASE", "item": "coal", "instruction": "Compra la veta de carbón."}
+				return {"category": "VETAS", "item": "coal", "instruction": "Compra la veta de carbón."}
 		2:
 			return {"category": "EXPANSION", "item": "expansion", "instruction": "Compra la ampliación a 7 × 5."}
 		3:
@@ -800,7 +806,7 @@ func update_money(amount: int) -> void:
 	if shop_open:
 		if shop_title.text == "INVESTIGACIÓN":
 			return
-		if shop_title.text == "BASE":
+		if shop_title.text in ITEM_CATEGORIES:
 			refresh_item_buttons()
 			return
 		if shop_title.text in CATEGORIES:
@@ -857,18 +863,17 @@ func open_category(category: String) -> void:
 				button.pressed.connect(request_item.bind("expansion", expansion_requested))
 			purchase_buttons["expansion"] = button
 			shop_content.add_child(button)
-		"BASE":
-			shop_content.add_child(create_label("MINERIA", 19, Color("#f3ca85")))
+		"VETAS":
 			add_item_button("VETA DE CARBÓN · 100", economy.COAL_VEIN_PRICE, "coal", coal_vein_requested)
 			add_item_button("VETA DE LATÓN · 150", economy.BRASS_VEIN_PRICE, "brass", brass_vein_requested)
-			if visible_shop_items().size() > (2 if progression != null and progression.is_item_unlocked("brass") else 1):
-				shop_content.add_child(create_label("AUTOMATIZACION", 19, Color("#f3ca85")))
+		"HERRAMIENTAS":
+			add_item_button("TALADRO AUTOMÁTICO · 200", economy.DRILL_PRICE, "drill", drill_requested)
+			add_item_button("COMPACTADOR · 300", CompactorScript.PRICE, "compactor", compactor_requested)
+		"AUTOMATIZACIÓN":
 			add_item_button("CINTA RECTA · 50", economy.CONVEYOR_PRICE, "straight", conveyor_requested)
 			add_item_button("CINTA EN L DERECHA · 50", economy.CONVEYOR_PRICE, "corner_right", corner_conveyor_requested)
 			add_item_button("CINTA EN L IZQUIERDA · 50", economy.CONVEYOR_PRICE, "corner_left", left_corner_conveyor_requested)
 			add_item_button("CINTA EN T · 50", economy.CONVEYOR_PRICE, "junction", junction_conveyor_requested)
-			add_item_button("TALADRO AUTOMÁTICO · 200", economy.DRILL_PRICE, "drill", drill_requested)
-			add_item_button("COMPACTADOR · 300", CompactorScript.PRICE, "compactor", compactor_requested)
 		"DEFENSA":
 			var left_cell: Vector2i = grid.defense_cell("left")
 			var right_cell: Vector2i = grid.defense_cell("right")

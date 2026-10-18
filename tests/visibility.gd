@@ -29,13 +29,13 @@ func run_checks() -> void:
 	game.cycle.changed.emit()
 	shop.open_shop()
 	await create_timer(0.4).timeout
-	shop.open_category("BASE")
+	shop.open_category("VETAS")
 	await settle()
 	check(shop.item_buttons.keys() == ["coal"] and shop.purchase_buttons.keys() == ["coal"], "A fresh store contains only the researched base item")
 	var headings: Array[String] = []
 	for child in shop.shop_content.get_children():
 		if child is Label: headings.append(child.text)
-	check(headings == ["MINERIA"], "Hidden automation items leave no empty heading or gap")
+	check(headings.is_empty(), "Hidden automation items leave no empty heading or gap")
 	shop.request_item("drill", shop.drill_requested)
 	check(not game.placing_drill, "A hidden item still cannot be purchased through its handler")
 	if DisplayServer.get_name() != "headless" and "--capture" in args:
@@ -55,12 +55,13 @@ func run_checks() -> void:
 	if DisplayServer.get_name() != "headless" and "--capture" in args:
 		root.get_texture().get_image().save_png("/workspace/.onboarding/display-test/new-research-notice.png")
 	await click(control_point(shop.research_buttons["drill"]))
-	shop.open_category("BASE")
-	check(shop.item_buttons.keys() == ["coal", "drill"], "Researching an item makes it appear in the normal store")
+	shop.open_category("HERRAMIENTAS")
+	check(shop.item_buttons.keys() == ["drill"], "Researching an item makes it appear in the normal store")
 	player.award_night()
 	check(shop.notice_research_ids == ["drill", "straight_belt"], "Research-point rewards do not repeat or expand the notice")
+	shop.open_category("AUTOMATIZACIÓN")
 	game.research_technology("straight_belt")
-	check(shop.item_buttons.keys() == ["coal", "straight", "drill"], "An unlock refreshes an already open store immediately")
+	check(shop.item_buttons.keys() == ["straight"], "An unlock refreshes an already open store immediately")
 	await dismiss_notice(shop)
 	check(not shop.research_notice.visible and not shop.research_notice_backdrop.visible and shop.notice_research_ids.is_empty(), "The timer removes the notice and its accumulated research list")
 	shop.open_category("INVESTIGACIÓN")
