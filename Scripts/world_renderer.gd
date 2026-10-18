@@ -153,26 +153,35 @@ func draw_nugget(center: Vector2, kind: String, amount: int) -> void:
 
 func draw_refined_nugget(center: Vector2, kind: String, amount: int) -> void:
 	var brass: bool = kind.begins_with("brass")
+	# A modest step up from raw ore; larger tiers can grow into fuller clusters.
 	var outline := PackedVector2Array([
-		center + Vector2(-18, -6), center + Vector2(-9, -17),
-		center + Vector2(9, -17), center + Vector2(18, -6),
-		center + Vector2(16, 10), center + Vector2(5, 18),
-		center + Vector2(-11, 15), center + Vector2(-18, 4),
+		center + Vector2(-15, -3), center + Vector2(-11, -10),
+		center + Vector2(-4, -15), center + Vector2(5, -14),
+		center + Vector2(9, -9), center + Vector2(14, -6),
+		center + Vector2(16, 2), center + Vector2(12, 10),
+		center + Vector2(4, 14), center + Vector2(-5, 15),
+		center + Vector2(-13, 10), center + Vector2(-16, 3),
 	])
-	draw_colored_polygon(outline, Color("#cf923f") if brass else Color("#26333e"))
+	draw_colored_polygon(outline, Color("#a3753e") if brass else Color("#171719"))
 	draw_colored_polygon(PackedVector2Array([
-		center + Vector2(-18, -6), center + Vector2(0, 0),
-		center + Vector2(5, 18), center + Vector2(-11, 15), center + Vector2(-18, 4),
-	]), Color("#a66b2d") if brass else Color("#3d4d59"))
+		center + Vector2(-13, -3), center + Vector2(-9, -9),
+		center + Vector2(-3, -13), center + Vector2(4, -12),
+		center + Vector2(6, -7), center + Vector2(1, -1),
+		center + Vector2(-5, 3), center + Vector2(-11, 3),
+	]), Color("#dfb578") if brass else Color("#444649"))
 	draw_colored_polygon(PackedVector2Array([
-		center + Vector2(-18, -6), center + Vector2(-9, -17),
-		center + Vector2(9, -17), center + Vector2(18, -6), center,
-	]), Color("#f0c875") if brass else Color("#71838c"))
+		center + Vector2(3, -5), center + Vector2(9, -7),
+		center + Vector2(13, -3), center + Vector2(13, 3),
+		center + Vector2(8, 8), center + Vector2(1, 7), center + Vector2(-1, 2),
+	]), Color("#bf8c4e") if brass else Color("#2d2f32"))
+	draw_colored_polygon(PackedVector2Array([
+		center + Vector2(-9, 7), center + Vector2(-4, 3),
+		center + Vector2(2, 4), center + Vector2(5, 10),
+		center + Vector2(0, 12), center + Vector2(-6, 12),
+	]), Color("#8f7744") if brass else Color("#222326"))
 	var closed: PackedVector2Array = outline.duplicate()
 	closed.append(outline[0])
-	draw_polyline(closed, Color("#69451e") if brass else Color("#111a22"), 2)
-	draw_line(center + Vector2(-7, -13), center + Vector2(6, -13), Color("#fff0b8") if brass else Color("#b4c4c9"), 2)
-	draw_line(center, center + Vector2(5, 15), Color("#edb65d") if brass else Color("#536977"), 1.5)
+	draw_polyline(closed, Color("#5c4026") if brass else Color("#0c0d0e"), 1.5)
 	if amount > 1:
 		draw_string(ThemeDB.fallback_font, center + Vector2(12, 20), str(amount), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#ffdb85"))
 
