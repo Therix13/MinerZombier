@@ -724,7 +724,10 @@ func update_cycle() -> void:
 					cycle_goal.text = "Coloca la veta en la casilla dorada."
 				else:
 					cycle_goal.text = tutorial_navigation_text()
-			1, 6:
+			6:
+				cycle_action.hide()
+				cycle_goal.text = tutorial_navigation_text() if cycle.needs_ammo_vein() and not cycle.needs_tutorial_income() and not game.get("placing_coal") else cycle.tutorial_text()
+			1:
 				cycle_action.text = "MUNICIÓN · %d / 4" % roundi(cycle.ammo_damage() / 0.5) if cycle.tutorial_step == 6 else "CARBÓN VENDIDO · %d / %d" % [mini(cycle.coal_sold, cycle.TUTORIAL_SALES_TARGET), cycle.TUTORIAL_SALES_TARGET]
 				cycle_action.disabled = true
 			2:
@@ -733,6 +736,8 @@ func update_cycle() -> void:
 			3, 4, 5:
 				cycle_action.hide()
 				if cycle.needs_tutorial_income():
+					cycle_goal.text = cycle.tutorial_text()
+				elif cycle.advanced_vein_lesson() and (not cycle.vein_fusion_targets().is_empty() or game.get("placing_coal")):
 					cycle_goal.text = cycle.tutorial_text()
 				elif cycle.vein_lesson_active() and cycle.mining.coal_veins.has(cycle.TUTORIAL_NEW_VEIN_CELL):
 					cycle_goal.text = cycle.tutorial_text()
@@ -789,10 +794,12 @@ func tutorial_purchase() -> Dictionary:
 		3:
 			if not game.get("placing_coal") and not cycle.mining.coal_veins.has(cycle.TUTORIAL_NEW_VEIN_CELL): return {"category": "VETAS", "item": "coal", "instruction": "Compra otra veta de carbón para fusionarlas."}
 		4:
-			return {"category": "DEFENSA", "item": "defense_platforms", "instruction": "Compra las plataformas."}
+			if cycle.vein_fusion_targets().is_empty() and not game.get("placing_coal"): return {"category":"VETAS","item":"coal","instruction":"Compra otra veta de carbón para seguir fusionando."}
 		5:
-			if not game.get("placing_launcher"):
-				return {"category": "DEFENSA", "item": "launcher", "instruction": "Compra el Lanzapepitas."}
+			if not cycle.platforms_ready(): return {"category":"DEFENSA","item":"defense_platforms","instruction":"Compra las plataformas para colocar el arma."}
+			if not game.get("placing_launcher"): return {"category":"DEFENSA","item":"launcher","instruction":"Compra el Lanzapepitas."}
+		6:
+			if cycle.needs_ammo_vein() and not game.get("placing_coal"): return {"category":"VETAS","item":"coal","instruction":"Compra una veta de Nv. 1 para fabricar munición."}
 	return {}
 
 func tutorial_navigation_text() -> String:

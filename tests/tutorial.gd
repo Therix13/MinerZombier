@@ -134,8 +134,8 @@ func check_locked_actions() -> void:
 
 func extract_one() -> void:
 	for attempt in range(30):
-		for index in range(5): await click_cell(cycle.TUTORIAL_COAL_CELL)
-		if cycle.tutorial_step != 6 or game.mining.nugget_type(cycle.TUTORIAL_ORE_CELL) == "coal": return
+		for index in range(5): await click_cell(cycle.tutorial_mining_cell())
+		if cycle.tutorial_step != 6 or game.mining.nugget_type(cycle.tutorial_output_cell()) == "coal": return
 		var parking: Array[Vector2i] = game.get_node("TutorialGuide").targets()
 		await drag_cell(parking[0],parking[1])
 
@@ -148,7 +148,7 @@ func earn_purchase_money() -> void:
 	var mover: Node = game.get_node("WorldInteractions")
 	if requested > 2:
 		game.economy.coins = 1000
-		check(cycle.needs_tutorial_income(), "Even excess coins cannot skip the required level-%d sale" % requested)
+		check(cycle.needs_tutorial_income() == (not cycle.level4_sold), "Excess coins bypass only funding, while the first level-four sale remains mandatory")
 		game.economy.coins = balance
 		check(not cycle.allows_action("unlock_defense" if requested == 3 else "buy_launcher"), "The requested tier must be sold before its purchase")
 		game.mining.coal_nuggets[cycle.TUTORIAL_ORE_CELL] = 1
@@ -171,6 +171,44 @@ func earn_purchase_money() -> void:
 		count += 1
 	await settle()
 	check(count < 300 and not cycle.needs_tutorial_income() and game.economy.coins == balance + earned and not cycle.allows_action("mine_coal"), "Only actual tier sales fund the next purchase; its menu then unlocks")
+
+func fund_current_vein() -> void:
+	var count := 0
+	var mover: Node = game.get_node("WorldInteractions")
+	while cycle.needs_tutorial_income() and count < 100:
+		var targets: Array[Vector2i] = cycle.income_targets()
+		if targets.size() == 1:
+			for strike in range(5): game.mining.mine(targets[0])
+		else:
+			check(mover.drop("nugget",targets[0],targets[1]),"Actual nugget sales fund the next vein without gifts")
+		count += 1
+	await settle()
+	check(count < 100 and not cycle.needs_tutorial_income(),"The marked mining route can pay for the next vein")
+
+func learn_advanced_veins() -> void:
+	var purchases := 0
+	var merges := 0
+	while cycle.advanced_vein_lesson() and purchases < 8:
+		if cycle.needs_tutorial_income(): await fund_current_vein()
+		var pair: Array[Vector2i] = cycle.vein_fusion_targets()
+		if pair.size() == 2:
+			var tier: int = game.mining.vein_level(pair[0])
+			check(game.mining.vein_level(pair[1]) == tier,"The guide only pairs veins of the same tier")
+			await drag_cell(pair[0],pair[1])
+			check(game.mining.vein_level(pair[1]) == tier + 1,"A real drag creates the next vein tier")
+			merges += 1
+			if DisplayServer.get_name() != "headless" and pair[1] == cycle.TUTORIAL_COAL_CELL and tier == 2:
+				await settle()
+				root.get_texture().get_image().save_png("/workspace/.onboarding/display-test/advanced-vein-lesson.png")
+		else:
+			await purchase_route("VETAS","coal")
+			var at: Vector2i = cycle.next_vein_cell()
+			await click_cell(at)
+			check(game.mining.vein_at(at) == "coal","A paid new vein occupies its marked staging cell")
+			purchases += 1
+	await settle()
+	check(purchases == 6 and merges == 6 and cycle.tutorial_step == 5 and game.mining.vein_level(cycle.TUTORIAL_COAL_CELL) == 4,"Six purchased veins and six real merges complete the lesson through levels three and four")
+	check(grid.cave_width == 3 and grid.cave_height == 3 and grid.defense_tiles.is_empty(),"The level-four vein lesson needs neither expansion nor defense purchases")
 
 func run_checks() -> void:
 	root.show()
@@ -253,29 +291,36 @@ func run_checks() -> void:
 	check(game.mining.coal_veins.size() == 2 and game.economy.coins == 0 and cycle.tutorial_display_step() == 4,"The second vein is paid for and marked as the fourth lesson")
 	await drag_cell(cycle.TUTORIAL_NEW_VEIN_CELL,cycle.TUTORIAL_COAL_CELL)
 	check(cycle.vein_fusion_taught and cycle.tutorial_step == 4 and game.mining.vein_level(cycle.TUTORIAL_COAL_CELL) == 2 and game.mining.coal_veins.size() == 1,"A real drag fuses the two veins before defense preparation")
-	await earn_purchase_money()
+	await learn_advanced_veins()
+	if cycle.needs_tutorial_income(): await earn_purchase_money()
+	var platform_cash: int = game.economy.coins
 	await purchase_route("DEFENSA", "defense_platforms")
-	check(cycle.tutorial_step == 5 and grid.defense_tiles.size() == 2 and game.economy.coins == 35 and cycle.level3_sold, "Platforms are bought with mined sales")
-	await earn_purchase_money()
+	check(cycle.tutorial_step == 5 and grid.defense_tiles.size() == 2 and game.economy.coins == platform_cash - 100,"Platforms are bought during the weapon lesson after learning level-four veins")
+	if cycle.needs_tutorial_income(): await earn_purchase_money()
+	var launcher_cash: int = game.economy.coins
 	await purchase_route("DEFENSA", "launcher")
-	check(game.placing_launcher and game.economy.coins == 305, "Selecting the launcher reserves no money")
+	check(game.placing_launcher and game.economy.coins == launcher_cash,"Selecting the launcher reserves no money")
 	await click_cell(grid.defense_cell("right"))
-	check(game.launchers.launchers.is_empty() and game.placing_launcher and game.economy.coins == 305, "Wrong launcher placement preserves the purchase funds")
+	check(game.launchers.launchers.is_empty() and game.placing_launcher and game.economy.coins == launcher_cash,"Wrong launcher placement preserves the purchase funds")
 	await click_cell(grid.defense_cell("left"))
-	check(cycle.tutorial_step == 6 and game.economy.coins == 105 and cycle.level4_sold and not cycle.free_launcher_available, "The first launcher costs 200 at placement")
+	check(cycle.tutorial_step == 6 and game.economy.coins == launcher_cash - 200 and cycle.level4_sold and not cycle.free_launcher_available,"The first launcher costs 200 at placement")
+	if cycle.needs_tutorial_income(): await fund_current_vein()
+	await purchase_route("VETAS","coal")
+	await click_cell(cycle.TUTORIAL_NEW_VEIN_CELL)
+	check(game.mining.vein_level(cycle.TUTORIAL_NEW_VEIN_CELL) == 1 and not cycle.needs_ammo_vein(),"A separate paid level-one vein supplies basic ammunition after the main vein reaches level four")
 	await check_locked_actions()
-	game.mining.items_for("coal_3")[cycle.TUTORIAL_ORE_CELL] = 1
+	game.mining.items_for("coal_3")[cycle.tutorial_output_cell()] = 1
 	var parking: Array[Vector2i] = game.get_node("TutorialGuide").targets()
 	var before_sale: int = game.economy.coins
 	await drag_cell(parking[0], parking[1])
-	check(parking[1] == grid.sale_cell and game.economy.coins == before_sale + game.economy.sale_value("coal_3") and game.mining.nuggets_at(cycle.TUTORIAL_ORE_CELL) == 0, "Surplus high-tier ore is sold during ammunition training to keep the unexpanded mine free")
+	check(parking[1] == grid.sale_cell and game.economy.coins == before_sale + game.economy.sale_value("coal_3") and game.mining.nuggets_at(cycle.tutorial_output_cell()) == 0, "Surplus high-tier ore is sold during ammunition training to keep the unexpanded mine free")
 	var sold: int = cycle.coal_sold
 	for index in range(4):
 		await extract_one()
 		if index == 0:
-			await drag_cell(cycle.TUTORIAL_ORE_CELL, grid.sale_cell)
-			check(game.mining.nuggets_at(cycle.TUTORIAL_ORE_CELL) == 1 and cycle.coal_sold == sold, "Ammo loading cannot sell the required ammunition")
-		await drag_cell(cycle.TUTORIAL_ORE_CELL, grid.defense_cell("left"))
+			await drag_cell(cycle.tutorial_output_cell(), grid.sale_cell)
+			check(game.mining.nuggets_at(cycle.tutorial_output_cell()) == 1 and cycle.coal_sold == sold, "Ammo loading cannot sell the required ammunition")
+		await drag_cell(cycle.tutorial_output_cell(), grid.defense_cell("left"))
 	check(cycle.tutorial_step == cycle.TUTORIAL_LAST_STEP and is_equal_approx(cycle.ammo_damage(), 2.0), "Four raw nuggets complete preparation after the earlier fusion lesson")
 	var total_exp: int = game.get("progression").total_experience
 	await click_cell(cycle.TUTORIAL_COAL_CELL)
@@ -317,7 +362,7 @@ func run_checks() -> void:
 	shop.open_category("VETAS")
 	check(shop.shop_title.text == "TIENDA", "Direct category calls cannot skip the research lesson")
 	await click_control(shop.category_buttons["INVESTIGACIÓN"])
-	check(shop.research_buttons.keys() == ["brass"] and not shop.research_buttons["brass"].disabled, "Only the level-two brass vein is available in the initial research lesson")
+	check(shop.research_buttons.has("brass") and not shop.research_buttons["brass"].disabled and (game.progression.level > 2 or shop.research_buttons.keys() == ["brass"]), "Brass is available and level-two players see only that research")
 	check(not shop.research_buttons.has("junction_belt"), "Higher-level research is absent during the first research lesson")
 	shop.technology_requested.emit("junction_belt")
 	check(cycle.is_research_tutorial_active() and game.get("progression").research_points == research_points, "An invalid research attempt does not complete the lesson or spend points")
