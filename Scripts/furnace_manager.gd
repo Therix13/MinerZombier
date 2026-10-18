@@ -27,9 +27,9 @@ func _exit_tree() -> void:
 func can_place(cell: Vector2i) -> bool:
 	return mining.can_move_nugget(cell) and grid.is_valid_cell(cell) and cell != grid.sale_cell and not game.get("conveyors").belts.has(cell) and not game.get("launchers").launchers.has(cell)
 
-func place(cell: Vector2i) -> bool:
+func place(cell: Vector2i, output_direction: int = 0) -> bool:
 	if not can_place(cell): return false
-	machines[cell] = {"fuel": 0, "input": "", "output": "", "elapsed": 0.0, "burning": false}
+	machines[cell] = {"fuel": 0, "input": "", "output": "", "elapsed": 0.0, "burning": false, "direction": posmod(output_direction, 4)}
 	changed.emit()
 	return true
 
@@ -96,10 +96,11 @@ func process_smelting(delta: float) -> void:
 			data["burning"] = true
 			changed.emit()
 		data["elapsed"] = minf(PROCESS_TIME, float(data.get("elapsed", 0.0)) + maxf(delta, 0.0))
+		queue_redraw()
 		if float(data["elapsed"]) < PROCESS_TIME: continue
 		data["input"] = ""
 		data["output"] = "brass_ingot"
-		data["elapsed"] = 0.0
+		data["elapsed"] = PROCESS_TIME
 		data["burning"] = false
 		changed.emit()
 		try_output(cell)
@@ -108,14 +109,24 @@ func try_output(cell: Vector2i) -> void:
 	var kind: String = machines[cell].get("output", "")
 	if kind.is_empty(): return
 	var belts: RefCounted = game.get("conveyors")
-	for direction: Vector2i in DIRECTIONS:
-		var at: Vector2i = cell + direction
-		if not belts.belts.has(at) or not mining.can_move_nugget(at) or not belts.accepts_from(at, cell): continue
-		mining.items_for(kind)[at] = 1
-		machines[cell]["output"] = ""
-		mining.changed.emit()
-		changed.emit()
-		return
+	var at: Vector2i = cell + DIRECTIONS[posmod(int(machines[cell].get("direction", 0)), 4)]
+	if at == grid.sale_cell or not mining.can_move_nugget(at): return
+	if belts.belts.has(at) and not belts.accepts_from(at, cell): return
+	mining.items_for(kind)[at] = 1
+	machines[cell]["output"] = ""
+	machines[cell]["elapsed"] = 0.0
+	mining.changed.emit()
+	changed.emit()
+
+func _input(event: InputEvent) -> void:
+	if game == null or not event is InputEventKey or not event.pressed or event.echo or event.keycode != KEY_R: return
+	var mover: Node = game.get_node_or_null("WorldInteractions")
+	if mover == null or not mover.phase_allows() or game.get("cycle").is_night: return
+	if not mover.placing_furnace and not (game.get("holding_object") and game.get("held_object_type") == "furnace"): return
+	game.set("placement_direction", posmod(int(game.get("placement_direction")) + 1, 4))
+	if game.get("holding_object"): game.set("dragging_object", true)
+	queue_redraw()
+	get_viewport().set_input_as_handled()
 
 func _process(delta: float) -> void:
 	if not game.get("cycle").defeated: process_smelting(delta)
@@ -130,10 +141,12 @@ func _draw() -> void:
 	var mover: Node = game.get_node_or_null("WorldInteractions")
 	if mover != null and mover.placing_furnace and not game.get("shop").shop_open and not game.get("shop").shop_animating:
 		var cell: Vector2i = grid.world_to_cell(game.get_local_mouse_position())
-		draw_machine(grid.get_cell_rect(cell).get_center(), {"fuel": 0})
+		draw_machine(grid.get_cell_rect(cell).get_center(), {"fuel": 0, "direction": game.get("placement_direction")})
 		draw_rect(grid.get_cell_rect(cell).grow(-1), Color("#f0c777") if can_place(cell) else Color("#df7770"), false, 2)
 	if game.get("dragging_object") and game.get("held_object_type") == "furnace" and machines.has(game.get("held_object_cell")):
-		draw_machine(game.get("drag_world_position"), machines[game.get("held_object_cell")])
+		var data: Dictionary = machines[game.get("held_object_cell")].duplicate()
+		data["direction"] = game.get("placement_direction")
+		draw_machine(game.get("drag_world_position"), data)
 
 func draw_machine(center: Vector2, data: Dictionary) -> void:
 	draw_rect(Rect2(center - Vector2(21, 21), Vector2(42, 42)), Color("#392d28"))
@@ -145,3 +158,14 @@ func draw_machine(center: Vector2, data: Dictionary) -> void:
 	for x in [-7, 0, 7]: draw_line(center + Vector2(x, -4), center + Vector2(x, 11), Color("#3b3830"), 2)
 	draw_rect(Rect2(center + Vector2(-13, 17), Vector2(26, 2)), Color("#272b2c"))
 	draw_rect(Rect2(center + Vector2(-13, 17), Vector2(26.0 * float(data["fuel"]) / CAPACITY, 2)), Color("#efba61"))
+
+	# Smelting progress is separate from the thin fuel gauge below the fire.
+	if data.get("burning", false) or not str(data.get("output", "")).is_empty():
+		var progress: float = clampf(float(data.get("elapsed", 0.0)) / PROCESS_TIME, 0.0, 1.0)
+		draw_rect(Rect2(center + Vector2(-16, -17), Vector2(32, 4)), Color("#292c2d"))
+		draw_rect(Rect2(center + Vector2(-16, -17), Vector2(32 * progress, 4)), Color("#f6bc5c"))
+	var outward: Vector2 = Vector2(DIRECTIONS[posmod(int(data.get("direction", 0)), 4)])
+	var side := Vector2(-outward.y, outward.x)
+	var tip: Vector2 = center + outward * 22
+	draw_line(center + outward * 14, tip - outward * 3, Color("#f7d57b"), 3)
+	draw_colored_polygon(PackedVector2Array([tip, tip - outward * 8 + side * 5, tip - outward * 8 - side * 5]), Color("#f7d57b"))

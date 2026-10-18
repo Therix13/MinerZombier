@@ -147,7 +147,7 @@ func swaps_contents(kind: String, source: Vector2i, destination: Vector2i) -> bo
 	return source != destination and not cell_data(destination).is_empty() and not (kind == "nugget" and (destination == grid.sale_cell or game.get("launchers").can_receive(destination) or game.get("mining").can_move_nugget(destination))) and can_drop(kind, source, destination)
 
 func rotate_data(data: Dictionary, direction: int) -> void:
-	for kind in ["coal_vein", "brass_vein", "belt", "compactor"]:
+	for kind in ["coal_vein", "brass_vein", "belt", "compactor", "furnace"]:
 		if data.has(kind): data[kind]["direction"] = posmod(direction, 4)
 	if data.has("drill"): data["drill"] = posmod(direction, 4)
 
@@ -168,7 +168,7 @@ func apply_cells(cells: Dictionary) -> void:
 	game.get_node("Compactors").changed.emit()
 	game.get_node("Furnaces").changed.emit()
 
-func drop(kind: String, source: Vector2i, destination: Vector2i, direction: int = 1) -> bool:
+func drop(kind: String, source: Vector2i, destination: Vector2i, direction: int = -1) -> bool:
 	if not can_drop(kind, source, destination):
 		return false
 	if destination == grid.sale_cell and kind != "nugget": return sell(kind, source)
@@ -202,7 +202,10 @@ func drop(kind: String, source: Vector2i, destination: Vector2i, direction: int 
 			mining.move_nugget(source, destination)
 			return true
 	var origin: Dictionary = cell_data(source)
-	if kind != "nugget": rotate_data(origin, direction)
+	if kind != "nugget":
+		var rotation: int = direction
+		if rotation < 0: rotation = int(origin.get("furnace", {}).get("direction", 0)) if kind == "furnace" else 1
+		rotate_data(origin, rotation)
 	if source == destination:
 		apply_cells({source: origin})
 	else:
@@ -339,7 +342,7 @@ func place_selected(cell: Vector2i) -> bool:
 			cycle.use_free_launcher()
 			game.set("placing_free_launcher", false)
 		"compactor": game.get_node("Compactors").place(cell, game.get_node("Compactors").direction)
-		"furnace": game.get_node("Furnaces").place(cell)
+		"furnace": game.get_node("Furnaces").place(cell, direction)
 	game.set("placement_paid", false)
 	game.get_node("Compactors").paid = false
 	if cycle.is_guided_tutorial_active() or not Input.is_key_pressed(KEY_SHIFT) or not economy.can_afford(item_price(item)):
@@ -437,6 +440,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		game.set("placement_direction", int(data["belt"]["direction"]))
 	elif kind == "drill":
 		game.set("placement_direction", int(data["drill"]))
-	elif kind == "compactor":
-		game.set("placement_direction", int(data["compactor"]["direction"]))
+	elif kind in ["compactor", "furnace"]:
+		game.set("placement_direction", int(data[kind].get("direction", 0)))
 	get_viewport().set_input_as_handled()

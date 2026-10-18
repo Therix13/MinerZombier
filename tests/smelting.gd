@@ -46,6 +46,7 @@ func run_checks() -> void:
 	var cash: int = game.economy.coins
 	furnace.process_smelting(3.9)
 	check(furnace.machines[c]["fuel"] == 19 and furnace.machines[c]["output"] == "" and furnace.machines[c]["input"] == "brass_4", "One fuel starts a four-second batch; nothing finishes early")
+	put(out, {"coal": 1})
 	furnace.process_smelting(0.1)
 	check(furnace.machines[c]["input"] == "" and furnace.machines[c]["output"] == "brass_ingot" and furnace.machines[c]["fuel"] == 19, "One level-four nugget becomes exactly one level-one ingot")
 	furnace.process_smelting(100)
@@ -117,6 +118,51 @@ func run_checks() -> void:
 	var saved: Dictionary = furnace.machines[c].duplicate(true)
 	check(mover.drop("furnace", c, b) and furnace.machines[b] == saved, "Moving a working furnace preserves its fuel and progress")
 	check(mover.sell("furnace", b) and game.mining.nugget_type(b) == "brass_4" and game.mining.nuggets_at(b) == 1, "Selling a working furnace returns only its unconsumed material")
+	clear_items()
+	if DisplayServer.get_name() != "headless" and "--capture" in OS.get_cmdline_user_args():
+		await create_timer(3.1).timeout
+	for direction in range(4):
+		furnace.place(c, direction)
+		var target: Vector2i = c + furnace.DIRECTIONS[direction]
+		furnace.receive(c, "coal_4")
+		furnace.receive(c, "brass_4")
+		furnace.process_smelting(2)
+		check(furnace.machines[c]["elapsed"] == 2.0 and furnace.machines[c]["burning"], "Direction %d shows half a batch after two seconds" % direction)
+		if direction == 1 and DisplayServer.get_name() != "headless" and "--capture" in OS.get_cmdline_user_args():
+			furnace.queue_redraw()
+			await settle()
+			root.get_texture().get_image().save_png("/workspace/.onboarding/display-test/furnace-progress.png")
+		put(target, {"coal": 1})
+		furnace.process_smelting(2)
+		check(furnace.machines[c]["output"] == "brass_ingot" and furnace.machines[c]["elapsed"] == 4, "Direction %d retains the completed product behind a blocked exit" % direction)
+		game.mining.items_for("coal").erase(target)
+		furnace.process_smelting(0)
+		check(game.mining.nugget_type(target) == "brass_ingot" and furnace.machines[c]["elapsed"] == 0, "Direction %d ejects onto empty ground and resets progress" % direction)
+		clear_items()
+	furnace.place(c, 1)
+	game.conveyors.place(b, 3)
+	furnace.receive(c, "coal_4")
+	furnace.receive(c, "brass_4")
+	furnace.process_smelting(4)
+	check(furnace.machines[c]["output"] == "brass_ingot" and game.mining.nuggets_at(b) == 0, "A belt facing into the outlet cannot accept the finished ingot")
+	game.conveyors.belts[b]["direction"] = 1
+	furnace.process_smelting(0)
+	check(game.mining.nugget_type(b) == "brass_ingot", "Correcting the outlet belt releases the waiting product")
+	clear_items()
+	game.economy.toggle_developer_mode()
+	mover.select_item("furnace")
+	await settle()
+	var before: int = game.placement_direction
+	await key(KEY_R)
+	check(game.placement_direction == (before + 1) % 4, "R rotates the furnace placement outlet")
+	await place_at(c)
+	check(furnace.machines[c]["direction"] == (before + 1) % 4, "Placement stores the preview outlet direction")
+	await mouse_move(point(c))
+	await mouse_button(point(c), true)
+	await key(KEY_R)
+	await mouse_move(point(b))
+	await mouse_button(point(b), false)
+	check(furnace.machines.has(b) and furnace.machines[b]["direction"] == (before + 2) % 4, "Dragging and R rotate the actual furnace outlet")
 	if DisplayServer.get_name() != "headless" and "--capture" in OS.get_cmdline_user_args():
 		clear_items()
 		for level in range(1, 5): game.mining.items_for("brass_ingot" if level == 1 else "brass_ingot_" + str(level))[Vector2i(15, level - 1)] = 1

@@ -40,10 +40,10 @@ func run_checks() -> void:
 	check(furnace.machines.has(c) and not mover.placing_furnace, "A real click places the furnace")
 	check(not game.mining.can_place_vein(c) and not game.drills.can_place(c) and not game.conveyors.can_place(c) and not compactors.can_place(c) and not game.mining.can_move_nugget(c), "All construction and loose-ore placement respects the furnace footprint")
 	for kind: String in ["coal_4"]:
-		furnace.machines[c] = {"fuel": 0}
+		furnace.machines[c] = {"fuel": 0, "direction": 0}
 		put(a, {kind: 1})
 		check(mover.drop("nugget", a, c) and furnace.machines[c]["fuel"] == furnace.FUEL_VALUES[kind] and game.mining.nuggets_at(a) == 0, "Manual %s adds exactly %d fuel" % [kind, furnace.FUEL_VALUES[kind]])
-	furnace.machines[c] = {"fuel": 0}
+	furnace.machines[c] = {"fuel": 0, "direction": 0}
 	for kind: String in ["brass", "brass_2", "brass_3"]:
 		put(a, {kind: 1})
 		check(not mover.drop("nugget", a, c) and game.mining.nugget_type(a) == kind, "Nonfuel %s is preserved outside the furnace" % kind)
@@ -54,13 +54,13 @@ func run_checks() -> void:
 	game.mining.coal_nuggets.clear()
 	game.conveyors.place(a, 1)
 	game.conveyors.place(b, 3)
-	furnace.machines[c] = {"fuel": 20}
+	furnace.machines[c] = {"fuel": 20, "direction": 0}
 	put(a, {"coal_4": 1})
 	put(b, {"coal_4": 1})
 	game.conveyors.tick()
 	check(furnace.machines[c]["fuel"] == 40 and game.mining.nuggets_at(a) == 0 and game.mining.nugget_type(b) == "coal_4", "Competing belts respect remaining fuel capacity and preserve rejected coal")
 	game.mining.coal_level4_nuggets.clear()
-	furnace.machines[c] = {"fuel": 0}
+	furnace.machines[c] = {"fuel": 0, "direction": 0}
 	for i in range(2): furnace.receive(c, "coal_4")
 	var saved: Dictionary = furnace.machines[c].duplicate(true)
 	check(mover.drop("furnace", c, Vector2i(15, 2)) and furnace.machines[Vector2i(15, 2)] == saved, "Moving a fueled furnace preserves its full inventory")
