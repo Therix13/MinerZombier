@@ -40,10 +40,10 @@ func check_first_automated_sale(game: Node) -> void:
 	for i in range(7):
 		mining.call("mine", Vector2i(15, 1))
 	conveyors.call("tick")
-	check(cycle.get("coal_sold") == 1 and cycle.get("tutorial_step") == 2, "First sale by conveyor advances tutorial without manual sale")
-	check(economy.get("coins") == 1005, "First automated sale pays once and grants expansion bonus once")
+	check(cycle.get("coal_sold") == 1 and cycle.get("tutorial_step") == 1, "First automatic sale waits for the remaining four sales")
+	check(economy.get("coins") == 505, "First automatic sale pays once without an early tutorial bonus")
 	conveyors.call("tick")
-	check(economy.get("coins") == 1005 and cycle.get("coal_sold") == 1, "Empty conveyor does not duplicate sale or tutorial reward")
+	check(economy.get("coins") == 505 and cycle.get("coal_sold") == 1, "Empty conveyor does not duplicate sale or tutorial reward")
 
 func run_checks() -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args()
@@ -73,7 +73,7 @@ func run_checks() -> void:
 	var defense_cell: Vector2i = game.get("grid").defense_cell("left")
 	game.get("launchers").place(defense_cell)
 	game.get("launchers").receive(defense_cell, "coal")
-	game.get("cycle").tutorial_step = 7
+	game.get("cycle").tutorial_step = game.get("cycle").TUTORIAL_LAST_STEP
 	game.call("start_night")
 	check(not get_nodes_in_group("zombies").is_empty(), "Shutdown scenario has an active enemy")
 	var final_refs: Array[WeakRef] = manager_refs(game)

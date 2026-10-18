@@ -6,12 +6,11 @@ const NIGHT_REWARD: int = 50
 const TUTORIAL_EXPANSION_BONUS: int = 500
 const TUTORIAL_COAL_CELL := Vector2i(14, 0)
 const TUTORIAL_ORE_CELL := Vector2i(15, 0)
-const TUTORIAL_BELT_CELL := Vector2i(14, 1)
+const TUTORIAL_SALES_TARGET: int = 5
 const TUTORIAL_ACTIONS := [
 	["buy_coal", "place_coal"],
 	["mine_coal", "sell_coal"],
 	["expand"],
-	["buy_conveyor", "place_conveyor"],
 	["unlock_defense"],
 	["buy_launcher", "place_launcher"],
 	["mine_coal", "load_ammo"],
@@ -19,9 +18,10 @@ const TUTORIAL_ACTIONS := [
 ]
 const TUTORIAL_TITLES := [
 	"Tu primera veta", "Del carbón a las monedas", "Haz sitio para crecer",
-	"Tu primera cinta", "Prepara las defensas", "Tu primer lanzapapas",
+	"Prepara las defensas", "Tu primer lanzapapas",
 	"Carga la munición", "¡Todo listo!",
 ]
+const TUTORIAL_LAST_STEP: int = 6
 
 var day: int = 1
 var is_night: bool = false
@@ -68,6 +68,8 @@ func _on_sale(kind: String) -> void:
 	if kind == "coal":
 		coal_sold += 1
 	refresh_tutorial()
+	if is_tutorial_active() and tutorial_step == 1:
+		changed.emit()
 
 func is_tutorial_active() -> bool:
 	return day == 1 and not is_night and not defeated
@@ -75,10 +77,10 @@ func is_tutorial_active() -> bool:
 func allows_action(action: String) -> bool:
 	if not is_tutorial_active():
 		return true
-	return action in TUTORIAL_ACTIONS[clampi(tutorial_step, 0, 7)]
+	return action in TUTORIAL_ACTIONS[clampi(tutorial_step, 0, TUTORIAL_LAST_STEP)]
 
 func tutorial_title() -> String:
-	return TUTORIAL_TITLES[clampi(tutorial_step, 0, 7)]
+	return TUTORIAL_TITLES[clampi(tutorial_step, 0, TUTORIAL_LAST_STEP)]
 
 func allows_world_press(cell: Vector2i, placing: String = "") -> bool:
 	if not is_tutorial_active():
@@ -86,7 +88,7 @@ func allows_world_press(cell: Vector2i, placing: String = "") -> bool:
 	if placing == "coal":
 		return allows_action("place_coal") and cell == TUTORIAL_COAL_CELL
 	if placing == "belt":
-		return allows_action("place_conveyor") and cell == TUTORIAL_BELT_CELL
+		return false
 	if placing == "launcher":
 		return allows_action("place_launcher") and cell == grid.defense_cell("left")
 	if not placing.is_empty():
@@ -120,22 +122,20 @@ func refresh_tutorial() -> void:
 	if day != 1 or is_night or defeated:
 		return
 	var previous: int = tutorial_step
-	while tutorial_step < 7:
+	while tutorial_step < TUTORIAL_LAST_STEP:
 		var completed: bool = false
 		match tutorial_step:
 			0:
 				completed = not mining.coal_veins.is_empty()
 			1:
-				completed = coal_sold > 0
+				completed = coal_sold >= TUTORIAL_SALES_TARGET
 			2:
 				completed = grid.cave_width >= 7 and grid.cave_height >= 5
 			3:
-				completed = not conveyors.belts.is_empty()
-			4:
 				completed = grid.defense_tiles.size() >= 2
-			5:
+			4:
 				completed = not launchers.launchers.is_empty()
-			6:
+			5:
 				completed = ammo_damage() >= 2.0
 		if not completed:
 			break
@@ -154,23 +154,21 @@ func tutorial_text() -> String:
 		1:
 			if mining.nuggets_at(TUTORIAL_ORE_CELL) > 0:
 				return "Arrastra la pepita hasta el cofre marcado para venderla."
-			return "Haz clic en la veta hasta extraer una pepita. Después la venderemos."
+			return "Extrae y vende 5 pepitas de carbón en el cofre."
 		2:
-			return "Tu primera venta te dio 500 monedas extra. Amplía la base a 7 × 5."
+			return "Has ganado 500 monedas extra. Amplía la base a 7 × 5."
 		3:
-			return "Compra una cinta y colócala en la casilla marcada."
-		4:
 			return "Desbloquea las dos plataformas para defender la entrada."
-		5:
+		4:
 			return "Obtén tu lanzapapas gratuito y colócalo en la plataforma dorada."
-		6:
+		5:
 			if mining.nuggets_at(TUTORIAL_ORE_CELL) > 0:
 				return "Arrastra la pepita al lanzapapas marcado. Necesitas cargar 4 en total."
 			return "Extrae carbón de tu veta y arrástralo al lanzapapas: 4 pepitas preparan la primera noche."
 	return "¡Preparación lista! Inicia la primera noche."
 
 func can_start_night() -> bool:
-	return not is_night and not defeated and not launchers.launchers.is_empty() and has_ammo() and (day > 1 or tutorial_step >= 7)
+	return not is_night and not defeated and not launchers.launchers.is_empty() and has_ammo() and (day > 1 or tutorial_step >= TUTORIAL_LAST_STEP)
 
 func start_night() -> bool:
 	if not can_start_night():

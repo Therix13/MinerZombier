@@ -6,6 +6,7 @@ var conveyors: RefCounted
 var drills: RefCounted
 var launchers: RefCounted
 var tutorial: RefCounted
+var interactions: Node
 var placing_launcher: bool = false
 var hovered_cell := Vector2i(-999, -999)
 var sale_hovered := false
@@ -29,6 +30,7 @@ func setup(grid_manager: RefCounted, mining_manager: RefCounted, conveyor_manage
 	drills = drill_manager
 
 func _draw() -> void:
+	var swap_bundle: bool = dragging_object and is_instance_valid(interactions) and interactions.swaps_contents(held_object_type, held_object_cell, grid.world_to_cell(drag_world_position))
 	draw_rect(Rect2(Vector2.ZERO, Vector2(grid.MAP_WIDTH * grid.TILE_SIZE, grid.GRID_OFFSET_Y)), Color.WHITE)
 	for y in range(grid.MAP_HEIGHT):
 		for x in range(grid.MAP_WIDTH):
@@ -46,7 +48,7 @@ func _draw() -> void:
 		var connector_center: Vector2 = connector_rect.get_center()
 		draw_circle(connector_center, 3.0, Color("#d1ad66"))
 	for cell in conveyors.belts:
-		if holding_object and dragging_object and held_object_type == "belt" and cell == held_object_cell:
+		if holding_object and dragging_object and (held_object_type == "belt" or swap_bundle) and cell == held_object_cell:
 			continue
 		draw_conveyor(grid.get_cell_rect(cell).get_center(), conveyors.belt_direction(cell), false, conveyors.belt_shape(cell))
 	for cell in drills.drills:
@@ -54,12 +56,16 @@ func _draw() -> void:
 			continue
 		draw_drill(grid.get_cell_rect(cell).get_center(), int(drills.drills[cell]), false)
 	for cell in mining.coal_nuggets:
+		if holding_object and dragging_object and (held_object_type == "belt" or swap_bundle) and cell == held_object_cell:
+			continue
 		var amount: int = int(mining.coal_nuggets[cell])
 		if holding_object and dragging_object and held_object_type == "nugget" and cell == held_object_cell:
 			amount -= 1
 		if amount > 0:
 			draw_coal_nugget(grid.get_cell_rect(cell).get_center(), amount)
 	for cell in mining.brass_nuggets:
+		if holding_object and dragging_object and (held_object_type == "belt" or swap_bundle) and cell == held_object_cell:
+			continue
 		var amount: int = int(mining.brass_nuggets[cell])
 		if holding_object and dragging_object and held_object_type == "nugget" and cell == held_object_cell:
 			amount -= 1
@@ -117,6 +123,8 @@ func _draw() -> void:
 			valid = destination == held_object_cell or (grid.defense_tiles.has(destination) and launchers.can_place(destination))
 		elif held_object_type == "nugget":
 			valid = mining.can_move_nugget(destination) or destination == grid.sale_cell or launchers.can_receive(destination)
+		if is_instance_valid(interactions):
+			valid = interactions.can_drop(held_object_type, held_object_cell, destination)
 		if tutorial != null:
 			valid = valid and tutorial.allows_interaction(held_object_type, held_object_cell, destination, true)
 		if destination != grid.sale_cell or not valid:
@@ -132,9 +140,15 @@ func _draw() -> void:
 			draw_drill(drag_world_position, placement_direction, true)
 		elif held_object_type == "belt":
 			draw_conveyor(drag_world_position, placement_direction, true, held_belt_shape)
+			if mining.nugget_type(held_object_cell) == "coal":
+				draw_coal_nugget(drag_world_position, mining.nuggets_at(held_object_cell))
+			elif mining.nugget_type(held_object_cell) == "brass":
+				draw_brass_nugget(drag_world_position, mining.nuggets_at(held_object_cell))
 		elif held_object_type == "launcher":
 			draw_launcher(drag_world_position, launchers.launchers[held_object_cell], true)
 		elif held_object_type == "nugget":
+			if swap_bundle and conveyors.belts.has(held_object_cell):
+				draw_conveyor(drag_world_position, conveyors.belt_direction(held_object_cell), true, conveyors.belt_shape(held_object_cell))
 			if mining.nugget_type(held_object_cell) == "brass":
 				draw_brass_nugget(drag_world_position, 1)
 			else:

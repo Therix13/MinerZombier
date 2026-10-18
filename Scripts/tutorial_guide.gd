@@ -37,7 +37,7 @@ func focus_objective() -> void:
 	var view_size: Vector2 = get_viewport().get_visible_rect().size
 	var zoom: float = clampf(view_size.x / (12.0 * cycle.grid.TILE_SIZE), controller.min_zoom, controller.max_zoom)
 	camera.zoom = Vector2.ONE * zoom
-	camera.position = Vector2(14.5 * cycle.grid.TILE_SIZE, 162.0 if cycle.tutorial_step >= 4 else cycle.grid.GRID_OFFSET_Y + 20.0)
+	camera.position = Vector2(14.5 * cycle.grid.TILE_SIZE, 162.0 if cycle.tutorial_step >= 3 else cycle.grid.GRID_OFFSET_Y + 20.0)
 	controller.clamp_position()
 	camera.force_update_scroll()
 	game.get("shop").set_view_mode(false)
@@ -103,17 +103,16 @@ func targets() -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
 	match cycle.tutorial_step:
 		0: result.append(cycle.TUTORIAL_COAL_CELL)
-		1, 6:
+		1, 5:
 			if cycle.mining.nuggets_at(cycle.TUTORIAL_ORE_CELL) > 0:
 				result.append(cycle.TUTORIAL_ORE_CELL)
 				result.append(cycle.grid.sale_cell if cycle.tutorial_step == 1 else cycle.grid.defense_cell("left"))
 			else:
 				result.append(cycle.TUTORIAL_COAL_CELL)
-		3: result.append(cycle.TUTORIAL_BELT_CELL)
-		4:
+		3:
 			result.append(cycle.grid.defense_cell("left"))
 			result.append(cycle.grid.defense_cell("right"))
-		5, 7: result.append(cycle.grid.defense_cell("left"))
+		4, 6: result.append(cycle.grid.defense_cell("left"))
 	return result
 
 func _draw() -> void:
@@ -124,11 +123,11 @@ func _draw() -> void:
 	for index in range(cells.size()):
 		var rect: Rect2 = cycle.grid.get_cell_rect(cells[index]).grow(-1.5)
 		var color := Color("#f0c777")
-		if cells.size() == 2 and index == 0 and cycle.tutorial_step in [1, 6]:
+		if cells.size() == 2 and index == 0 and cycle.tutorial_step in [1, 5]:
 			color = Color("#b6d98e")
 		draw_rect(rect, Color(color, 0.12))
 		draw_rect(rect, Color(color, glow), false, 2.0)
-	if cells.size() == 2 and cycle.tutorial_step in [1, 6]:
+	if cells.size() == 2 and cycle.tutorial_step in [1, 5]:
 		var source: Vector2 = cycle.grid.get_cell_rect(cells[0]).get_center()
 		var destination: Vector2 = cycle.grid.get_cell_rect(cells[1]).get_center()
 		var direction: Vector2 = (destination - source).normalized()

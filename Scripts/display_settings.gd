@@ -25,7 +25,6 @@ var apply_button: Button
 var back_button: Button
 var mode_selector: OptionButton
 var resolution_selector: OptionButton
-var status: Label
 var pause_event_received: bool = false
 
 func _ready() -> void:
@@ -113,17 +112,8 @@ func apply_display(persist: bool = true) -> void:
 	changed.emit()
 	if persist:
 		var save_error: Error = save_settings()
-		if status != null:
-			status.text = display_hint(true)
-			if save_error != OK:
-				status.text += "\nNo se pudo guardar la selección para el próximo inicio."
-
-func display_hint(applied: bool = false) -> String:
-	if is_editor_embedded():
-		return "El editor controla esta ventana. Ejecuta el juego en una ventana independiente para probar los modos de pantalla. La resolución sí se aplica."
-	if applied:
-		return "Configuración aplicada."
-	return "Hasta 2560 × 1440 (2K / QHD).\nSin bordes y pantalla completa ocupan todo el monitor."
+		if save_error != OK:
+			push_warning("No se pudo guardar la configuración de pantalla.")
 
 func update_layout() -> void:
 	if menu_root == null:
@@ -170,7 +160,6 @@ func build_interface() -> void:
 	quit_button = make_button("SALIR DEL JUEGO")
 	quit_button.pressed.connect(quit_game)
 	pause_page.add_child(quit_button)
-	add_label(pause_page, "ESC: continuar · Retroceso: cancelar colocación al jugar", 15)
 	settings_page = VBoxContainer.new()
 	settings_page.add_theme_constant_override("separation", 14)
 	pages.add_child(settings_page)
@@ -182,14 +171,12 @@ func build_interface() -> void:
 	mode_selector.add_item("Pantalla completa", WindowMode.FULLSCREEN)
 	mode_selector.custom_minimum_size.y = 42
 	settings_page.add_child(mode_selector)
-	add_label(settings_page, "Resolución del juego", 17)
+	add_label(settings_page, "Resolución", 17)
 	resolution_selector = OptionButton.new()
 	for candidate: Vector2i in RESOLUTIONS:
-		resolution_selector.add_item("%d × %d%s" % [candidate.x, candidate.y, " · 2K / QHD" if candidate.x == 2560 else ""])
+		resolution_selector.add_item("%d × %d" % [candidate.x, candidate.y])
 	resolution_selector.custom_minimum_size.y = 42
 	settings_page.add_child(resolution_selector)
-	status = add_label(settings_page, display_hint(), 15)
-	status.custom_minimum_size.y = 64
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	settings_page.add_child(row)
@@ -254,7 +241,6 @@ func open_settings() -> void:
 		open_menu()
 	mode_selector.select(window_mode)
 	resolution_selector.select(RESOLUTIONS.find(resolution))
-	status.text = display_hint()
 	pause_page.hide()
 	settings_page.show()
 	mode_selector.grab_focus()

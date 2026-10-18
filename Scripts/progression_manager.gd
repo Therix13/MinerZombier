@@ -19,17 +19,21 @@ const RESEARCHES := {
 		"name": "Latón", "branch": "MINERÍA", "cost": 1, "level": 3,
 		"requires": ["drill"], "description": "Desbloquea la veta de latón en la tienda.",
 	},
+	"straight_belt": {
+		"name": "Cinta transportadora", "branch": "LOGÍSTICA", "cost": 1, "level": 2,
+		"requires": [], "description": "Desbloquea la cinta recta en la tienda.",
+	},
 	"curved_belts": {
-		"name": "Cintas curvas", "branch": "LOGÍSTICA", "cost": 1, "level": 2,
-		"requires": [], "description": "Desbloquea las cintas en L de ambas direcciones.",
+		"name": "Cintas curvas", "branch": "LOGÍSTICA", "cost": 1, "level": 3,
+		"requires": ["straight_belt"], "description": "Desbloquea las cintas en L de ambas direcciones.",
 	},
 	"junction_belt": {
 		"name": "Unión en T", "branch": "LOGÍSTICA", "cost": 2, "level": 4,
 		"requires": ["curved_belts"], "description": "Desbloquea la cinta que reúne tres entradas.",
 	},
 }
-const BASE_ITEMS := ["coal", "straight", "launcher", "defense_platforms"]
-const ITEM_RESEARCH := {"drill": "drill", "brass": "brass", "corner": "curved_belts", "corner_right": "curved_belts", "corner_left": "curved_belts", "junction": "junction_belt"}
+const BASE_ITEMS := ["coal", "launcher", "defense_platforms"]
+const ITEM_RESEARCH := {"straight": "straight_belt", "drill": "drill", "brass": "brass", "corner": "curved_belts", "corner_right": "curved_belts", "corner_left": "curved_belts", "junction": "junction_belt"}
 # Older scenes can still refer to these names. They now resolve item unlocks.
 const TECHNOLOGIES := RESEARCHES
 

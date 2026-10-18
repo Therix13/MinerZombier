@@ -20,6 +20,7 @@ signal technology_requested(technology_id: String)
 const DisplaySettingsScript = preload("res://Scripts/display_settings.gd")
 const TutorialGuideScript = preload("res://Scripts/tutorial_guide.gd")
 const IntroCinematicScript = preload("res://Scripts/intro_cinematic.gd")
+const WorldInteractionsScript = preload("res://Scripts/world_interactions.gd")
 
 const PANEL_WIDTH := 340.0
 const TOGGLE_SIZE := 58.0
@@ -29,6 +30,7 @@ const CATEGORIES := ["EXPANSION", "BASE", "DEFENSA", "INVESTIGACIÓN"]
 const RESEARCH_VIEW := {
 	"drill": ["drill", "Taladro", "Automático"],
 	"brass": ["ore", "Latón", "Nueva veta"],
+	"straight_belt": ["belt", "Cinta", "Transportadora"],
 	"curved_belts": ["curve", "Curvas", "Izquierda · derecha"],
 	"junction_belt": ["junction", "Unión en T", "3 entradas"],
 }
@@ -76,6 +78,14 @@ func setup(economy_manager: RefCounted, grid_manager: RefCounted) -> void:
 	# Older scenes can have a built-in main script. Updating main.gd alone
 	# does not update those scenes, so install the pause menu here as well.
 	ensure_pause_menu.call_deferred()
+	ensure_interactions.call_deferred()
+
+func ensure_interactions() -> void:
+	var game: Node = get_parent().get_parent()
+	if not game.has_node("WorldInteractions"):
+		var interactions := WorldInteractionsScript.new()
+		interactions.name = "WorldInteractions"
+		game.add_child(interactions)
 
 func ensure_pause_menu() -> void:
 	var ui_layer: CanvasLayer = get_parent() as CanvasLayer
@@ -208,11 +218,13 @@ func build_research_content() -> void:
 	shop_content.add_child(research_summary)
 	var previous_branch: String = ""
 	var row: HBoxContainer
+	var section: VBoxContainer
+	var branch_count: int = 0
 	for technology_id in progression.RESEARCHES:
 		var data: Dictionary = progression.RESEARCHES[technology_id]
 		var branch: String = data["branch"]
 		if branch != previous_branch:
-			var section := VBoxContainer.new()
+			section = VBoxContainer.new()
 			section.add_theme_constant_override("separation", 6)
 			shop_content.add_child(section)
 			section.add_child(create_label(branch, 13, Color("#c8ad79")))
@@ -220,6 +232,14 @@ func build_research_content() -> void:
 			row.add_theme_constant_override("separation", 5)
 			section.add_child(row)
 			previous_branch = branch
+			branch_count = 0
+		elif branch_count % 2 == 0:
+			var down := create_label("↓", 15, Color("#a18a61"))
+			down.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			section.add_child(down)
+			row = HBoxContainer.new()
+			row.add_theme_constant_override("separation", 5)
+			section.add_child(row)
 		else:
 			var arrow := create_label("→", 19, Color("#a18a61"))
 			arrow.custom_minimum_size.x = 18
@@ -228,6 +248,7 @@ func build_research_content() -> void:
 			arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			row.add_child(arrow)
 		row.add_child(build_research_card(technology_id, data))
+		branch_count += 1
 	refresh_research_buttons()
 
 func build_research_card(technology_id: String, data: Dictionary) -> Button:
@@ -355,13 +376,13 @@ func build_cycle_panel() -> void:
 	cycle_heading.autowrap_mode = TextServer.AUTOWRAP_OFF
 	cycle_heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(cycle_heading)
-	cycle_badge = create_label("01 / 07", 12, Color("#efd29b"))
+	cycle_badge = create_label("", 12, Color("#efd29b"))
 	cycle_badge.autowrap_mode = TextServer.AUTOWRAP_OFF
 	header.add_child(cycle_badge)
 	cycle_steps = HBoxContainer.new()
 	cycle_steps.add_theme_constant_override("separation", 5)
 	column.add_child(cycle_steps)
-	for index in range(7):
+	for index in range(cycle.TUTORIAL_LAST_STEP):
 		var segment := ColorRect.new()
 		segment.custom_minimum_size.y = 3
 		segment.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -392,10 +413,9 @@ func _on_cycle_action() -> void:
 		match cycle.tutorial_step:
 			0: coal_vein_requested.emit()
 			2: expansion_requested.emit()
-			3: conveyor_requested.emit()
-			4: unlock_defense_platforms()
-			5: launcher_requested.emit()
-			7: night_requested.emit()
+			3: unlock_defense_platforms()
+			4: launcher_requested.emit()
+			6: night_requested.emit()
 		update_cycle()
 	elif cycle.can_start_night() and not shop_open and not shop_animating:
 		night_requested.emit()
@@ -405,7 +425,7 @@ func update_cycle() -> void:
 		return
 	var tutorial: bool = cycle.is_tutorial_active()
 	cycle_heading.text = "PRIMEROS PASOS" if tutorial else "DEFENSA DE LA BASE"
-	cycle_badge.text = "%02d / 07" % mini(cycle.tutorial_step + 1, 7) if tutorial else "DÍA %d" % cycle.day
+	cycle_badge.text = "%02d / %02d" % [mini(cycle.tutorial_step + 1, cycle.TUTORIAL_LAST_STEP), cycle.TUTORIAL_LAST_STEP] if tutorial else "DÍA %d" % cycle.day
 	cycle_steps.visible = tutorial
 	for index in range(cycle_steps.get_child_count()):
 		cycle_steps.get_child(index).color = Color("#8db574") if index < cycle.tutorial_step else (Color("#e1b879") if index == cycle.tutorial_step else Color("#354b3a"))
@@ -420,32 +440,24 @@ func update_cycle() -> void:
 				cycle_action.disabled = game.get("placing_coal") or not economy.can_afford(economy.COAL_VEIN_PRICE)
 				if game.get("placing_coal"):
 					cycle_goal.text = "Coloca la veta en la casilla dorada. Su salida quedará orientada hacia la derecha."
-			1, 6:
-				if cycle.tutorial_step == 6:
+			1, 5:
+				if cycle.tutorial_step == 5:
 					cycle_action.text = "MUNICIÓN · %d / 4" % roundi(cycle.ammo_damage() / 0.5)
-				elif cycle.mining.nuggets_at(cycle.TUTORIAL_ORE_CELL) > 0:
-					cycle_action.text = "ARRASTRA LA PEPITA AL COFRE"
 				else:
-					var vein: Dictionary = cycle.mining.coal_veins.get(cycle.TUTORIAL_COAL_CELL, {})
-					cycle_action.text = "EXTRAE CARBÓN · %d / %d" % [vein.get("progress", 0), cycle.mining.mining_clicks]
+					cycle_action.text = "CARBÓN VENDIDO · %d / %d" % [mini(cycle.coal_sold, cycle.TUTORIAL_SALES_TARGET), cycle.TUTORIAL_SALES_TARGET]
 				cycle_action.disabled = true
 			2:
 				cycle_action.text = "AMPLIAR A 7 × 5 · 500"
 				cycle_action.disabled = not economy.can_afford(economy.EXPANSION_PRICE)
 			3:
-				cycle_action.text = "COLOCA LA CINTA MARCADA" if game.get("placing_belt") else "COMPRAR CINTA · 50"
-				cycle_action.disabled = game.get("placing_belt") or not economy.can_afford(economy.CONVEYOR_PRICE)
-				if game.get("placing_belt"):
-					cycle_goal.text = "Coloca la cinta en la casilla dorada, justo debajo de tu veta."
-			4:
 				cycle_action.text = "DESBLOQUEAR DEFENSAS · 100"
 				cycle_action.disabled = not economy.can_afford(economy.DEFENSE_TILE_PRICE)
-			5:
+			4:
 				cycle_action.text = "COLOCA EL LANZAPAPAS" if game.get("placing_launcher") else "OBTENER LANZAPAPAS · GRATIS"
 				cycle_action.disabled = game.get("placing_launcher")
 				if game.get("placing_launcher"):
 					cycle_goal.text = "Coloca el lanzapapas en la plataforma izquierda resaltada en dorado."
-			7:
+			6:
 				cycle_action.text = "INICIAR PRIMERA NOCHE"
 				cycle_action.disabled = not cycle.can_start_night()
 	elif cycle.defeated:

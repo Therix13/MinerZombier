@@ -34,12 +34,15 @@ func check_level_rules() -> void:
 	check(player.level == 4 and player.experience == 0 and player.research_points == 3 and levels == [2, 3, 4], "Large rewards grant each level and its research point")
 	check(not player.research("unknown") and not player.research("mining_i"), "Unknown and removed global technologies spend no points")
 	check(not player.research("junction_belt"), "Unlocks require their prerequisite")
-	check(player.research("curved_belts") and player.research_points == 2, "A new item unlock spends its research cost")
-	check(not player.research("curved_belts") and player.research_points == 2, "Duplicate research is refused")
+	check(player.research("straight_belt") and player.research_points == 2 and player.is_item_unlocked("straight"), "Straight-belt research spends its cost and unlocks conveyors")
+	check(player.research("curved_belts") and player.research_points == 1, "Curved conveyors require and follow the straight-belt unlock")
+	check(not player.research("curved_belts") and player.research_points == 1, "Duplicate research is refused")
 	check(player.is_item_unlocked("corner_right") and player.is_item_unlocked("corner_left"), "One curved-belt research unlocks both directions")
+	check(not player.research("junction_belt"), "Advanced conveyors refuse an unaffordable unlock")
+	player.add_experience(70)
 	check(player.research("junction_belt") and player.research_points == 0 and player.is_item_unlocked("junction"), "Advanced unlock costs two points and unlocks the T belt")
 	check(not player.research("drill") and not player.is_item_unlocked("drill"), "Insufficient points leave an item locked")
-	check(player.is_item_unlocked("coal") and player.is_item_unlocked("straight") and player.is_item_unlocked("launcher") and not player.is_item_unlocked("unknown"), "Tutorial items stay available and unknown items stay locked")
+	check(player.is_item_unlocked("coal") and player.is_item_unlocked("launcher") and not player.is_item_unlocked("unknown"), "Tutorial items stay available and unknown items stay locked")
 
 func run_checks() -> void:
 	check_level_rules()
@@ -94,14 +97,14 @@ func run_checks() -> void:
 	shop.open_shop()
 	await create_timer(0.4).timeout
 	shop.open_category("BASE")
-	check(not shop.item_buttons["coal"]["button"].disabled and not shop.item_buttons["straight"]["button"].disabled, "Basic store items need no research")
+	check(not shop.item_buttons["coal"]["button"].disabled and shop.item_buttons["straight"]["button"].disabled, "Coal is available while the straight conveyor requires research")
 	check(shop.item_buttons["drill"]["button"].disabled and shop.item_buttons["brass"]["button"].disabled and shop.item_buttons["corner_left"]["button"].disabled and shop.item_buttons["junction"]["button"].disabled, "The store visibly locks items behind research")
 	var locked_coins: int = game.economy.coins
 	shop.item_buttons["drill"]["button"].pressed.emit()
 	check(not game.placing_drill and game.economy.coins == locked_coins, "Synthetic locked-button events cannot buy a locked item")
 	shop.open_category("INVESTIGACIÓN")
 	await settle()
-	check(shop.shop_title.text == "INVESTIGACIÓN" and shop.research_buttons.size() == 4, "Research category contains four item unlocks")
+	check(shop.shop_title.text == "INVESTIGACIÓN" and shop.research_buttons.size() == 5, "Research category contains five item unlocks")
 	check(not shop.progression_panel.visible, "The XP HUD stays hidden while the shop is open")
 	var before_coins: int = game.economy.coins
 	shop.research_buttons["drill"].pressed.emit()
@@ -142,14 +145,15 @@ func run_checks() -> void:
 	check(not player.has_research("curved_belts"), "Defeat blocks research")
 	cycle.defeated = false
 	cycle.changed.emit()
+	shop.research_buttons["straight_belt"].pressed.emit()
 	shop.research_buttons["curved_belts"].pressed.emit()
 	shop.research_buttons["junction_belt"].pressed.emit()
-	check(player.unlocked.size() == 4 and player.is_item_unlocked("junction"), "All four researches unlock only their intended items")
+	check(player.unlocked.size() == 5 and player.is_item_unlocked("junction"), "All five researches unlock only their intended items")
 	var level: int = player.level
 	var experience: int = player.total_experience
 	cycle.is_night = true
 	cycle.complete_night()
-	check(player.level == level and player.total_experience == experience and player.unlocked.size() == 4, "Unlocks and EXP survive a day change without a fake sale reward")
+	check(player.level == level and player.total_experience == experience and player.unlocked.size() == 5, "Unlocks and EXP survive a day change without a fake sale reward")
 	root.size = Vector2i(800, 600)
 	await settle()
 	var scroll: ScrollContainer = shop.shop_scroll
