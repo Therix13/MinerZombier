@@ -143,11 +143,34 @@ func _draw() -> void:
 			draw_nugget(drag_world_position, mining.nugget_type(held_object_cell), 1)
 
 func draw_nugget(center: Vector2, kind: String, amount: int) -> void:
-	if kind.begins_with("brass"): draw_brass_nugget(center, amount)
+	if kind.ends_with("_2"): draw_refined_nugget(center, kind, amount)
+	elif kind.begins_with("brass"): draw_brass_nugget(center, amount)
 	else: draw_coal_nugget(center, amount)
-	if kind.ends_with("_2"):
-		draw_rect(Rect2(center + Vector2(5, -16), Vector2(12, 13)), Color("#e4bd71"))
-		draw_string(ThemeDB.fallback_font, center + Vector2(8, -5), "2", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#302719"))
+
+func draw_refined_nugget(center: Vector2, kind: String, amount: int) -> void:
+	var brass: bool = kind.begins_with("brass")
+	var outline := PackedVector2Array([
+		center + Vector2(-18, -6), center + Vector2(-9, -17),
+		center + Vector2(9, -17), center + Vector2(18, -6),
+		center + Vector2(16, 10), center + Vector2(5, 18),
+		center + Vector2(-11, 15), center + Vector2(-18, 4),
+	])
+	draw_colored_polygon(outline, Color("#cf923f") if brass else Color("#26333e"))
+	draw_colored_polygon(PackedVector2Array([
+		center + Vector2(-18, -6), center + Vector2(0, 0),
+		center + Vector2(5, 18), center + Vector2(-11, 15), center + Vector2(-18, 4),
+	]), Color("#a66b2d") if brass else Color("#3d4d59"))
+	draw_colored_polygon(PackedVector2Array([
+		center + Vector2(-18, -6), center + Vector2(-9, -17),
+		center + Vector2(9, -17), center + Vector2(18, -6), center,
+	]), Color("#f0c875") if brass else Color("#71838c"))
+	var closed: PackedVector2Array = outline.duplicate()
+	closed.append(outline[0])
+	draw_polyline(closed, Color("#69451e") if brass else Color("#111a22"), 2)
+	draw_line(center + Vector2(-7, -13), center + Vector2(6, -13), Color("#fff0b8") if brass else Color("#b4c4c9"), 2)
+	draw_line(center, center + Vector2(5, 15), Color("#edb65d") if brass else Color("#536977"), 1.5)
+	if amount > 1:
+		draw_string(ThemeDB.fallback_font, center + Vector2(12, 20), str(amount), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#ffdb85"))
 
 func preview_allowed(kind: String) -> bool:
 	return tutorial == null or tutorial.allows_world_press(hovered_cell, kind)
