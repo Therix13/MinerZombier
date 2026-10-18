@@ -131,7 +131,7 @@ func run_checks() -> void:
 	await shift(true)
 	await place_at(left)
 	await shift(false)
-	check(game.launchers.launchers.has(left) and game.economy.coins == balance and not game.cycle.free_launcher_available, "A free first turret stays free while cancelling its next preview")
+	check(game.launchers.launchers.has(left) and game.economy.coins == balance - 200 and not game.cycle.free_launcher_available, "Even a legacy free-turret flag cannot bypass the full price")
 	clear_items()
 	put(a, {"coal_vein": {"direction": 1, "progress": 0}})
 	await mouse_move(point(a))

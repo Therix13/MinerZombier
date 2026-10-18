@@ -64,13 +64,14 @@ var cycle_title: Label
 var cycle_heading: Label
 var cycle_badge: Label
 var cycle_steps: HBoxContainer
-var cycle_goal: Label
+var cycle_goal: RichTextLabel
 var cycle_action: Button
 var progression: RefCounted
 var progression_panel: PanelContainer
 var level_label: Label
 var experience_bar: ProgressBar
-var research_summary: Label
+var research_summary: RichTextLabel
+var research_texture: Texture2D
 var research_buttons: Dictionary = {}
 var research_status: Dictionary = {}
 var research_details: Dictionary = {}
@@ -336,8 +337,8 @@ func open_research() -> void:
 func build_research_content() -> void:
 	if progression == null:
 		return
-	research_summary = create_label("", 17, Color("#d6edb4"))
-	research_summary.tooltip_text = "Cada nivel y cada noche superada otorgan 1 PI.\nEXP: zombi +%d · carbón vendido +%d · latón vendido +%d." % [progression.ZOMBIE_EXPERIENCE, progression.SALE_EXPERIENCE["coal"], progression.SALE_EXPERIENCE["brass"]]
+	research_summary = create_research_label("", 17, Color("#d6edb4"))
+	research_summary.tooltip_text = "Cada nivel y cada noche superada otorgan 1 punto de investigación.\nEXP: zombi +%d · carbón vendido +%d · latón vendido +%d." % [progression.ZOMBIE_EXPERIENCE, progression.SALE_EXPERIENCE["coal"], progression.SALE_EXPERIENCE["brass"]]
 	shop_content.add_child(research_summary)
 	var previous_branch: String = ""
 	var row: HBoxContainer
@@ -419,7 +420,8 @@ func build_research_card(technology_id: String, data: Dictionary) -> Button:
 	footer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	footer.alignment = BoxContainer.ALIGNMENT_END
 	column.add_child(footer)
-	var cost := compact_research_label("%d PI" % data["cost"], 12)
+	var cost := create_research_label("%d {research}" % data["cost"], 12)
+	cost.custom_minimum_size = Vector2(48, 22)
 	cost.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	footer.add_child(cost)
 	var status := compact_research_label("", 11)
@@ -441,7 +443,7 @@ func refresh_research_buttons() -> void:
 	if progression == null:
 		return
 	if research_summary != null:
-		research_summary.text = "Nivel %d · %d PI" % [progression.level, progression.research_points]
+		set_research_text(research_summary, "Nivel %d · %d {research}" % [progression.level, progression.research_points])
 	var blocked: bool = cycle != null and (cycle.is_night or cycle.defeated or cycle.is_tutorial_active())
 	for technology_id in research_buttons:
 		var button: Button = research_buttons[technology_id]
@@ -459,7 +461,7 @@ func refresh_research_buttons() -> void:
 		button.add_theme_stylebox_override("pressed", create_style("#302b1f", "#e4c28a", 2, 9))
 		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if available else Control.CURSOR_ARROW
 		for name in ["title", "effect", "cost", "rank"]:
-			details[name].add_theme_color_override("font_color", color)
+			details[name].add_theme_color_override("default_color" if details[name] is RichTextLabel else "font_color", color)
 		details["icon"].tint = Color.WHITE if researched or available else Color(1, 1, 1, 0.5)
 		details["icon"].queue_redraw()
 		details["state_icon"].kind = "done" if researched else ("add" if available else "lock")
@@ -471,7 +473,7 @@ func refresh_research_buttons() -> void:
 		var reason: String = progression.research_block_reason(technology_id)
 		if blocked and not researched:
 			reason = "Completa el tutorial." if cycle.is_tutorial_active() else "Investiga durante el día."
-		button.tooltip_text = "%s\n%s\nNivel %d · %d PI" % [data["name"], data["description"], data["level"], data["cost"]]
+		button.tooltip_text = "%s\n%s\nNivel %d · Coste: %d de investigación" % [data["name"], data["description"], data["level"], data["cost"]]
 		for prerequisite in data["requires"]:
 			button.tooltip_text += "\nRequiere: %s" % progression.RESEARCHES[prerequisite]["name"]
 		button.tooltip_text += "\n" + ("Pulsa para investigar." if available else reason)
@@ -519,7 +521,7 @@ func build_cycle_panel() -> void:
 		cycle_steps.add_child(segment)
 	cycle_title = create_label("", 21, Color("#f1e6c9"))
 	column.add_child(cycle_title)
-	cycle_goal = create_label("", 14, Color("#bacbb7"))
+	cycle_goal = create_research_label("", 14, Color("#bacbb7"))
 	cycle_goal.custom_minimum_size.y = 58
 	column.add_child(cycle_goal)
 	cycle_action = create_button("")
@@ -555,7 +557,7 @@ func update_cycle() -> void:
 	cycle_heading.text = "PRIMEROS PASOS" if tutorial else "DEFENSA DE LA BASE"
 	cycle_badge.text = "%02d / %02d" % [mini(cycle.tutorial_step + 1, cycle.TUTORIAL_LAST_STEP), cycle.TUTORIAL_LAST_STEP] if tutorial else "DÍA %d" % cycle.day
 	cycle_steps.visible = tutorial
-	cycle_goal.add_theme_color_override("font_color", Color("#bacbb7"))
+	cycle_goal.add_theme_color_override("default_color", Color("#bacbb7"))
 	cycle_action.show()
 	for index in range(cycle_steps.get_child_count()):
 		cycle_steps.get_child(index).color = Color("#8db574") if index < cycle.tutorial_step else (Color("#e1b879") if index == cycle.tutorial_step else Color("#354b3a"))
@@ -571,31 +573,27 @@ func update_cycle() -> void:
 					cycle_goal.text = "Coloca la veta en la casilla dorada."
 				else:
 					cycle_goal.text = tutorial_navigation_text()
-			1, 5:
-				if cycle.tutorial_step == 5:
-					cycle_action.text = "MUNICIÓN · %d / 4" % roundi(cycle.ammo_damage() / 0.5)
-				else:
-					cycle_action.text = "CARBÓN VENDIDO · %d / %d" % [mini(cycle.coal_sold, cycle.TUTORIAL_SALES_TARGET), cycle.TUTORIAL_SALES_TARGET]
+			1, 6:
+				cycle_action.text = "MUNICIÓN · %d / 4" % roundi(cycle.ammo_damage() / 0.5) if cycle.tutorial_step == 6 else "CARBÓN VENDIDO · %d / %d" % [mini(cycle.coal_sold, cycle.TUTORIAL_SALES_TARGET), cycle.TUTORIAL_SALES_TARGET]
 				cycle_action.disabled = true
-			2, 3:
+			2:
+				cycle_action.text = "2 × Nv. 1 → Nv. 2"
+				cycle_action.disabled = true
+			3, 4, 5:
 				cycle_action.hide()
-				cycle_goal.text = tutorial_navigation_text()
-			4:
-				cycle_action.hide()
-				if game.get("placing_launcher"):
+				if cycle.needs_tutorial_income():
+					cycle_goal.text = cycle.tutorial_text()
+				elif game.get("placing_launcher"):
 					cycle_goal.text = "Coloca el Lanzapepitas en la plataforma dorada."
 				else:
 					cycle_goal.text = tutorial_navigation_text()
-			6:
-				cycle_action.text = "2 × Nv. 1 → Nv. 2"
-				cycle_action.disabled = true
 			7:
 				cycle_action.text = "INICIAR PRIMERA NOCHE"
 				cycle_action.disabled = not cycle.can_start_night()
 	elif cycle.is_research_tutorial_active():
 		cycle_heading.text = "INVESTIGACIÓN"
 		cycle_title.text = "Tu primer desbloqueo"
-		cycle_goal.text = "Tienes %d PI. %s" % [progression.research_points, tutorial_navigation_text()]
+		set_research_text(cycle_goal, "Tienes %d {research}. %s" % [progression.research_points, tutorial_navigation_text()])
 		cycle_action.hide()
 	elif cycle.defeated:
 		cycle_title.text = "Base destruida"
@@ -614,7 +612,7 @@ func update_cycle() -> void:
 		cycle_action.disabled = not cycle.can_start_night() or shop_open or shop_animating
 		if cycle.needs_defense_warning():
 			cycle_goal.text = "Alto riesgo de perder. Coloca al menos 2 torretas."
-			cycle_goal.add_theme_color_override("font_color", Color("#edbb76"))
+			cycle_goal.add_theme_color_override("default_color", Color("#edbb76"))
 	shop_button.disabled = (tutorial and tutorial_purchase().is_empty()) or cycle.is_night or cycle.defeated
 	view_button.disabled = cycle.is_guided_tutorial_active() or cycle.defeated
 	var guide: Node = get_parent().get_parent().get_node_or_null("TutorialGuide")
@@ -625,20 +623,20 @@ func update_cycle() -> void:
 func tutorial_purchase() -> Dictionary:
 	if cycle != null and cycle.is_research_tutorial_active():
 		return {"category": "INVESTIGACIÓN", "item": "research", "instruction": "Desbloquea un objeto a tu elección."}
-	if cycle == null or not cycle.is_tutorial_active():
+	if cycle == null or not cycle.is_tutorial_active() or cycle.needs_tutorial_income():
 		return {}
 	var game: Node = get_parent().get_parent()
 	match cycle.tutorial_step:
 		0:
 			if not game.get("placing_coal"):
 				return {"category": "VETAS", "item": "coal", "instruction": "Compra la veta de carbón."}
-		2:
-			return {"category": "EXPANSION", "item": "expansion", "instruction": "Compra la ampliación a 7 × 5."}
 		3:
-			return {"category": "DEFENSA", "item": "defense_platforms", "instruction": "Desbloquea las plataformas."}
+			return {"category": "EXPANSION", "item": "expansion", "instruction": "Compra la ampliación a 7 × 5."}
 		4:
+			return {"category": "DEFENSA", "item": "defense_platforms", "instruction": "Compra las plataformas."}
+		5:
 			if not game.get("placing_launcher"):
-				return {"category": "DEFENSA", "item": "launcher", "instruction": "Obtén tu Lanzapepitas gratuito."}
+				return {"category": "DEFENSA", "item": "launcher", "instruction": "Compra el Lanzapepitas."}
 	return {}
 
 func tutorial_navigation_text() -> String:
@@ -741,6 +739,28 @@ func create_art_button(kind: String, description: String, price: int = -1) -> Bu
 	button.set_meta("price_label", cost)
 	button.set_meta("item_art", art)
 	return button
+
+func create_research_label(value: String, font_size: int = 17, color: Color = Color("#f0e0c8")) -> RichTextLabel:
+	var label := RichTextLabel.new()
+	label.fit_content = true
+	label.scroll_active = false
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.add_theme_font_size_override("normal_font_size", font_size)
+	label.add_theme_color_override("default_color", color)
+	set_research_text(label, value)
+	return label
+
+func set_research_text(label: RichTextLabel, value: String) -> void:
+	label.clear()
+	var parts: PackedStringArray = value.split("{research}")
+	for index in range(parts.size()):
+		label.add_text(parts[index])
+		if index < parts.size() - 1:
+			if research_texture == null:
+				var picture := Image.new()
+				picture.load_svg_from_string('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M12 4h8v9l7 11q2 5-4 5H9q-6 0-4-5l7-11Z" fill="#c9eff9" fill-opacity=".25" stroke="#b5e6f5" stroke-width="2" stroke-linejoin="round"/><path d="m10 19-4 7q0 2 3 2h14q3 0 3-2l-4-7Z" fill="#279ee8"/><path d="M11 19q5-3 11 0" fill="none" stroke="#67d7ff" stroke-width="2"/><path d="M12 3h8v4h-8Z" fill="#b48248" stroke="#e0b779"/><path d="M13 9v5l-5 10" fill="none" stroke="#e9faff" stroke-width="1.5" stroke-linecap="round"/><circle cx="18" cy="23" r="1.5" fill="#b1efff"/><circle cx="13" cy="25" r="1" fill="#b1efff"/></svg>')
+				research_texture = ImageTexture.create_from_image(picture)
+			label.add_image(research_texture, 20, 20)
 
 func create_label(value: String, font_size: int = 17, color: Color = Color("#f0e0c8")) -> Label:
 	var label := Label.new()
@@ -980,8 +1000,8 @@ func open_category(category: String) -> void:
 			catalog_grid().add_child(platforms_button)
 			platforms_button.disabled = platforms_button.disabled or not tutorial_allows_item("defense_platforms")
 			purchase_buttons["defense_platforms"] = platforms_button
-			var launcher_button := create_art_button("launcher", "Lanzapepitas · Nv. 1\nMunición: pepitas de nivel 1.", 0 if cycle != null and cycle.free_launcher_available else economy.LAUNCHER_PRICE)
-			launcher_button.disabled = not (cycle != null and cycle.free_launcher_available) and not economy.can_afford(economy.LAUNCHER_PRICE)
+			var launcher_button := create_art_button("launcher", "Lanzapepitas · Nv. 1\nMunición: pepitas de nivel 1.", economy.LAUNCHER_PRICE)
+			launcher_button.disabled = not economy.can_afford(economy.LAUNCHER_PRICE)
 			launcher_button.disabled = launcher_button.disabled or not tutorial_allows_item("launcher")
 			launcher_button.pressed.connect(request_item.bind("launcher", launcher_requested))
 			purchase_buttons["launcher"] = launcher_button

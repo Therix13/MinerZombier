@@ -248,7 +248,7 @@ func item_price(item: String) -> int:
 		"brass": return economy.BRASS_VEIN_PRICE
 		"straight", "corner_right", "corner_left", "junction": return economy.CONVEYOR_PRICE
 		"drill": return economy.DRILL_PRICE
-		"launcher": return 0 if game.get("cycle").free_launcher_available else economy.LAUNCHER_PRICE
+		"launcher": return economy.LAUNCHER_PRICE
 		"compactor": return game.get_node("Compactors").PRICE
 	return -1
 
@@ -271,7 +271,7 @@ func select_item(item: String) -> bool:
 		"drill": game.set("placing_drill", true)
 		"launcher":
 			game.set("placing_launcher", true)
-			game.set("placing_free_launcher", cycle.free_launcher_available)
+			game.set("placing_free_launcher", false)
 		"compactor":
 			game.get_node("Compactors").placing = true
 			game.get_node("Compactors").paid = false

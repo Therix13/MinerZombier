@@ -47,9 +47,14 @@ func run_checks() -> void:
 	for sale in range(4):
 		for i in range(7): mining.call("mine", Vector2i(14, 0))
 		mining.call("move_nugget", Vector2i(15, 0), grid.get("sale_cell"))
-	check(economy.get("coins") == 1025 and cycle.get("coal_sold") == 5 and cycle.get("tutorial_step") == 2, "Five manual sales grant the expansion bonus once")
+	check(economy.get("coins") == 525 and cycle.get("coal_sold") == 5 and cycle.get("tutorial_step") == 2, "Five manual sales pay only their sale prices")
+	for nugget in range(2):
+		for click in range(7): mining.mine(cycle.TUTORIAL_COAL_CELL)
+		mining.move_nugget(cycle.TUTORIAL_ORE_CELL, cycle.TUTORIAL_FUSION_CELL)
+	mining.move_nugget(cycle.TUTORIAL_FUSION_CELL, grid.sale_cell)
+	check(cycle.fusion_sold and economy.coins == 540, "Fusion follows the five sales and pays only for its sold product")
 	game.call("buy_expansion")
-	check(grid.get("cave_width") == 7 and grid.get("cave_height") == 5 and economy.get("coins") == 525, "Purchase expands base to 7x5")
+	check(grid.get("cave_width") == 7 and grid.get("cave_height") == 5 and economy.get("coins") == 40, "Purchase expands base to 7x5")
 	check(conveyors.call("place", Vector2i(15, 0), 0), "Place conveyor toward sale point")
 	mining.call("move_vein", Vector2i(14, 0), Vector2i(15, 1), 0)
 	check(drills.call("place", Vector2i(15, 2), 0), "Place drill facing vein")
@@ -57,7 +62,7 @@ func run_checks() -> void:
 		drills.call("tick")
 	check(mining.call("nuggets_at", Vector2i(15, 0)) == 1, "Drill produces coal onto conveyor")
 	conveyors.call("tick")
-	check(economy.get("coins") == 530 and mining.call("nuggets_at", Vector2i(15, 0)) == 0, "Conveyor sells coal and pays economy")
+	check(economy.get("coins") == 45 and mining.call("nuggets_at", Vector2i(15, 0)) == 0, "Conveyor sells coal and pays economy")
 	check(cycle.get("coal_sold") == 6, "Conveyor coal sale also updates sale count")
 	grid.call("purchase_defense_platforms")
 	cycle.call("refresh_tutorial")
@@ -65,9 +70,6 @@ func run_checks() -> void:
 	check(launchers.call("place", defense_cell), "Place launcher on defense platform")
 	for i in range(4):
 		launchers.call("receive", defense_cell, "coal")
-	mining.items_for("coal")[Vector2i(13, 3)] = 1
-	mining.items_for("coal")[Vector2i(14, 3)] = 1
-	check(mining.fuse(Vector2i(13, 3), Vector2i(14, 3)), "The first-day fusion lesson creates level-two coal")
 	check(cycle.call("can_start_night"), "Tutorial and ammunition unlock first night")
 	game.call("start_night")
 	var zombies: Array[Node] = get_nodes_in_group("zombies")

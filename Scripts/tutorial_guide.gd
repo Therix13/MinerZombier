@@ -37,6 +37,8 @@ func on_step_changed() -> void:
 	if not cycle.is_tutorial_active():
 		queue_redraw()
 		return
+	if cycle.needs_tutorial_income():
+		game.get("shop").close_shop()
 	if last_step != cycle.tutorial_step:
 		last_step = cycle.tutorial_step
 		# This also cancels/refunds Shift-repeat purchases in older scene scripts.
@@ -54,11 +56,11 @@ func focus_objective() -> void:
 	var camera: Camera2D = game.get("camera")
 	var view_size: Vector2 = get_viewport().get_visible_rect().size
 	# Leave room around the centered defense platforms for the tutorial card.
-	var columns: float = 16.0 if cycle.tutorial_step >= 3 else 12.0
+	var columns: float = 16.0 if cycle.tutorial_step >= 4 else 12.0
 	var zoom: float = clampf(view_size.x / (columns * cycle.grid.TILE_SIZE), controller.min_zoom, controller.max_zoom)
 	camera.zoom = Vector2.ONE * zoom
 	var center_x: float = cycle.grid.get_cell_rect(cycle.grid.sale_cell).get_center().x
-	camera.position = Vector2(center_x, 162.0 if cycle.tutorial_step >= 3 else cycle.grid.GRID_OFFSET_Y + 20.0)
+	camera.position = Vector2(center_x, 162.0 if cycle.tutorial_step >= 4 else cycle.grid.GRID_OFFSET_Y + 20.0)
 	controller.clamp_position()
 	camera.force_update_scroll()
 	game.get("shop").set_view_mode(false)
@@ -211,23 +213,21 @@ func _input(event: InputEvent) -> void:
 
 func targets() -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
+	if cycle.tutorial_step == 2 or cycle.needs_tutorial_income():
+		if cycle.mining.nugget_type(cycle.TUTORIAL_FUSION_CELL) == "coal_2":
+			return [cycle.TUTORIAL_FUSION_CELL, cycle.grid.sale_cell]
+		if cycle.mining.nuggets_at(cycle.TUTORIAL_ORE_CELL) > 0:
+			return [cycle.TUTORIAL_ORE_CELL, cycle.TUTORIAL_FUSION_CELL]
+		return [cycle.TUTORIAL_COAL_CELL]
 	match cycle.tutorial_step:
 		0:
 			if game.get("placing_coal"): result.append(cycle.TUTORIAL_COAL_CELL)
-		1, 5:
+		1, 6:
 			if cycle.mining.nuggets_at(cycle.TUTORIAL_ORE_CELL) > 0:
-				result.append(cycle.TUTORIAL_ORE_CELL)
-				result.append(cycle.grid.sale_cell if cycle.tutorial_step == 1 else cycle.grid.defense_cell("left"))
-			else:
-				result.append(cycle.TUTORIAL_COAL_CELL)
-		4:
+				return [cycle.TUTORIAL_ORE_CELL, cycle.grid.sale_cell if cycle.tutorial_step == 1 else cycle.grid.defense_cell("left")]
+			return [cycle.TUTORIAL_COAL_CELL]
+		5:
 			if game.get("placing_launcher"): result.append(cycle.grid.defense_cell("left"))
-		6:
-			if cycle.mining.nuggets_at(cycle.TUTORIAL_ORE_CELL) > 0:
-				result.append(cycle.TUTORIAL_ORE_CELL)
-				result.append(cycle.TUTORIAL_FUSION_CELL)
-			else:
-				result.append(cycle.TUTORIAL_COAL_CELL)
 		7: result.append(cycle.grid.defense_cell("left"))
 	return result
 
@@ -240,13 +240,13 @@ func _draw() -> void:
 	for index in range(cells.size()):
 		var rect: Rect2 = cycle.grid.get_cell_rect(cells[index]).grow(-1.5)
 		var color := Color("#f0c777")
-		if cells.size() == 2 and index == 0 and (not lesson or cycle.tutorial_step in [1, 5, 6]):
+		if cells.size() == 2 and index == 0 and (not lesson or (cycle.tutorial_step in [1, 2, 6] or cycle.needs_tutorial_income())):
 			color = Color("#b6d98e")
 		draw_rect(rect, Color(color, 0.12))
 		draw_rect(rect, Color(color, glow), false, 2.0)
-	if cells.size() == 1 and cycle.mining.vein_at(cells[0]) != "" and (not lesson or cycle.tutorial_step in [1, 5, 6]):
+	if cells.size() == 1 and cycle.mining.vein_at(cells[0]) != "" and (not lesson or (cycle.tutorial_step in [1, 2, 6] or cycle.needs_tutorial_income())):
 		draw_mining_click(cells[0])
-	if cells.size() == 2 and (not lesson or cycle.tutorial_step in [1, 5, 6]):
+	if cells.size() == 2 and (not lesson or (cycle.tutorial_step in [1, 2, 6] or cycle.needs_tutorial_income())):
 		var source: Vector2 = cycle.grid.get_cell_rect(cells[0]).get_center()
 		var destination: Vector2 = cycle.grid.get_cell_rect(cells[1]).get_center()
 		var direction: Vector2 = (destination - source).normalized()
