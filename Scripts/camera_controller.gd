@@ -3,7 +3,7 @@ extends RefCounted
 const VISIBLE_COLUMNS: float = 9.0
 const ZOOM_STEP: float = 1.1
 const DEFENSE_TOP: float = -640.0
-const DEFENSE_HEADER: float = 84.0
+const DEFENSE_HALF_WIDTH: float = 330.0
 const DEFENSE_FOOTER: float = 64.0
 const DEFENSE_LEFT_MARGIN: float = 340.0
 const DEFENSE_RIGHT_MARGIN: float = 20.0
@@ -47,9 +47,9 @@ func get_active_min_zoom() -> float:
 	return defense_zoom()
 
 func defense_bounds() -> Rect2:
-	# Include the spawn area, platforms, ammunition connections, and base.
-	# The first mining row starts exactly at GRID_OFFSET_Y.
-	return Rect2(0.0, DEFENSE_TOP, grid.MAP_WIDTH * grid.TILE_SIZE, grid.GRID_OFFSET_Y - DEFENSE_TOP)
+	# Fit the combat lanes, platforms, and entrance, rather than empty map edges.
+	var center_x: float = grid.get_cell_rect(grid.sale_cell).get_center().x
+	return Rect2(center_x - DEFENSE_HALF_WIDTH, DEFENSE_TOP, DEFENSE_HALF_WIDTH * 2.0, grid.GRID_OFFSET_Y - DEFENSE_TOP)
 
 func defense_frame() -> Rect2:
 	var size: Vector2 = viewport.get_visible_rect().size
@@ -57,7 +57,7 @@ func defense_frame() -> Rect2:
 	var ui: CanvasLayer = camera.get_parent().get_node_or_null("CanvasLayer") as CanvasLayer
 	if ui != null:
 		factor = ui.scale.x
-	return Rect2(Vector2(DEFENSE_LEFT_MARGIN, DEFENSE_HEADER) * factor, Vector2(maxf(1.0, size.x - (DEFENSE_LEFT_MARGIN + DEFENSE_RIGHT_MARGIN) * factor), maxf(1.0, size.y - (DEFENSE_HEADER + DEFENSE_FOOTER) * factor)))
+	return Rect2(Vector2(DEFENSE_LEFT_MARGIN * factor, 0.0), Vector2(maxf(1.0, size.x - (DEFENSE_LEFT_MARGIN + DEFENSE_RIGHT_MARGIN) * factor), maxf(1.0, size.y - DEFENSE_FOOTER * factor)))
 
 func defense_zoom() -> float:
 	var frame: Rect2 = defense_frame()
@@ -76,6 +76,9 @@ func fit_defense_view() -> void:
 	defense_mask.show()
 	defense_mask.queue_redraw()
 	camera.force_update_scroll()
+	var zone: Node2D = camera.get_parent().get("defense_zone") as Node2D
+	if zone != null:
+		zone.queue_redraw()
 
 func update_zoom_limits(initial: bool = false) -> void:
 	var viewport_size: Vector2 = viewport.get_visible_rect().size
@@ -161,14 +164,7 @@ class DefenseMask extends Node2D:
 	var view_rect: Rect2
 
 	func _draw() -> void:
-		# Cover the mine and unused margins in world space, below the HUD.
-		var color := Color("#18252c")
-		var areas: Array[Rect2] = [
-			Rect2(view_rect.position, Vector2(view_rect.size.x, maxf(0.0, arena.position.y - view_rect.position.y))),
-			Rect2(Vector2(view_rect.position.x, arena.end.y), Vector2(view_rect.size.x, maxf(0.0, view_rect.end.y - arena.end.y))),
-			Rect2(Vector2(view_rect.position.x, arena.position.y), Vector2(maxf(0.0, arena.position.x - view_rect.position.x), arena.size.y)),
-			Rect2(Vector2(arena.end.x, arena.position.y), Vector2(maxf(0.0, view_rect.end.x - arena.end.x), arena.size.y)),
-		]
-		for area in areas:
-			if area.has_area():
-				draw_rect(area, color)
+		# Hide only the mine; the battlefield continues behind the HUD.
+		var mine := Rect2(Vector2(view_rect.position.x, arena.end.y), Vector2(view_rect.size.x, maxf(0.0, view_rect.end.y - arena.end.y)))
+		if mine.has_area():
+			draw_rect(mine, Color("#18252c"))
