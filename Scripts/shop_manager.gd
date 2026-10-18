@@ -97,6 +97,10 @@ var research_notice: PanelContainer
 var research_notice_backdrop: ColorRect
 var research_notice_label: Label
 var research_notice_timer: Timer
+var research_notice_grid: GridContainer
+var research_notice_progress: ProgressBar
+var research_notice_cards: Dictionary = {}
+var research_notice_tween: Tween
 var notice_research_ids: Array[String] = []
 
 func setup(economy_manager: RefCounted, grid_manager: RefCounted) -> void:
@@ -237,6 +241,7 @@ func _process(_delta: float) -> void:
 	if progression == null:
 		return
 	update_notice_visibility()
+	if research_notice.visible: research_notice_progress.value = research_notice_timer.time_left / research_notice_timer.wait_time
 	# Preserve research locks even with older scenes that handle purchases themselves.
 	var game: Node = get_parent().get_parent()
 	var item: String = ""
@@ -337,20 +342,66 @@ func build_research_notice() -> void:
 	research_notice_backdrop.add_child(center)
 	research_notice = PanelContainer.new()
 	research_notice.name = "NewResearchNotice"
-	research_notice.custom_minimum_size = Vector2(420, 100)
+	research_notice.custom_minimum_size = Vector2(480, 0)
 	research_notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := create_style("#192920", "#d5b078", 1, 9)
-	style.content_margin_left = 14
-	style.content_margin_right = 14
-	style.content_margin_top = 10
-	style.content_margin_bottom = 10
+	var style := create_style("#192d26", "#d5b078", 2, 16)
+	style.content_margin_left = 24
+	style.content_margin_right = 24
+	style.content_margin_top = 22
+	style.content_margin_bottom = 18
+	style.shadow_color = Color(0,0,0,0.4)
+	style.shadow_size = 14
 	research_notice.add_theme_stylebox_override("panel", style)
 	center.add_child(research_notice)
-	research_notice_label = create_label("", 15, Color("#efd5a2"))
-	research_notice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	research_notice_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var column := VBoxContainer.new()
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_theme_constant_override("separation", 16)
+	research_notice.add_child(column)
+	var header := HBoxContainer.new()
+	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	header.add_theme_constant_override("separation", 14)
+	column.add_child(header)
+	var emblem := PanelContainer.new()
+	emblem.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	emblem.add_theme_stylebox_override("panel",create_style("#24443c","#547d6a",1,12))
+	header.add_child(emblem)
+	var flask := create_research_label("{research}",22)
+	flask.clear()
+	flask.push_paragraph(HORIZONTAL_ALIGNMENT_CENTER)
+	flask.add_image(research_texture,32,32)
+	flask.pop()
+	flask.custom_minimum_size = Vector2(40,40)
+	flask.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	emblem.add_child(flask)
+	var titles := VBoxContainer.new()
+	titles.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	titles.add_theme_constant_override("separation",3)
+	header.add_child(titles)
+	research_notice_label = create_label("Nuevas investigaciones",22,Color("#ffe1a2"))
 	research_notice_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	research_notice.add_child(research_notice_label)
+	titles.add_child(research_notice_label)
+	var subtitle := create_label("Nuevas opciones para tu mina",13,Color("#a8c4b2"))
+	subtitle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	titles.add_child(subtitle)
+	research_notice_grid = GridContainer.new()
+	research_notice_grid.columns = 2
+	research_notice_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	research_notice_grid.add_theme_constant_override("h_separation",10)
+	research_notice_grid.add_theme_constant_override("v_separation",10)
+	column.add_child(research_notice_grid)
+	var footer := create_label("Encuéntralas en el menú › Investigación",12,Color("#a8b8a5"))
+	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	footer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(footer)
+	research_notice_progress = ProgressBar.new()
+	research_notice_progress.custom_minimum_size.y = 3
+	research_notice_progress.max_value = 1
+	research_notice_progress.show_percentage = false
+	research_notice_progress.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	research_notice_progress.add_theme_stylebox_override("background",create_style("#30493a","#30493a",0,2))
+	research_notice_progress.add_theme_stylebox_override("fill",create_style("#d6b374","#d6b374",0,2))
+	column.add_child(research_notice_progress)
 	research_notice.hide()
 	research_notice_backdrop.hide()
 	research_notice_timer = Timer.new()
@@ -366,13 +417,48 @@ func announce_researches(research_ids: Array[String]) -> void:
 	if research_ids.is_empty(): return
 	for research_id: String in research_ids:
 		if research_id not in notice_research_ids: notice_research_ids.append(research_id)
-	var names: PackedStringArray = []
-	for research_id: String in notice_research_ids: names.append(RESEARCH_VIEW[research_id][1])
-	research_notice_label.text = "Nuevas investigaciones\n" + " · ".join(names)
+	rebuild_notice_cards()
 	research_notice_timer.stop()
 	research_notice.hide()
 	research_notice_backdrop.hide()
 	update_notice_visibility()
+
+func rebuild_notice_cards() -> void:
+	research_notice_cards.clear()
+	for child in research_notice_grid.get_children():
+		research_notice_grid.remove_child(child)
+		child.queue_free()
+	for research_id: String in notice_research_ids:
+		var card := PanelContainer.new()
+		card.name = "Notice_" + research_id
+		card.custom_minimum_size = Vector2(210,76)
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var style := create_style("#263d30","#486448",1,10)
+		for side in ["left","right","top","bottom"]: style.set("content_margin_"+side,10)
+		card.add_theme_stylebox_override("panel",style)
+		var row := HBoxContainer.new()
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_theme_constant_override("separation",10)
+		card.add_child(row)
+		var item: String = {"straight_belt":"straight","curved_belts":"corner_right","junction_belt":"junction"}.get(research_id,research_id)
+		var art: Control = create_item_preview(item,Vector2(48,48))
+		art.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(art)
+		var labels := VBoxContainer.new()
+		labels.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		labels.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		labels.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		labels.add_theme_constant_override("separation",4)
+		row.add_child(labels)
+		var name_label := create_label(RESEARCH_VIEW[research_id][1],16,Color("#f4e6c9"))
+		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		labels.add_child(name_label)
+		var detail := create_label(RESEARCH_VIEW[research_id][2],11,Color("#9eb69b"))
+		detail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		labels.add_child(detail)
+		research_notice_grid.add_child(card)
+		research_notice_cards[research_id] = card
 
 func update_notice_visibility() -> void:
 	if research_notice == null or notice_research_ids.is_empty(): return
@@ -384,6 +470,11 @@ func update_notice_visibility() -> void:
 	elif not research_notice.visible:
 		research_notice.show()
 		research_notice_backdrop.show()
+		if research_notice_tween != null: research_notice_tween.kill()
+		research_notice_backdrop.modulate.a = 0
+		research_notice_tween = create_tween()
+		research_notice_tween.tween_property(research_notice_backdrop,"modulate:a",1.0,0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		research_notice_progress.value = 1
 		research_notice_timer.start()
 
 func open_research() -> void:

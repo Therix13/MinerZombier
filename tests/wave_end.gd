@@ -17,6 +17,7 @@ func run_checks() -> void:
 	game.launchers.place(platform)
 	game.launchers.receive(platform, "coal")
 	game.cycle.tutorial_step = game.cycle.TUTORIAL_LAST_STEP
+	game.cycle.barrier_broken = true
 	player.add_experience(49)
 	game.start_night()
 	get_nodes_in_group("zombies")[0].take_damage(100)
@@ -41,7 +42,7 @@ func run_checks() -> void:
 	check(game.cycle.is_night and not shop.research_notice.visible and not game.night_victory_overlay.visible, "Research alerts and victory remain deferred throughout the full three-second delay")
 	manager._process(0.01)
 	await settle()
-	check(game.cycle.day == 2 and not game.cycle.is_night and game.night_victory_overlay.visible and game.economy.coins > coins, "Exactly three clear seconds end the wave and display its victory")
+	check(game.cycle.day == 2 and not game.cycle.is_night and game.night_victory_overlay.visible and game.economy.coins == coins, "Exactly three clear seconds end the wave and display its victory without adding gold")
 	check(not shop.research_notice.visible and not shop.notice_research_ids.is_empty(), "Queued research waits behind the victory screen")
 	var rewarded: int = game.economy.coins
 	manager._process(3.0)
