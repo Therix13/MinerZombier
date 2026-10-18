@@ -55,22 +55,13 @@ func _draw() -> void:
 		if holding_object and dragging_object and held_object_type == "drill" and cell == held_object_cell:
 			continue
 		draw_drill(grid.get_cell_rect(cell).get_center(), int(drills.drills[cell]), false)
-	for cell in mining.coal_nuggets:
-		if holding_object and dragging_object and (held_object_type == "belt" or swap_bundle) and cell == held_object_cell:
-			continue
-		var amount: int = int(mining.coal_nuggets[cell])
-		if holding_object and dragging_object and held_object_type == "nugget" and cell == held_object_cell:
-			amount -= 1
-		if amount > 0:
-			draw_coal_nugget(grid.get_cell_rect(cell).get_center(), amount)
-	for cell in mining.brass_nuggets:
-		if holding_object and dragging_object and (held_object_type == "belt" or swap_bundle) and cell == held_object_cell:
-			continue
-		var amount: int = int(mining.brass_nuggets[cell])
-		if holding_object and dragging_object and held_object_type == "nugget" and cell == held_object_cell:
-			amount -= 1
-		if amount > 0:
-			draw_brass_nugget(grid.get_cell_rect(cell).get_center(), amount)
+	for kind: String in mining.ORE_KINDS:
+		var items: Dictionary = mining.items_for(kind)
+		for cell: Vector2i in items:
+			if holding_object and dragging_object and (held_object_type == "belt" or swap_bundle) and cell == held_object_cell: continue
+			var amount: int = int(items[cell])
+			if holding_object and dragging_object and held_object_type == "nugget" and cell == held_object_cell and kind == mining.nugget_type(cell): amount -= 1
+			if amount > 0: draw_nugget(grid.get_cell_rect(cell).get_center(), kind, amount)
 	for cell in mining.brass_veins:
 		if holding_object and dragging_object and held_object_type == "vein" and cell == held_object_cell:
 			continue
@@ -93,7 +84,7 @@ func _draw() -> void:
 		var defense_outline: Rect2 = grid.get_cell_rect(cell)
 		draw_rect(defense_outline.grow(-1.0), Color("#eab958"), false, 3.0)
 	for shot in launchers.shots:
-		draw_line(shot["from"], shot["to"], Color("#d9b46a") if shot["kind"] == "brass" else Color("#444444"), 3.0)
+		draw_line(shot["from"], shot["to"], Color("#d9b46a") if str(shot["kind"]).begins_with("brass") else Color("#444444"), 5.0 if str(shot["kind"]).ends_with("_2") else 3.0)
 	draw_sale_cell()
 	if placing_coal and preview_allowed("coal") and grid.owned_tiles.has(hovered_cell) and mining.can_place_vein(hovered_cell) and not conveyors.belts.has(hovered_cell) and not drills.drills.has(hovered_cell) and not launchers.launchers.has(hovered_cell):
 		draw_coal_vein(grid.get_cell_rect(hovered_cell).get_center(), placement_direction, 0, true)
@@ -149,10 +140,14 @@ func _draw() -> void:
 		elif held_object_type == "nugget":
 			if swap_bundle and conveyors.belts.has(held_object_cell):
 				draw_conveyor(drag_world_position, conveyors.belt_direction(held_object_cell), true, conveyors.belt_shape(held_object_cell))
-			if mining.nugget_type(held_object_cell) == "brass":
-				draw_brass_nugget(drag_world_position, 1)
-			else:
-				draw_coal_nugget(drag_world_position, 1)
+			draw_nugget(drag_world_position, mining.nugget_type(held_object_cell), 1)
+
+func draw_nugget(center: Vector2, kind: String, amount: int) -> void:
+	if kind.begins_with("brass"): draw_brass_nugget(center, amount)
+	else: draw_coal_nugget(center, amount)
+	if kind.ends_with("_2"):
+		draw_rect(Rect2(center + Vector2(5, -16), Vector2(12, 13)), Color("#e4bd71"))
+		draw_string(ThemeDB.fallback_font, center + Vector2(8, -5), "2", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#302719"))
 
 func preview_allowed(kind: String) -> bool:
 	return tutorial == null or tutorial.allows_world_press(hovered_cell, kind)
@@ -402,6 +397,8 @@ func draw_launcher(center: Vector2, data: Dictionary, preview: bool) -> void:
 	for i in range(slots):
 		var offset_x: float = 5.0 + float(i) * (rect.size.x - 10.0) / float(maxi(slots - 1, 1))
 		draw_circle(rect.position + Vector2(offset_x, rect.size.y - 5.0), 1.8, Color("#f5d17b") if i < ammo.size() else Color("#2f2b25"))
+		if i < ammo.size() and str(ammo[i]).ends_with("_2"):
+			draw_arc(rect.position + Vector2(offset_x, rect.size.y - 5.0), 3.0, 0, TAU, 10, Color("#ffe8aa"), 1)
 
 func draw_defense_platform(rect: Rect2) -> void:
 	var body: Rect2 = rect.grow(-3.0)

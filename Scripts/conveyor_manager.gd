@@ -45,7 +45,7 @@ func belt_shape(cell: Vector2i) -> String:
 	return str(belt_data(cell).get("shape", STRAIGHT))
 
 func can_place(cell: Vector2i) -> bool:
-	return grid.owned_tiles.has(cell) and (grid.is_valid_cell(cell) or grid.is_ammo_cell(cell)) and not grid.is_defense_position(cell) and (drills == null or not drills.drills.has(cell)) and cell != grid.sale_cell and not belts.has(cell) and (launchers == null or not launchers.launchers.has(cell)) and mining.vein_at(cell) == "" and mining.nuggets_at(cell) == 0
+	return grid.owned_tiles.has(cell) and (grid.is_valid_cell(cell) or grid.is_ammo_cell(cell)) and not grid.is_defense_position(cell) and (drills == null or not drills.drills.has(cell)) and cell != grid.sale_cell and not belts.has(cell) and (launchers == null or not launchers.launchers.has(cell)) and mining.vein_at(cell) == "" and mining.nuggets_at(cell) == 0 and not mining.occupied_by_compactor(cell)
 
 func place(cell: Vector2i, direction: int, shape: String = STRAIGHT) -> bool:
 	if not grid.owned_tiles.has(cell) or not can_place(cell):
@@ -109,7 +109,10 @@ func tick() -> void:
 			continue
 		var destination: Vector2i = source + DIRECTIONS[belt_direction(source)]
 		var kind: String = mining.nugget_type(source)
-		if launchers != null and launchers.can_receive(destination):
+		if mining.occupied_by_compactor(destination) and mining.compactors.can_receive(destination, kind):
+			if not requests.has(destination): requests[destination] = []
+			requests[destination].append({"source": source, "kind": kind})
+		elif launchers != null and launchers.can_receive(destination):
 			if not requests.has(destination):
 				requests[destination] = []
 			requests[destination].append({"source": source, "kind": kind})
@@ -146,9 +149,12 @@ func tick() -> void:
 		mining.remove_one_nugget(transfer["source"], transfer["kind"])
 		sale_completed.emit(transfer["kind"])
 	for transfer in transfers:
+		if mining.occupied_by_compactor(transfer["destination"]):
+			mining.compactors.receive(transfer["destination"], transfer["kind"])
+			continue
 		if launchers != null and launchers.launchers.has(transfer["destination"]):
 			launchers.receive(transfer["destination"], transfer["kind"])
 			continue
-		var items: Dictionary = mining.brass_nuggets if transfer["kind"] == "brass" else mining.coal_nuggets
+		var items: Dictionary = mining.items_for(transfer["kind"])
 		items[transfer["destination"]] = 1
 	changed.emit()

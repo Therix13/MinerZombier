@@ -115,7 +115,7 @@ func run_checks() -> void:
 	check(not game.placing_drill and game.economy.coins == locked_coins, "Synthetic locked-button events cannot buy a locked item")
 	shop.open_category("INVESTIGACIÓN")
 	await settle()
-	check(shop.shop_title.text == "INVESTIGACIÓN" and shop.research_buttons.size() == 5, "Research category contains five item unlocks")
+	check(shop.shop_title.text == "INVESTIGACIÓN" and shop.research_buttons.size() == 6, "Research category contains six item unlocks")
 	check(not shop.progression_panel.visible, "The XP HUD stays hidden while the shop is open")
 	var before_coins: int = game.economy.coins
 	shop.research_buttons["drill"].pressed.emit()
@@ -160,12 +160,15 @@ func run_checks() -> void:
 	shop.research_buttons["curved_belts"].pressed.emit()
 	shop.research_buttons["junction_belt"].pressed.emit()
 	check(player.unlocked.size() == 5 and player.is_item_unlocked("junction"), "All five researches unlock only their intended items")
+	player.award_night()
+	shop.research_buttons["compactor"].pressed.emit()
+	check(player.unlocked.size() == 6 and player.is_item_unlocked("compactor"), "Compactor research unlocks the new processing machine")
 	var level: int = player.level
 	var experience: int = player.total_experience
 	points = player.research_points
 	cycle.is_night = true
 	cycle.complete_night()
-	check(player.level == level and player.total_experience == experience and player.unlocked.size() == 5, "Unlocks and EXP survive a day change without a fake sale reward")
+	check(player.level == level and player.total_experience == experience and player.unlocked.size() == 6, "Unlocks and EXP survive a day change without a fake sale reward")
 	check(player.research_points == points + 1, "A completed night grants exactly one extra research point")
 	cycle.complete_night()
 	check(player.research_points == points + 1 and cycle.day == 3, "Duplicate completion callbacks do not repeat the reward or advance the day")
@@ -179,9 +182,9 @@ func run_checks() -> void:
 	root.size = Vector2i(800, 600)
 	await settle()
 	var scroll: ScrollContainer = shop.shop_scroll
-	scroll.ensure_control_visible(shop.research_buttons["junction_belt"])
+	scroll.ensure_control_visible(shop.research_buttons["compactor"])
 	await settle()
-	var last: Rect2 = shop.research_buttons["junction_belt"].get_global_rect()
+	var last: Rect2 = shop.research_buttons["compactor"].get_global_rect()
 	var visible: Rect2 = scroll.get_global_rect()
 	check(last.position.y >= visible.position.y - 1 and last.end.y <= visible.end.y + 1, "Last research remains reachable in a smaller window")
 	game.queue_free()

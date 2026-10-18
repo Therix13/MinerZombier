@@ -56,7 +56,7 @@ func can_receive(cell: Vector2i) -> bool:
 	return launchers.has(cell) and (launchers[cell]["ammo"] as Array).size() < capacity
 
 func receive(cell: Vector2i, kind: String) -> bool:
-	if not can_receive(cell) or (kind != "coal" and kind != "brass"):
+	if not can_receive(cell) or kind not in mining.ORE_KINDS:
 		return false
 	var ammo: Array = launchers[cell]["ammo"]
 	ammo.append(kind)
@@ -94,7 +94,7 @@ func advance(delta: float) -> void:
 		data["angle"] = (target_position - center).angle()
 		var kind: String = str(ammo.pop_front())
 		data["cooldown"] = fire_interval
-		var damage: float = (2.0 if kind == "brass" else 1.0) * damage_multiplier
+		var damage: float = ammo_damage(kind)
 		if nearest.has_method("take_damage"):
 			nearest.call("take_damage", damage)
 		elif nearest.has_method("apply_damage"):
@@ -103,3 +103,6 @@ func advance(delta: float) -> void:
 		visual_changed = true
 	if visual_changed:
 		changed.emit()
+
+func ammo_damage(kind: String) -> float:
+	return (2.0 if kind.begins_with("brass") else 1.0) * mining.material_units(kind) * damage_multiplier

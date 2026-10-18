@@ -10,7 +10,7 @@ const LEVEL_EXPERIENCE_GROWTH: float = 1.6
 const POINTS_PER_LEVEL: int = 1
 const POINTS_PER_NIGHT: int = 1
 const ZOMBIE_EXPERIENCE: int = 25
-const SALE_EXPERIENCE := {"coal": 1, "brass": 2}
+const SALE_EXPERIENCE := {"coal": 1, "brass": 2, "coal_2": 4, "brass_2": 8}
 const RESEARCHES := {
 	"drill": {
 		"name": "Taladro", "branch": "MINERÍA", "cost": 1, "level": 2,
@@ -32,9 +32,13 @@ const RESEARCHES := {
 		"name": "Unión en T", "branch": "LOGÍSTICA", "cost": 2, "level": 4,
 		"requires": ["curved_belts"], "description": "Desbloquea la cinta que reúne tres entradas.",
 	},
+	"compactor": {
+		"name": "Compactador", "branch": "PROCESAMIENTO", "cost": 1, "level": 3,
+		"requires": ["drill"], "description": "Convierte 4 pepitas iguales en una de nivel 2.",
+	},
 }
 const BASE_ITEMS := ["coal", "launcher", "defense_platforms"]
-const ITEM_RESEARCH := {"straight": "straight_belt", "drill": "drill", "brass": "brass", "corner": "curved_belts", "corner_right": "curved_belts", "corner_left": "curved_belts", "junction": "junction_belt"}
+const ITEM_RESEARCH := {"straight": "straight_belt", "drill": "drill", "brass": "brass", "corner": "curved_belts", "corner_right": "curved_belts", "corner_left": "curved_belts", "junction": "junction_belt", "compactor": "compactor"}
 # Older scenes can still refer to these names. They now resolve item unlocks.
 const TECHNOLOGIES := RESEARCHES
 

@@ -132,7 +132,7 @@ func resupply_targets() -> Array[Vector2i]:
 	var controller: RefCounted = game.get("camera_controller")
 	if not resupply_active() or resupply_step != 1 or controller.defense_view or controller.transitioning:
 		return result
-	for items: Dictionary in [cycle.mining.coal_nuggets, cycle.mining.brass_nuggets]:
+	for items: Dictionary in cycle.mining.nugget_stores().values():
 		for cell: Vector2i in items:
 			if int(items[cell]) <= 0: continue
 			result.append(cell)

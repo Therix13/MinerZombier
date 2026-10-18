@@ -9,7 +9,9 @@ func _ready() -> void:
 	game.get("renderer").interactions = self
 
 func stores() -> Dictionary:
-	return {"coal_vein": game.get("mining").coal_veins, "brass_vein": game.get("mining").brass_veins, "coal": game.get("mining").coal_nuggets, "brass": game.get("mining").brass_nuggets, "belt": game.get("conveyors").belts, "entry": game.get("conveyors").last_junction_entry, "drill": game.get("drills").drills, "launcher": game.get("launchers").launchers}
+	var result: Dictionary = {"coal_vein": game.get("mining").coal_veins, "brass_vein": game.get("mining").brass_veins, "belt": game.get("conveyors").belts, "entry": game.get("conveyors").last_junction_entry, "drill": game.get("drills").drills, "launcher": game.get("launchers").launchers, "compactor": game.get_node("Compactors").machines}
+	result.merge(game.get("mining").nugget_stores())
+	return result
 
 func cell_data(cell: Vector2i) -> Dictionary:
 	var result: Dictionary = {}
@@ -17,7 +19,7 @@ func cell_data(cell: Vector2i) -> Dictionary:
 	for kind in maps:
 		if maps[kind].has(cell):
 			var value: Variant = maps[kind][cell]
-			if kind in ["coal", "brass"] and int(value) <= 0:
+			if kind in game.get("mining").ORE_KINDS and int(value) <= 0:
 				continue
 			result[kind] = value.duplicate(true) if value is Dictionary or value is Array else value
 	if result.has("belt"):
@@ -26,7 +28,7 @@ func cell_data(cell: Vector2i) -> Dictionary:
 
 func has_kind(cell: Vector2i, kind: String) -> bool:
 	var data: Dictionary = cell_data(cell)
-	if kind == "nugget": return data.has("coal") or data.has("brass")
+	if kind == "nugget": return game.get("mining").nuggets_at(cell) > 0
 	if kind == "vein": return data.has("coal_vein") or data.has("brass_vein")
 	return data.has(kind)
 
@@ -34,16 +36,16 @@ func can_hold(cell: Vector2i, data: Dictionary) -> bool:
 	if (not grid.owned_tiles.has(cell) and not grid.defense_tiles.has(cell)) or cell == grid.sale_cell:
 		return false
 	var buildings: int = 0
-	for kind in ["coal_vein", "brass_vein", "drill", "belt", "launcher"]:
+	for kind in ["coal_vein", "brass_vein", "drill", "belt", "launcher", "compactor"]:
 		if data.has(kind): buildings += 1
 	if buildings > 1:
 		return false
-	var ore: bool = data.has("coal") or data.has("brass")
+	var ore: bool = data.has("coal") or data.has("brass") or data.has("coal_2") or data.has("brass_2")
 	if data.has("launcher"):
 		return grid.defense_tiles.has(cell) and not ore
 	if grid.is_defense_position(cell):
 		return data.is_empty()
-	if data.has("coal_vein") or data.has("brass_vein") or data.has("drill"):
+	if data.has("coal_vein") or data.has("brass_vein") or data.has("drill") or data.has("compactor"):
 		return grid.is_valid_cell(cell) and not ore
 	return grid.is_valid_cell(cell) or grid.is_ammo_cell(cell)
 
@@ -66,6 +68,9 @@ func can_drop(kind: String, source: Vector2i, destination: Vector2i) -> bool:
 		return false
 	if kind == "belt" and loaded_belt(source):
 		return false
+	if kind == "compactor" and loaded_compactor(source) and source != destination: return false
+	if kind == "nugget" and game.get("mining").occupied_by_compactor(destination):
+		return game.get_node("Compactors").can_receive(destination, game.get("mining").nugget_type(source))
 	if game.get("cycle").is_night:
 		# Mine and reload during combat, while buildings remain in place.
 		return kind == "nugget" and (source == destination or game.get("launchers").can_receive(destination) or game.get("mining").can_move_nugget(destination))
@@ -77,20 +82,24 @@ func can_drop(kind: String, source: Vector2i, destination: Vector2i) -> bool:
 		if game.get("mining").can_move_nugget(destination):
 			return true
 	# Swapping another object must not move a loaded conveyor indirectly.
-	if loaded_belt(source) or loaded_belt(destination):
+	if loaded_belt(source) or loaded_belt(destination) or loaded_compactor(source) or loaded_compactor(destination):
 		return false
 	return can_hold(destination, cell_data(source)) and can_hold(source, cell_data(destination))
 
 func loaded_belt(cell: Vector2i) -> bool:
 	return game.get("conveyors").belts.has(cell) and game.get("mining").nuggets_at(cell) > 0
 
+func loaded_compactor(cell: Vector2i) -> bool:
+	return game.get("mining").occupied_by_compactor(cell) and int(game.get_node("Compactors").machines[cell]["count"]) > 0
+
 func swaps_contents(kind: String, source: Vector2i, destination: Vector2i) -> bool:
+	if kind == "nugget" and game.get("mining").occupied_by_compactor(destination): return false
 	if game.get("cycle").is_night:
 		return false
 	return source != destination and not cell_data(destination).is_empty() and not (kind == "nugget" and (destination == grid.sale_cell or game.get("launchers").can_receive(destination) or game.get("mining").can_move_nugget(destination))) and can_drop(kind, source, destination)
 
 func rotate_data(data: Dictionary, direction: int) -> void:
-	for kind in ["coal_vein", "brass_vein", "belt"]:
+	for kind in ["coal_vein", "brass_vein", "belt", "compactor"]:
 		if data.has(kind): data[kind]["direction"] = posmod(direction, 4)
 	if data.has("drill"): data["drill"] = posmod(direction, 4)
 
@@ -108,6 +117,7 @@ func apply_cells(cells: Dictionary) -> void:
 	game.get("conveyors").changed.emit()
 	game.get("drills").changed.emit()
 	game.get("launchers").changed.emit()
+	game.get_node("Compactors").changed.emit()
 
 func drop(kind: String, source: Vector2i, destination: Vector2i, direction: int = 1) -> bool:
 	if not can_drop(kind, source, destination):
@@ -115,6 +125,12 @@ func drop(kind: String, source: Vector2i, destination: Vector2i, direction: int 
 	var mining: RefCounted = game.get("mining")
 	var launchers: RefCounted = game.get("launchers")
 	if kind == "nugget" and source != destination:
+		if mining.occupied_by_compactor(destination):
+			var ore: String = mining.nugget_type(source)
+			if not game.get_node("Compactors").receive(destination, ore): return false
+			mining.remove_one_nugget(source, ore)
+			mining.changed.emit()
+			return true
 		if destination == grid.sale_cell:
 			mining.move_nugget(source, destination)
 			return true
@@ -147,6 +163,7 @@ func pick_kind(cell: Vector2i, _point: Vector2) -> String:
 	if game.get("drills").drills.has(cell): return "drill"
 	if game.get("launchers").launchers.has(cell): return "launcher"
 	if game.get("conveyors").belts.has(cell): return "belt"
+	if game.get("mining").occupied_by_compactor(cell): return "compactor"
 	return ""
 
 func clear_drag() -> void:
@@ -180,7 +197,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if game.get("cycle").is_tutorial_active() or not phase_allows() or not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_LEFT or not event.pressed or game.get("holding_object"):
 		return
-	if game.get("placing_coal") or game.get("placing_brass") or game.get("placing_belt") or game.get("placing_drill") or game.get("placing_launcher"):
+	if game.get("placing_coal") or game.get("placing_brass") or game.get("placing_belt") or game.get("placing_drill") or game.get("placing_launcher") or game.get_node("Compactors").placing:
 		return
 	var cell: Vector2i = world_cell(event.position)
 	var kind: String = pick_kind(cell, event.position)
@@ -200,4 +217,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		game.set("placement_direction", int(data["belt"]["direction"]))
 	elif kind == "drill":
 		game.set("placement_direction", int(data["drill"]))
+	elif kind == "compactor":
+		game.set("placement_direction", int(data["compactor"]["direction"]))
 	get_viewport().set_input_as_handled()

@@ -1,0 +1,216 @@
+extends "res://tests/interactions.gd"
+
+var compactors: Node2D
+var shop: Control
+
+func click_control(control: Control) -> void:
+	var at: Vector2 = root.get_screen_transform() * (control.get_global_transform_with_canvas() * (control.size * 0.5))
+	await mouse_move(at)
+	await mouse_button(at, true)
+	await mouse_button(at, false)
+
+func wait_shop() -> void:
+	var deadline: int = Time.get_ticks_msec() + 3000
+	while shop.shop_animating and Time.get_ticks_msec() < deadline: await process_frame
+	await settle()
+
+func key(code: Key) -> void:
+	for pressed: bool in [true, false]:
+		var event := InputEventKey.new()
+		event.keycode = code
+		event.physical_keycode = code
+		event.pressed = pressed
+		Input.parse_input_event(event)
+		await settle()
+
+func buy_from_shop() -> void:
+	shop.open_shop()
+	await wait_shop()
+	shop.open_category("BASE")
+	await settle()
+	shop.shop_scroll.ensure_control_visible(shop.item_buttons["compactor"]["button"])
+	await settle()
+	await click_control(shop.item_buttons["compactor"]["button"])
+	await wait_shop()
+
+func run_checks() -> void:
+	root.show()
+	var args: PackedStringArray = OS.get_cmdline_user_args()
+	var scene: String = args[0] if not args.is_empty() else "main.tscn"
+	game = load("res://" + scene).instantiate()
+	if "--legacy" in args: game.set_script(load(OS.get_environment("GODOT_LEGACY_MAIN")))
+	root.add_child(game)
+	current_scene = game
+	await settle()
+	game.set_process(false)
+	var display: CanvasLayer
+	for child in game.get_children():
+		if child.has_method("toggle_pause_menu"): display = child
+	display.resolution = Vector2i(1280, 720)
+	display.window_mode = 0
+	display.apply_display(false)
+	await settle()
+	shop = game.get("shop")
+	mover = game.get_node("WorldInteractions")
+	compactors = game.get_node("Compactors")
+	game.cycle.day = 2
+	game.cycle.changed.emit()
+	game.grid.expand()
+	var c := Vector2i(14, 1)
+	var a := Vector2i(13, 1)
+	var b := Vector2i(15, 1)
+	var d := Vector2i(16, 1)
+	var e := Vector2i(14, 2)
+	var coins: int = game.economy.coins
+	compactors.buy()
+	check(not compactors.placing and game.economy.coins == coins, "An unresearched compactor cannot be bought")
+	game.progression.add_experience(130)
+	check(not game.progression.can_research("compactor"), "Compactor research requires the drill prerequisite")
+	game.research_technology("drill")
+	game.research_technology("compactor")
+	check(game.progression.is_item_unlocked("compactor") and game.progression.research_points == 0, "Level-three research unlocks compactors for one point")
+	if DisplayServer.get_name() != "headless" and "--capture" in args:
+		shop.open_shop()
+		await wait_shop()
+		shop.open_category("INVESTIGACIÓN")
+		await settle()
+		shop.shop_scroll.ensure_control_visible(shop.research_buttons["compactor"])
+		await settle()
+		root.get_texture().get_image().save_png("/workspace/.onboarding/display-test/compactor-research.png")
+		shop.close_shop()
+		await wait_shop()
+	await buy_from_shop()
+	check(compactors.placing and game.economy.coins == coins - compactors.PRICE, "A real shop click purchases the compactor at its listed price")
+	await key(KEY_BACKSPACE)
+	check(not compactors.placing and game.economy.coins == coins, "Cancelling machine placement refunds the purchase exactly once")
+	await key(KEY_BACKSPACE)
+	check(game.economy.coins == coins, "Repeated cancellation never duplicates the refund")
+	await buy_from_shop()
+	await key(KEY_R)
+	check(compactors.direction == 2, "R rotates the placement preview")
+	await key(KEY_R)
+	await key(KEY_R)
+	await key(KEY_R)
+	await mouse_move(point(c))
+	await mouse_button(point(c), true)
+	await mouse_button(point(c), false)
+	check(compactors.machines.has(c) and not compactors.placing, "Real world input places the purchased machine")
+	if not compactors.machines.has(c):
+		game.free()
+		quit(1)
+		return
+	compactors.set_process(false)
+	check(not game.mining.can_place_vein(c) and not game.drills.can_place(c) and not game.conveyors.can_place(c) and not game.mining.can_move_nugget(c), "Other buildings and loose ore cannot overlap the compactor")
+	game.conveyors.place(b, 1)
+	for index in range(3):
+		put(a, {"coal": 1})
+		check(mover.drop("nugget", a, c) and game.mining.nuggets_at(a) == 0, "Manual input consumes coal nugget %d exactly once" % (index + 1))
+		compactors.process_outputs()
+	check(compactors.machines[c]["count"] == 3 and game.mining.nuggets_at(b) == 0, "Three inputs never produce a level-two nugget early")
+	put(a, {"brass": 1})
+	check(not mover.drop("nugget", a, c) and game.mining.nugget_type(a) == "brass" and compactors.machines[c]["count"] == 3, "Mixed material input is rejected without losing either material")
+	game.mining.brass_nuggets.clear()
+	put(a, {"coal_2": 1})
+	check(not mover.drop("nugget", a, c) and game.mining.nugget_type(a) == "coal_2", "Level-two items cannot be compacted recursively or downgraded")
+	game.mining.coal_level2_nuggets.clear()
+	check(not mover.drop("compactor", c, d), "A partially loaded compactor cannot move away with its buffer")
+	check(mover.drop("compactor", c, c, 0) and compactors.machines[c]["count"] == 3 and compactors.machines[c]["direction"] == 0, "A loaded machine can turn its output without losing its buffer or becoming trapped")
+	mover.drop("compactor", c, c, 1)
+	put(d, {"coal_vein": {"direction": 1, "progress": 0}})
+	check(not mover.drop("vein", d, c) and compactors.machines[c]["count"] == 3, "Swapping another object cannot displace a loaded compactor")
+	game.mining.coal_veins.clear()
+	put(a, {"coal": 1})
+	check(mover.drop("nugget", a, c), "The fourth matching input completes the batch")
+	put(a, {"coal": 1})
+	check(not mover.drop("nugget", a, c) and game.mining.nuggets_at(a) == 1, "A full machine refuses a fifth nugget without consuming it")
+	put(b, {"brass": 1})
+	compactors.process_outputs()
+	check(compactors.machines[c]["count"] == 4 and game.mining.nugget_type(b) == "brass", "An occupied output preserves the complete batch and blocking item")
+	game.mining.brass_nuggets.clear()
+	compactors.process_outputs()
+	check(compactors.machines[c]["count"] == 0 and game.mining.nugget_type(b) == "coal_2" and game.mining.nuggets_at(b) == 1, "Four coal inputs produce exactly one level-two coal on the output belt")
+	compactors.process_outputs()
+	check(game.mining.nuggets_at(b) == 1, "Idle output processing cannot duplicate the product")
+	check(not mover.drop("belt", b, d), "A belt carrying level-two ore remains locked")
+	if DisplayServer.get_name() != "headless" and "--capture" in args:
+		game.redraw_world()
+		await settle()
+		root.get_texture().get_image().save_png("/workspace/.onboarding/display-test/compactor-machine.png")
+	check(mover.drop("nugget", b, e) and game.mining.nugget_type(e) == "coal_2" and game.conveyors.belts.has(b), "Manual movement preserves ore level and leaves its belt in place")
+	var xp: int = game.progression.total_experience
+	coins = game.economy.coins
+	check(mover.drop("nugget", e, game.grid.sale_cell) and game.economy.coins == coins + 20 and game.progression.total_experience == xp + 4, "Selling level-two coal pays exactly four ordinary nuggets in coins and EXP")
+	for index in range(4): compactors.receive(c, "brass")
+	compactors.process_outputs()
+	check(game.mining.nugget_type(b) == "brass_2", "Four brass inputs preserve their material in the level-two output")
+	game.conveyors.place(d, 1)
+	game.conveyors.tick()
+	check(game.mining.nugget_type(d) == "brass_2" and game.mining.nuggets_at(b) == 0, "Conveyors transport level-two ore without changing its type")
+	var sale_belt := Vector2i(15, 0)
+	game.conveyors.place(sale_belt, 0)
+	mover.drop("nugget", d, sale_belt)
+	coins = game.economy.coins
+	xp = game.progression.total_experience
+	game.conveyors.tick()
+	check(game.economy.coins == coins + 12 and game.progression.total_experience == xp + 8 and game.mining.nuggets_at(sale_belt) == 0, "Automated level-two brass sales pay once using the brass value")
+	game.grid.purchase_defense_platforms()
+	var platform: Vector2i = game.grid.defense_cell("left")
+	game.launchers.place(platform)
+	put(e, {"coal_2": 1})
+	check(mover.drop("nugget", e, platform), "Level-two ore can be loaded manually as ammunition")
+	game.launchers.receive(platform, "brass_2")
+	check(game.launchers.launchers[platform]["ammo"].size() == 2 and is_equal_approx(game.cycle.ammo_damage(), 6), "Refined ammunition takes one slot per nugget and keeps four times its material damage")
+	game.zombie_manager.set_process(false)
+	game.zombie_manager.start_wave(1)
+	var enemy: Node2D = get_nodes_in_group("zombies")[0]
+	enemy.set_process(false)
+	enemy.health = 10
+	enemy.position = game.grid.get_cell_rect(platform).get_center() + Vector2(0, -30)
+	game.launchers.advance(4)
+	check(is_equal_approx(enemy.health, 8), "A level-two coal shot deals four ordinary coal shots of damage")
+	game.launchers.advance(4)
+	check(is_equal_approx(enemy.health, 4), "A level-two brass shot deals four ordinary brass shots of damage")
+	for zombie in get_nodes_in_group("zombies"): zombie.queue_free()
+	await settle()
+	clear_items()
+	compactors.place(c, 1)
+	game.conveyors.place(a, 1)
+	game.conveyors.place(b, 1)
+	for index in range(4):
+		put(a, {"coal": 1})
+		game.conveyors.tick()
+	compactors.process_outputs()
+	check(game.mining.nugget_type(b) == "coal_2" and compactors.machines[c]["count"] == 0, "Conveyors automatically supply all four inputs and receive the refined output")
+	clear_items()
+	compactors.place(c, 1)
+	game.mining.place_vein(a, 1)
+	for index in range(28): game.mining.mine(a)
+	compactors.process_outputs()
+	check(game.mining.nugget_type(b) == "coal_2", "Manual or drilled vein production can feed a neighboring compactor directly")
+	clear_items()
+	compactors.place(c, 1)
+	game.conveyors.place(b, 0)
+	for index in range(4): compactors.receive(c, "coal")
+	compactors.process_outputs()
+	check(compactors.machines[c]["count"] == 4 and game.mining.nuggets_at(b) == 0, "An output belt facing the wrong way holds the complete batch")
+	game.conveyors.move(b, b, 1)
+	compactors.process_outputs()
+	check(compactors.machines[c]["count"] == 0 and game.mining.nugget_type(b) == "coal_2", "Fixing belt direction releases exactly one retained product")
+	clear_items()
+	compactors.place(sale_belt, 0)
+	coins = game.economy.coins
+	xp = game.progression.total_experience
+	for index in range(4): compactors.receive(sale_belt, "brass")
+	compactors.process_outputs()
+	compactors.process_outputs()
+	check(game.economy.coins == coins + 12 and game.progression.total_experience == xp + 8 and compactors.machines[sale_belt]["count"] == 0, "Direct chest output sells the refined item once without creating loose duplicates")
+	clear_items()
+	compactors.place(c, 1)
+	game.set_process(true)
+	compactors.set_process(true)
+	await drag(c, d)
+	check(compactors.machines.has(d) and not compactors.machines.has(c), "An empty compactor can be moved with a real mouse drag")
+	game.free()
+	await settle()
+	print("RESULT: ", passed, " passed; ", failed, " failed; compactor=", scene)
+	quit(1 if failed else 0)

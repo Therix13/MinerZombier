@@ -13,6 +13,7 @@ signal defense_platforms_unlocked
 signal view_toggle_requested
 signal launcher_requested
 signal drill_requested
+signal compactor_requested
 signal night_requested
 signal restart_requested
 signal technology_requested(technology_id: String)
@@ -21,6 +22,7 @@ const DisplaySettingsScript = preload("res://Scripts/display_settings.gd")
 const TutorialGuideScript = preload("res://Scripts/tutorial_guide.gd")
 const IntroCinematicScript = preload("res://Scripts/intro_cinematic.gd")
 const WorldInteractionsScript = preload("res://Scripts/world_interactions.gd")
+const CompactorScript = preload("res://Scripts/compactor_manager.gd")
 
 const PANEL_WIDTH := 340.0
 const TOGGLE_SIZE := 58.0
@@ -33,6 +35,7 @@ const RESEARCH_VIEW := {
 	"straight_belt": ["belt", "Cinta", "Transportadora"],
 	"curved_belts": ["curve", "Curvas", "Izquierda · derecha"],
 	"junction_belt": ["junction", "Unión en T", "3 entradas"],
+	"compactor": ["compactor", "Compactador", "4 → 1 · Nivel 2"],
 }
 
 var economy: RefCounted
@@ -77,6 +80,7 @@ func setup(economy_manager: RefCounted, grid_manager: RefCounted) -> void:
 	build_interface()
 	economy.money_changed.connect(update_money)
 	update_money(economy.coins)
+	compactor_requested.connect(func() -> void: get_parent().get_parent().get_node("Compactors").buy())
 	# Older scenes can have a built-in main script. Updating main.gd alone
 	# does not update those scenes, so install the pause menu here as well.
 	ensure_pause_menu.call_deferred()
@@ -84,6 +88,10 @@ func setup(economy_manager: RefCounted, grid_manager: RefCounted) -> void:
 
 func ensure_interactions() -> void:
 	var game: Node = get_parent().get_parent()
+	if not game.has_node("Compactors"):
+		var compactors := CompactorScript.new()
+		compactors.name = "Compactors"
+		game.add_child(compactors)
 	if not game.has_node("WorldInteractions"):
 		var interactions := WorldInteractionsScript.new()
 		interactions.name = "WorldInteractions"
@@ -764,6 +772,7 @@ func open_category(category: String) -> void:
 			add_item_button("CINTA EN L IZQUIERDA · 50", economy.CONVEYOR_PRICE, "corner_left", left_corner_conveyor_requested)
 			add_item_button("CINTA EN T · 50", economy.CONVEYOR_PRICE, "junction", junction_conveyor_requested)
 			add_item_button("TALADRO AUTOMÁTICO · 200", economy.DRILL_PRICE, "drill", drill_requested)
+			add_item_button("COMPACTADOR · 300", CompactorScript.PRICE, "compactor", compactor_requested)
 		"DEFENSA":
 			var left_cell: Vector2i = grid.defense_cell("left")
 			var right_cell: Vector2i = grid.defense_cell("right")
@@ -804,6 +813,8 @@ func request_item(item: String, request: Signal) -> void:
 		return
 	if cycle != null and (cycle.is_night or cycle.defeated or not tutorial_allows_item(item)):
 		return
+	var compactors: Node = get_parent().get_parent().get_node_or_null("Compactors")
+	if compactors != null: compactors.cancel_placement()
 	request.emit()
 
 func refresh_item_buttons() -> void:
@@ -891,6 +902,11 @@ class ResearchIcon extends Control:
 		var factor: float = minf(size.x, size.y) / 32.0
 		draw_set_transform((size - Vector2.ONE * 32.0 * factor) * 0.5, 0.0, Vector2.ONE * factor)
 		match kind:
+			"compactor":
+				draw_rect(Rect2(3, 3, 26, 26), tint, false, 2)
+				draw_rect(Rect2(8, 7, 16, 4), tint)
+				draw_rect(Rect2(8, 21, 16, 4), tint)
+				for index in range(4): draw_circle(Vector2(10 + (index % 2) * 10, 14 + (index / 2) * 4), 1.5, tint)
 			"ore":
 				draw_colored_polygon(PackedVector2Array([Vector2(3, 22), Vector2(8, 9), Vector2(21, 5), Vector2(29, 17), Vector2(23, 28), Vector2(9, 28)]), tint)
 				draw_line(Vector2(10, 12), Vector2(18, 9), Color("#352516"), 2, true)

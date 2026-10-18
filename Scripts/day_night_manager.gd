@@ -137,7 +137,7 @@ func ammo_damage() -> float:
 	for launcher in launchers.launchers.values():
 		var ammo: Array = launcher["ammo"]
 		for kind in ammo:
-			total += (2.0 if kind == "brass" else 1.0) * launchers.damage_multiplier
+			total += launchers.ammo_damage(kind)
 	return total
 
 func has_ammo() -> bool:
