@@ -55,6 +55,15 @@ func toggle_key() -> void:
 		Input.parse_input_event(event)
 		await settle()
 
+func wait_for_view() -> void:
+	var deadline: int = Time.get_ticks_msec() + 3000
+	while game.camera_controller.transitioning and Time.get_ticks_msec() < deadline:
+		await process_frame
+	await settle()
+
+func control_point(control: Control) -> Vector2:
+	return root.get_screen_transform() * (control.get_global_transform_with_canvas() * (control.size * 0.5))
+
 func run_checks() -> void:
 	root.show()
 	var args: PackedStringArray = OS.get_cmdline_user_args()
@@ -89,7 +98,15 @@ func run_checks() -> void:
 	game.camera.position = Vector2(744, 180)
 	controller.clamp_position()
 	game.cycle.changed.emit()
+	var mine_position: Vector2 = game.camera.position
 	game.start_night()
+	check(controller.transitioning and game.camera.position.is_equal_approx(mine_position), "Switching to defense begins a camera movement without teleporting")
+	await create_timer(0.15).timeout
+	check(game.camera.position.y < mine_position.y and game.camera.position.y > controller.to_position.y, "The camera travels upward through an intermediate position")
+	check(not mover.can_drop("launcher", platform, game.grid.defense_cell("right")), "World interactions wait until the camera finishes moving")
+	await wait_for_view()
+	var center: Vector2 = game.get_global_transform_with_canvas() * game.grid.get_cell_rect(game.grid.sale_cell).get_center()
+	check(absf(center.x - root.get_visible_rect().size.x * 0.5) < 0.01, "The defense entrance is centered horizontally on the screen")
 	await settle()
 	check(game.cycle.is_night and controller.defense_view and not shop.view_button.disabled, "Night starts in defense with the mine button enabled")
 	var manager: Node2D = game.zombie_manager
@@ -102,9 +119,15 @@ func run_checks() -> void:
 	for i in range(5): game.launchers.advance(4.0)
 	await settle()
 	check(game.launchers.launchers[platform]["ammo"].is_empty() and get_nodes_in_group("zombies").size() == 1, "Five shots leave the second wave active with one wounded enemy")
+	var guide: Node = game.get_node("TutorialGuide")
+	check(guide.resupply_step == 0 and shop.cycle_title.text == "Sin munición" and not shop.cycle_action.disabled, "The first shortage starts a short lesson with a mine shortcut")
 	var button: Button = shop.view_button
-	await click(root.get_screen_transform() * (button.get_global_transform_with_canvas() * (button.size * 0.5)))
-	check(not controller.defense_view and button.text == "DEFENSIVA", "A real click on MINA opens the mine during combat")
+	var defense_position: Vector2 = game.camera.position
+	await click(control_point(shop.cycle_action))
+	check(controller.transitioning and not controller.defense_view and game.camera.position.y > defense_position.y and game.camera.position.y < mine_position.y, "The lesson's mine shortcut moves the camera downward smoothly")
+	await wait_for_view()
+	check(not controller.defense_view and button.text == "DEFENSIVA", "The mine opens during combat")
+	check(guide.resupply_step == 1 and guide.resupply_targets() == [vein] and shop.cycle_action.disabled, "The lesson highlights extraction before reloading")
 	check(game.cycle.is_night and manager.active_wave and not paused, "Changing views does not pause or complete the wave")
 	var survivor: Node2D = get_nodes_in_group("zombies")[0]
 	var health: float = manager.base_health
@@ -114,6 +137,7 @@ func run_checks() -> void:
 	check(manager.base_health < health, "Enemies continue attacking while the mine is open")
 	for i in range(7): await click(cell_point(vein))
 	check(game.mining.nuggets_at(ore) == 1, "Real mine clicks produce a nugget during the night")
+	check(guide.resupply_targets() == [ore, platform], "The lesson points from the extracted nugget to the weapon")
 	check(not mover.drop("vein", vein, Vector2i(13, 0)), "Mining at night does not unlock moving buildings")
 	var ammo_connection: Vector2i = platform + Vector2i(0, 1)
 	game.conveyors.place(ammo_connection, 0)
@@ -124,15 +148,37 @@ func run_checks() -> void:
 	await mouse_button(cell_point(platform), false)
 	check(game.launchers.launchers[platform]["ammo"].size() == 1 and game.mining.nuggets_at(ammo_connection) == 0, "A real drag reloads the empty weapon with the extracted nugget")
 	check(game.conveyors.belts.has(ammo_connection) and shop.shop_button.disabled, "Reloading preserves the belt and the nighttime shop lock")
+	check(guide.resupply_step == 2 and shop.cycle_action.text == "VOLVER A DEFENSA", "Reloading advances the lesson to returning to defense")
+	await click(control_point(shop.cycle_action))
+	await wait_for_view()
+	check(controller.defense_view and button.text == "MINA" and not guide.resupply_active(), "Returning to defense completes the lesson")
+	await click(control_point(button))
+	await wait_for_view()
+	check(not controller.defense_view, "MINA remains available after the lesson")
 	await toggle_key()
+	await wait_for_view()
 	check(controller.defense_view and button.text == "MINA", "P returns to defense during the same wave")
 	await toggle_key()
+	await wait_for_view()
 	check(not controller.defense_view, "P can reopen the mine during the same wave")
 	await toggle_key()
+	await wait_for_view()
 	game.launchers.advance(4.0)
 	manager._process(0.01)
 	await settle()
 	check(game.cycle.day == 3 and not game.cycle.is_night and game.night_victory_overlay.visible, "The reloaded sixth shot completes the second night normally")
+	check(not guide.resupply_active(), "The last killing shot does not show an empty-ammo lesson after victory")
+	game.dismiss_night_victory_popup()
+	await wait_for_view()
+	game.launchers.receive(platform, "coal")
+	game.start_night()
+	await wait_for_view()
+	var next_zombie: Node2D = get_nodes_in_group("zombies")[0]
+	next_zombie.set_process(false)
+	next_zombie.position = game.grid.get_cell_rect(platform).get_center() + Vector2(0, -50)
+	game.launchers.advance(4.0)
+	await settle()
+	check(game.cycle.is_night and not game.cycle.has_ammo() and not guide.resupply_active(), "Later shortages do not repeat the completed lesson")
 	game.free()
 	await settle()
 	print("RESULT: ", passed, " passed; ", failed, " failed; night resupply=", scene)

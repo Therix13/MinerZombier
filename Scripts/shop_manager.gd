@@ -407,6 +407,10 @@ func build_cycle_panel() -> void:
 func _on_cycle_action() -> void:
 	if cycle_action.disabled:
 		return
+	var guide: Node = get_parent().get_parent().get_node_or_null("TutorialGuide")
+	if guide != null and guide.resupply_active():
+		guide.resupply_action()
+		return
 	if cycle.defeated:
 		restart_requested.emit()
 	elif cycle.is_tutorial_active():
@@ -477,6 +481,9 @@ func update_cycle() -> void:
 		cycle_action.disabled = not cycle.can_start_night() or shop_open or shop_animating
 	shop_button.disabled = tutorial or cycle.is_night or cycle.defeated
 	view_button.disabled = tutorial or cycle.defeated
+	var guide: Node = get_parent().get_parent().get_node_or_null("TutorialGuide")
+	if guide != null and guide.resupply_active():
+		guide.apply_resupply_card(self)
 	update_progression()
 
 func create_style(background: String, border: String, border_size: int, radius: int) -> StyleBoxFlat:

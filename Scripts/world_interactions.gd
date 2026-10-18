@@ -47,14 +47,14 @@ func can_hold(cell: Vector2i, data: Dictionary) -> bool:
 		return grid.is_valid_cell(cell) and not ore
 	return grid.is_valid_cell(cell) or grid.is_ammo_cell(cell)
 
-func phase_allows() -> bool:
+func phase_allows(allow_transition: bool = false) -> bool:
 	var cycle: RefCounted = game.get("cycle")
 	var shop: Control = game.get("shop")
 	var victory: Control = game.get("night_victory_overlay")
-	return not get_tree().paused and not cycle.defeated and not shop.shop_open and not shop.shop_animating and (victory == null or not victory.visible)
+	return not get_tree().paused and not cycle.defeated and not shop.shop_open and not shop.shop_animating and (victory == null or not victory.visible) and (allow_transition or not game.get("camera_controller").transitioning)
 
 func toggle_night_view() -> void:
-	if not game.get("cycle").is_night or not phase_allows():
+	if not game.get("cycle").is_night or not phase_allows(true):
 		return
 	clear_drag()
 	var controller: RefCounted = game.get("camera_controller")
@@ -170,6 +170,9 @@ func _input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if game.get("camera_controller").transitioning and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		get_viewport().set_input_as_handled()
+		return
 	if game.get("cycle").is_tutorial_active() or not phase_allows() or not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_LEFT or not event.pressed or game.get("holding_object"):
 		return
 	if game.get("placing_coal") or game.get("placing_brass") or game.get("placing_belt") or game.get("placing_drill") or game.get("placing_launcher"):
