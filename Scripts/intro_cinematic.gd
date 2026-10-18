@@ -16,6 +16,7 @@ var elapsed: float = 0.0
 var game: Node
 var display: CanvasLayer
 var game_ui: CanvasLayer
+var world_visibility: Dictionary = {}
 var ui_was_visible: bool = true
 var previously_paused: bool = false
 var owns_pause: bool = false
@@ -48,6 +49,11 @@ func _ready() -> void:
 	if game_ui != null:
 		ui_was_visible = game_ui.visible
 		game_ui.hide()
+	# The opaque film covers the game; exclude that paused world from rendering.
+	for child in game.get_children():
+		if child is CanvasItem and not child is Camera2D:
+			world_visibility[child] = child.visible
+			child.hide()
 	build_screen()
 	build_audio()
 	get_tree().paused = true
@@ -162,6 +168,9 @@ func restore_game() -> void:
 	if not owns_pause:
 		return
 	owns_pause = false
+	for item in world_visibility:
+		if is_instance_valid(item): item.visible = world_visibility[item]
+	world_visibility.clear()
 	if is_instance_valid(game_ui):
 		game_ui.visible = ui_was_visible
 	# If removed from code while the pause menu is open, let that menu own pause.
@@ -307,6 +316,8 @@ class FilmCanvas extends Node2D:
 	var miner: Node2D
 	var scenery: FilmDetails
 	var machine_cells: Array[Vector2i] = []
+	var ore_phase: int = -999
+	var last_scenery_state := Vector3(-1, -1, -1)
 
 	func _ready() -> void:
 		world = FilmWorld.new()
@@ -368,7 +379,10 @@ class FilmCanvas extends Node2D:
 			actor.z_index = 20
 			world.add_child(actor)
 			actors.append(actor)
+			actor.scale = Vector2.ONE * (1.3 if index % 11 == 0 else 1.0)
+			actor.modulate = Color("#c5b1d2") if index % 13 == 0 else Color.WHITE
 			var hit := Damage.new()
+			hit.amount = 2
 			hit.z_index = 30
 			world.add_child(hit)
 			hit.set_process(false)
@@ -404,6 +418,7 @@ class FilmCanvas extends Node2D:
 		abandoned = time >= FALL_END
 		destruction = 1.0 if abandoned else smoothstep(BATTLE_END, FALL_END - 0.6, time)
 		world.visible = time >= TITLE_END and not (time >= RUINS_END and time < YEARS_END)
+		if not world.visible: return
 		zone.set_night(not daylight)
 		var reveal: float = smoothstep(TITLE_END + 1.5, TITLE_END + 5.5, time)
 		var focus := Vector2(744, lerpf(240, -100, reveal))
@@ -427,36 +442,42 @@ class FilmCanvas extends Node2D:
 			launchers.launchers[cell] = {"ammo": ["brass_2", "brass_2", "brass_2", "brass_2", "brass_2"], "angle": (target - origin).angle()}
 			if fmod(battle_time + index * 0.07, 0.32) < 0.16 and target.y > -650:
 				launchers.shots.append({"from": origin, "to": target, "kind": "brass_2"})
-		for items in mining.nugget_stores().values(): items.clear()
-		if not abandoned:
-			for index in range(machine_cells.size()):
-				var cell: Vector2i = machine_cells[index]
-				if posmod(index + floori(battle_time * 2), 3) == 0:
-					mining.items_for("brass" if cell.x >= 17 else "coal")[cell] = 1
+		var phase: int = -1 if abandoned else floori(battle_time * 2)
+		if phase != ore_phase:
+			ore_phase = phase
+			for items in mining.nugget_stores().values(): items.clear()
+			if not abandoned:
+				for index in range(machine_cells.size()):
+					var cell: Vector2i = machine_cells[index]
+					if posmod(index + phase, 3) == 0:
+						mining.items_for("brass" if cell.x >= 17 else "coal")[cell] = 1
 		for cell: Vector2i in compactors.machines:
 			compactors.machines[cell]["elapsed"] = fmod(battle_time, 4)
 		compactors.modulate = Color("#45403a") if abandoned else Color.WHITE
 		renderer.modulate = Color("#766c5d") if abandoned else Color.WHITE
 		terrain.modulate = renderer.modulate
-		terrain.queue_redraw()
+		# The extended terrain is a retained grid; camera transforms move it for free.
 		base.base_health = 100 * (1 - destruction)
 		base.visible = not abandoned
 		for index in range(actors.size()):
 			var actor: Node2D = actors[index]
+			if abandoned:
+				actor.hide()
+				hits[index].hide()
+				continue
 			actor.position = zombie_position(index)
 			actor.visible = not abandoned and actor.position.y >= -660
 			actor.walking_time = time * 8 + index
 			actor.attacking = actor.position.y >= 160
-			actor.scale = Vector2.ONE * (1.3 if index % 11 == 0 else 1.0)
-			actor.modulate = Color("#c5b1d2") if index % 13 == 0 else Color.WHITE
-			actor.limbs.assign(["left_arm", "right_arm", "left_leg", "right_leg"])
-			if index % 4 == 0 and battle_time > 6: actor.limbs.erase("left_arm")
+			if index % 4 == 0:
+				if battle_time > 6: actor.limbs.erase("left_arm")
+				elif "left_arm" not in actor.limbs: actor.limbs.append("left_arm")
 			actor.queue_redraw()
 			var hit: Node2D = hits[index]
 			hit.visible = actor.visible and index % 4 == 0 and fmod(battle_time + index * 0.13, 2.7) < 0.7
+			if not hit.visible: continue
 			hit.position = actor.position
 			hit.age = fmod(battle_time + index * 0.13, 2.7)
-			hit.amount = 2
 			hit.limb = "left_arm" if battle_time > 6 else ""
 			hit.limb_position = Vector2(-12 - hit.age * 12, minf(18, -hit.age * 35 + hit.age * hit.age * 80))
 			hit.angle = hit.age * 4
@@ -464,11 +485,14 @@ class FilmCanvas extends Node2D:
 		miner.visible = daylight
 		miner.position = Vector2(lerpf(480, 744, smoothstep(YEARS_END + 0.5, ARRIVAL_END - 0.8, time)), lerpf(465, 218, smoothstep(YEARS_END + 0.5, ARRIVAL_END - 0.8, time)))
 		miner.walk = time * 7
-		miner.queue_redraw()
+		if miner.visible: miner.queue_redraw()
 		renderer.queue_redraw()
 		compactors.queue_redraw()
-		base.queue_redraw()
-		scenery.queue_redraw()
+		if base.visible: base.queue_redraw()
+		var scenery_state := Vector3(destruction, float(abandoned), float(daylight))
+		if scenery_state != last_scenery_state or (destruction > 0 and not abandoned):
+			scenery.queue_redraw()
+			last_scenery_state = scenery_state
 		queue_redraw()
 
 class FilmBars extends Node2D:
@@ -486,12 +510,11 @@ class FilmTerrain extends Node2D:
 
 	func _draw() -> void:
 		# Extend the same mine tiles to the frame edges during wide camera shots.
-		var visible: Rect2 = get_global_transform_with_canvas().affine_inverse() * get_viewport_rect()
-		for column in range(floori(visible.position.x / grid.TILE_SIZE), ceili(visible.end.x / grid.TILE_SIZE)):
-			for row in range(maxi(0, floori((visible.position.y - grid.GRID_OFFSET_Y) / grid.TILE_SIZE)), maxi(0, ceili((visible.end.y - grid.GRID_OFFSET_Y) / grid.TILE_SIZE))):
-				var rect: Rect2 = grid.get_cell_rect(Vector2i(column, row))
-				draw_rect(rect, Color("#383838"))
-				draw_rect(rect, Color("#222222"), false, 1)
+		var tile: float = grid.TILE_SIZE
+		# Cover every shot with one background and a batched line set.
+		var bounds := Rect2(-tile * 16, grid.GRID_OFFSET_Y, tile * 64, tile * 64)
+		draw_rect(bounds, Color("#383838"))
+		preload("res://Scripts/world_renderer.gd").draw_grid_lines(self, bounds, tile, Vector2(0, grid.GRID_OFFSET_Y))
 
 
 class ArrivalMiner extends Node2D:

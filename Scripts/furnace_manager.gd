@@ -1,5 +1,8 @@
 extends Node2D
 
+const ArtAtlas = preload("res://Scripts/art_atlas.gd")
+var rasterizing: bool = false
+
 signal smelted(cell: Vector2i)
 signal changed
 
@@ -151,13 +154,15 @@ func _draw() -> void:
 		draw_machine(game.get("drag_world_position"), data)
 
 func draw_machine(center: Vector2, data: Dictionary) -> void:
-	draw_rect(Rect2(center - Vector2(21, 21), Vector2(42, 42)), Color("#392d28"))
-	for y in range(4):
-		for x in range(3):
-			draw_rect(Rect2(center + Vector2(-19 + x * 13, -19 + y * 10), Vector2(12, 9)), Color("#94714e") if (x + y) % 2 == 0 else Color("#78604b"))
-	draw_rect(Rect2(center + Vector2(-13, -7), Vector2(26, 22)), Color("#292c2d"))
-	draw_rect(Rect2(center + Vector2(-10, -4), Vector2(20, 14)), Color("#d98a38") if int(data["fuel"]) > 0 else Color("#13171a"))
-	for x in [-7, 0, 7]: draw_line(center + Vector2(x, -4), center + Vector2(x, 11), Color("#3b3830"), 2)
+	var cached: bool = not rasterizing and ArtAtlas.paint(self, "furnace:%d:%d" % [int(data.get("direction", 0)), 1 if int(data["fuel"]) > 0 else 0], center)
+	if not cached:
+		draw_rect(Rect2(center - Vector2(21, 21), Vector2(42, 42)), Color("#392d28"))
+		for y in range(4):
+			for x in range(3):
+				draw_rect(Rect2(center + Vector2(-19 + x * 13, -19 + y * 10), Vector2(12, 9)), Color("#94714e") if (x + y) % 2 == 0 else Color("#78604b"))
+		draw_rect(Rect2(center + Vector2(-13, -7), Vector2(26, 22)), Color("#292c2d"))
+		draw_rect(Rect2(center + Vector2(-10, -4), Vector2(20, 14)), Color("#d98a38") if int(data["fuel"]) > 0 else Color("#13171a"))
+		for x in [-7, 0, 7]: draw_line(center + Vector2(x, -4), center + Vector2(x, 11), Color("#3b3830"), 2)
 	draw_rect(Rect2(center + Vector2(-13, 17), Vector2(26, 2)), Color("#272b2c"))
 	draw_rect(Rect2(center + Vector2(-13, 17), Vector2(26.0 * float(data["fuel"]) / CAPACITY, 2)), Color("#efba61"))
 
@@ -166,6 +171,7 @@ func draw_machine(center: Vector2, data: Dictionary) -> void:
 		var progress: float = clampf(float(data.get("elapsed", 0.0)) / PROCESS_TIME, 0.0, 1.0)
 		draw_rect(Rect2(center + Vector2(-16, -17), Vector2(32, 4)), Color("#292c2d"))
 		draw_rect(Rect2(center + Vector2(-16, -17), Vector2(32 * progress, 4)), Color("#f6bc5c"))
+	if cached: return
 	var outward: Vector2 = Vector2(DIRECTIONS[posmod(int(data.get("direction", 0)), 4)])
 	var side := Vector2(-outward.y, outward.x)
 	var tip: Vector2 = center + outward * 22

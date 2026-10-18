@@ -25,6 +25,8 @@ var base_health: float = BASE_MAX_HEALTH
 var cleared_time: float = 0.0
 
 func setup(grid_manager: RefCounted) -> void:
+	# Warm the shared artwork during loading, before the first wave.
+	ZombieScript.get_body_atlas()
 	grid = grid_manager
 	base_health = BASE_MAX_HEALTH
 	queue_redraw()

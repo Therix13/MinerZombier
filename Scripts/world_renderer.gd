@@ -1,5 +1,11 @@
 extends Node2D
 
+const ArtAtlas = preload("res://Scripts/art_atlas.gd")
+var rasterizing: bool = false
+
+var ground: GroundCanvas
+var ground_signature: int = 0
+var ground_rebuilds: int = 0
 var grid: RefCounted
 var mining: RefCounted
 var conveyors: RefCounted
@@ -24,23 +30,27 @@ var held_object_cell := Vector2i.ZERO
 var drag_world_position := Vector2.ZERO
 
 func setup(grid_manager: RefCounted, mining_manager: RefCounted, conveyor_manager: RefCounted, drill_manager: RefCounted) -> void:
+	ArtAtlas.prepare()
 	grid = grid_manager
 	mining = mining_manager
 	conveyors = conveyor_manager
 	drills = drill_manager
+	if ground == null:
+		ground = GroundCanvas.new()
+		ground.name = "CachedGround"
+		ground.show_behind_parent = true
+		add_child(ground)
+	ground.grid = grid
+	ground_signature = grid.owned_tiles.hash()
+	ground.queue_redraw()
+	ground_rebuilds += 1
 
 func _draw() -> void:
 	var swap_bundle: bool = dragging_object and is_instance_valid(interactions) and interactions.swaps_contents(held_object_type, held_object_cell, grid.world_to_cell(drag_world_position))
-	draw_rect(Rect2(Vector2.ZERO, Vector2(grid.MAP_WIDTH * grid.TILE_SIZE, grid.GRID_OFFSET_Y)), Color.WHITE)
-	for y in range(grid.MAP_HEIGHT):
-		for x in range(grid.MAP_WIDTH):
-			var cell := Vector2i(x, y)
-			var rect: Rect2 = grid.get_cell_rect(cell)
-			var color := Color("#383838")
-			if grid.owned_tiles.has(cell):
-				color = Color("#7b946f")
-			draw_rect(rect, color)
-			draw_rect(rect, Color("#222222"), false, 1.0)
+	if ground != null and ground_signature != grid.owned_tiles.hash():
+		ground_signature = grid.owned_tiles.hash()
+		ground.queue_redraw()
+		ground_rebuilds += 1
 	for cell in grid.ammo_tiles:
 		var connector_rect: Rect2 = grid.get_cell_rect(cell)
 		draw_rect(connector_rect, Color("#687f72"))
@@ -151,6 +161,7 @@ func _draw() -> void:
 		draw_nugget(grid.get_cell_rect(hovered_cell).get_center(), interactions.placing_resource, 1)
 
 func draw_nugget(center: Vector2, kind: String, amount: int) -> void:
+	if not rasterizing and amount == 1 and ArtAtlas.paint(self, "ore:" + kind, center): return
 	if "_ingot" in kind: draw_ingot(center, kind, amount)
 	elif mining.ore_level(kind) >= 3: draw_cluster_nugget(center, kind, amount)
 	elif mining.ore_level(kind) == 2: draw_refined_nugget(center, kind, amount)
@@ -237,6 +248,7 @@ func draw_coal_vein(
 	progress: int,
 	preview: bool
 ) -> void:
+	if not rasterizing and not preview and ArtAtlas.paint(self, "coal:%d:%d" % [direction_index, progress], center): return
 	var rect := Rect2(
 		center - Vector2.ONE * grid.TILE_SIZE * 0.5,
 		Vector2.ONE * grid.TILE_SIZE
@@ -386,6 +398,7 @@ func draw_sale_cell() -> void:
 		draw_rect(rect, Color("#ffe6a2"), false, 2.0)
 
 func draw_conveyor(center: Vector2, direction_index: int, preview: bool, shape: String = "straight") -> void:
+	if not rasterizing and not preview and ArtAtlas.paint(self, "belt:%s:%d" % ["corner_right" if shape == "corner" else shape, direction_index], center): return
 	var rect := Rect2(center - Vector2.ONE * grid.TILE_SIZE * 0.5, Vector2.ONE * grid.TILE_SIZE).grow(-3.0)
 	var base := Color("#59432c")
 	if preview:
@@ -417,6 +430,7 @@ func draw_conveyor(center: Vector2, direction_index: int, preview: bool, shape: 
 	draw_colored_polygon(arrow, Color("#f7d478"))
 
 func draw_drill(center: Vector2, direction_index: int, preview: bool) -> void:
+	if not rasterizing and not preview and ArtAtlas.paint(self, "drill:%d" % direction_index, center): return
 	var rect := Rect2(center - Vector2.ONE * grid.TILE_SIZE * 0.5, Vector2.ONE * grid.TILE_SIZE).grow(-3.0)
 	var metal := Color("#81888d")
 	if preview:
@@ -436,6 +450,7 @@ func draw_drill(center: Vector2, direction_index: int, preview: bool) -> void:
 	draw_colored_polygon(arrow, Color("#ffe084"))
 
 func draw_brass_vein(center: Vector2, direction_index: int, progress: int, preview: bool) -> void:
+	if not rasterizing and not preview and ArtAtlas.paint(self, "brass:%d:%d" % [direction_index, progress], center): return
 	var rect := Rect2(center - Vector2.ONE * grid.TILE_SIZE * 0.5, Vector2.ONE * grid.TILE_SIZE).grow(-3.0)
 	var base := Color("#634525")
 	if preview:
@@ -482,9 +497,37 @@ func draw_launcher(center: Vector2, data: Dictionary, preview: bool) -> void:
 			draw_arc(rect.position + Vector2(offset_x, rect.size.y - 5.0), 3.0, 0, TAU, 10, Color("#ffe8aa"), 1)
 
 func draw_defense_platform(rect: Rect2) -> void:
+	if not rasterizing and rect.size == Vector2.ONE * 48 and ArtAtlas.paint(self, "platform", rect.get_center()): return
 	var body: Rect2 = rect.grow(-3.0)
 	draw_rect(body, Color("#4c3b25"))
 	draw_rect(body.grow(-4.0), Color("#79838d"))
 	draw_rect(body.grow(-7.0), Color("#a7b1b9"), false, 2.0)
 	for offset: Vector2 in [Vector2(7, 7), Vector2(rect.size.x - 7, 7), Vector2(7, rect.size.y - 7), Vector2(rect.size.x - 7, rect.size.y - 7)]:
 		draw_circle(rect.position + offset, 2.6, Color("#e2ba74"))
+
+# One retained canvas for the terrain; moving ore never rebuilds its geometry.
+class GroundCanvas extends Node2D:
+	var grid: RefCounted
+	func _draw() -> void:
+		if grid == null: return
+		draw_rect(Rect2(Vector2.ZERO, Vector2(grid.MAP_WIDTH * grid.TILE_SIZE, grid.GRID_OFFSET_Y)), Color.WHITE)
+		var bounds := Rect2(0, grid.GRID_OFFSET_Y, grid.MAP_WIDTH * grid.TILE_SIZE, grid.MAP_HEIGHT * grid.TILE_SIZE)
+		draw_rect(bounds, Color("#383838"))
+		for cell: Vector2i in grid.owned_tiles:
+			if grid.is_valid_cell(cell): draw_rect(grid.get_cell_rect(cell), Color("#7b946f"))
+		draw_grid_lines(self, bounds, grid.TILE_SIZE, Vector2(0, grid.GRID_OFFSET_Y))
+
+	static func draw_grid_lines(canvas: Node2D, bounds: Rect2, tile_size: float, origin: Vector2) -> void:
+		var lines := PackedVector2Array()
+		for column in range(floori((bounds.position.x - origin.x) / tile_size), ceili((bounds.end.x - origin.x) / tile_size) + 1):
+			var x: float = origin.x + column * tile_size
+			lines.append(Vector2(x, bounds.position.y))
+			lines.append(Vector2(x, bounds.end.y))
+		for row in range(floori((bounds.position.y - origin.y) / tile_size), ceili((bounds.end.y - origin.y) / tile_size) + 1):
+			var y: float = origin.y + row * tile_size
+			lines.append(Vector2(bounds.position.x, y))
+			lines.append(Vector2(bounds.end.x, y))
+		canvas.draw_multiline(lines, Color("#222222"), 1.0)
+
+static func draw_grid_lines(canvas: Node2D, bounds: Rect2, tile_size: float, origin: Vector2) -> void:
+	GroundCanvas.draw_grid_lines(canvas, bounds, tile_size, origin)

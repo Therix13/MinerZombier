@@ -1,5 +1,8 @@
 extends Node2D
 
+const ArtAtlas = preload("res://Scripts/art_atlas.gd")
+var rasterizing: bool = false
+
 signal changed
 
 const PRICE: int = 300
@@ -144,14 +147,16 @@ func _draw() -> void:
 		draw_machine(game.get("drag_world_position"), data)
 
 func draw_machine(center: Vector2, data: Dictionary) -> void:
-	var rect := Rect2(center - Vector2(21, 21), Vector2(42, 42))
-	draw_rect(rect, Color("#292b2d"))
-	draw_rect(rect.grow(-3), Color("#697377"))
-	draw_rect(rect, Color("#d1ad6b"), false, 2)
-	draw_rect(Rect2(center + Vector2(-12, -14), Vector2(24, 5)), Color("#c2a064"))
-	draw_rect(Rect2(center + Vector2(-12, 6), Vector2(24, 5)), Color("#c2a064"))
-	draw_line(center + Vector2(-16, -9), center + Vector2(-16, 10), Color("#333c40"), 4)
-	draw_line(center + Vector2(16, -9), center + Vector2(16, 10), Color("#333c40"), 4)
+	var cached: bool = not rasterizing and ArtAtlas.paint(self, "compactor:%d" % int(data["direction"]), center)
+	if not cached:
+		var rect := Rect2(center - Vector2(21, 21), Vector2(42, 42))
+		draw_rect(rect, Color("#292b2d"))
+		draw_rect(rect.grow(-3), Color("#697377"))
+		draw_rect(rect, Color("#d1ad6b"), false, 2)
+		draw_rect(Rect2(center + Vector2(-12, -14), Vector2(24, 5)), Color("#c2a064"))
+		draw_rect(Rect2(center + Vector2(-12, 6), Vector2(24, 5)), Color("#c2a064"))
+		draw_line(center + Vector2(-16, -9), center + Vector2(-16, 10), Color("#333c40"), 4)
+		draw_line(center + Vector2(16, -9), center + Vector2(16, 10), Color("#333c40"), 4)
 	var count: int = int(data["count"])
 	for index in range(INPUT_COUNT):
 		draw_circle(center + Vector2(-5 + index * 10, 16), 2, Color("#eac978") if index < count else Color("#303638"))
@@ -160,6 +165,7 @@ func draw_machine(center: Vector2, data: Dictionary) -> void:
 	if count == INPUT_COUNT:
 		draw_rect(Rect2(center + Vector2(-12, -3), Vector2(24, 4)), Color("#303638"))
 		draw_rect(Rect2(center + Vector2(-12, -3), Vector2(24 * clampf(float(data.get("elapsed", 0.0)) / PROCESS_TIME, 0, 1), 4)), Color("#eac978"))
+	if cached: return
 	var output := Vector2(DIRECTIONS[int(data["direction"])])
 	var tip := center + output * 21
 	var side := Vector2(-output.y, output.x)
