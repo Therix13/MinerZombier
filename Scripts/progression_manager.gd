@@ -47,6 +47,11 @@ var experience: int = 0
 var total_experience: int = 0
 var research_points: int = 0
 var unlocked: Dictionary = {}
+var developer_mode: bool = false:
+	set(value):
+		if developer_mode == value: return
+		developer_mode = value
+		changed.emit()
 
 func experience_to_next_level() -> int:
 	return roundi(BASE_LEVEL_EXPERIENCE * pow(LEVEL_EXPERIENCE_GROWTH, level - 1))
@@ -77,7 +82,7 @@ func has_technology(technology_id: String) -> bool:
 	return has_research(technology_id)
 
 func has_research(research_id: String) -> bool:
-	return RESEARCHES.has(research_id) and unlocked.has(research_id)
+	return RESEARCHES.has(research_id) and (developer_mode or unlocked.has(research_id))
 
 func is_item_unlocked(item_id: String) -> bool:
 	return item_id in BASE_ITEMS or (ITEM_RESEARCH.has(item_id) and has_research(ITEM_RESEARCH[item_id]))
@@ -86,7 +91,7 @@ func visible_researches(at_level: int = -1) -> Array[String]:
 	var result: Array[String] = []
 	var visible_level: int = level if at_level < 0 else at_level
 	for research_id: String in RESEARCHES:
-		if int(RESEARCHES[research_id]["level"]) <= visible_level: result.append(research_id)
+		if developer_mode or int(RESEARCHES[research_id]["level"]) <= visible_level: result.append(research_id)
 	return result
 
 func research_block_reason(technology_id: String) -> String:

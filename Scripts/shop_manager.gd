@@ -160,6 +160,7 @@ func ensure_tutorial_guide() -> void:
 
 func set_progression(player_progression: RefCounted) -> void:
 	progression = player_progression
+	progression.developer_mode = economy.developer_mode
 	known_research_level = progression.level
 	cycle.set_progression(progression)
 	# Legacy scene scripts must also treat research solely as item unlocks.
@@ -803,6 +804,11 @@ func set_view_mode(defense_enabled: bool) -> void:
 
 func update_money(amount: int) -> void:
 	money_label.text = "∞ DEV" if economy.developer_mode else str(amount)
+	if progression != null:
+		progression.developer_mode = economy.developer_mode
+		var interactions: Node = get_parent().get_parent().get_node_or_null("WorldInteractions")
+		if interactions != null and interactions.placement_active() and not progression.is_item_unlocked(interactions.selected_item()):
+			interactions.cancel_active()
 	if shop_open:
 		if shop_title.text == "INVESTIGACIÓN":
 			return
