@@ -39,17 +39,17 @@ func run_checks() -> void:
 	var cycle: RefCounted = game.get("cycle")
 	check(economy.get("coins") == 500 and grid.get("owned_tiles").size() == 9, "Initial economy and 3x3 base")
 	check(mining.call("place_vein", Vector2i(14, 0), 1), "Place coal vein in owned cell")
-	for i in range(7):
+	for i in range(5):
 		mining.call("mine", Vector2i(14, 0))
-	check(mining.call("nuggets_at", Vector2i(15, 0)) == 1, "Seven mining actions produce coal")
+	check(mining.call("nuggets_at", Vector2i(15, 0)) == 1, "Five mining actions produce coal")
 	mining.call("move_nugget", Vector2i(15, 0), grid.get("sale_cell"))
 	check(economy.get("coins") == 505 and cycle.get("coal_sold") == 1 and cycle.get("tutorial_step") == 1, "The first manual sale pays without granting the five-sale bonus")
 	for sale in range(4):
-		for i in range(7): mining.call("mine", Vector2i(14, 0))
+		for i in range(5): mining.call("mine", Vector2i(14, 0))
 		mining.call("move_nugget", Vector2i(15, 0), grid.get("sale_cell"))
 	check(economy.get("coins") == 525 and cycle.get("coal_sold") == 5 and cycle.get("tutorial_step") == 2, "Five manual sales pay only their sale prices")
 	for nugget in range(2):
-		for click in range(7): mining.mine(cycle.TUTORIAL_COAL_CELL)
+		for click in range(5): mining.mine(cycle.TUTORIAL_COAL_CELL)
 		mining.move_nugget(cycle.TUTORIAL_ORE_CELL, cycle.TUTORIAL_FUSION_CELL)
 	mining.move_nugget(cycle.TUTORIAL_FUSION_CELL, grid.sale_cell)
 	check(cycle.fusion_sold and economy.coins == 540, "Fusion follows the five sales and pays only for its sold product")
@@ -58,7 +58,7 @@ func run_checks() -> void:
 	check(conveyors.call("place", Vector2i(15, 0), 0), "Place conveyor toward sale point")
 	mining.call("move_vein", Vector2i(14, 0), Vector2i(15, 1), 0)
 	check(drills.call("place", Vector2i(15, 2), 0), "Place drill facing vein")
-	for i in range(7):
+	for i in range(5):
 		drills.call("tick")
 	check(mining.call("nuggets_at", Vector2i(15, 0)) == 1, "Drill produces coal onto conveyor")
 	conveyors.call("tick")

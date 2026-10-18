@@ -37,7 +37,7 @@ func check_first_automated_sale(game: Node) -> void:
 	var cycle: RefCounted = game.get("cycle")
 	check(mining.call("place_vein", Vector2i(15, 1), 0), "Fresh game places coal vein toward sale conveyor")
 	check(conveyors.call("place", Vector2i(15, 0), 0), "Fresh game places sale conveyor")
-	for i in range(7):
+	for i in range(5):
 		mining.call("mine", Vector2i(15, 1))
 	conveyors.call("tick")
 	check(cycle.get("coal_sold") == 1 and cycle.get("tutorial_step") == 1, "First automatic sale waits for the remaining four sales")
@@ -67,7 +67,7 @@ func run_checks() -> void:
 		check(game.get("economy").coins == 500 and game.get("cycle").day == 1, "Restart %d resets coins and day" % (iteration + 1))
 		check(game.get("mining").coal_veins.is_empty() and game.get("conveyors").belts.is_empty(), "Restart %d resets placed objects" % (iteration + 1))
 		check(game.get("progression").level == 1 and game.get("progression").experience == 0 and game.get("progression").total_experience == 0 and game.get("progression").research_points == 0 and game.get("progression").unlocked.is_empty(), "Restart %d resets progression for the new game" % (iteration + 1))
-		check(game.get("mining").mining_clicks == 7 and is_equal_approx(game.get("drills").drill_interval, 0.6), "Restart %d restores base building statistics" % (iteration + 1))
+		check(game.get("mining").mining_clicks == 5 and is_equal_approx(game.get("drills").drill_interval, 0.6), "Restart %d restores base building statistics" % (iteration + 1))
 	# Close while a night is active, with enemies and their signal callbacks.
 	game.get("grid").purchase_defense_platforms()
 	var defense_cell: Vector2i = game.get("grid").defense_cell("left")

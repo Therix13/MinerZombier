@@ -133,7 +133,7 @@ func check_locked_actions() -> void:
 	check(not game.get("progression").has_research("drill"), "Research cannot bypass the tutorial")
 
 func extract_one() -> void:
-	for index in range(7):
+	for index in range(5):
 		await click_cell(cycle.TUTORIAL_COAL_CELL)
 
 func earn_purchase_money() -> void:
@@ -141,7 +141,7 @@ func earn_purchase_money() -> void:
 	var balance: int = game.economy.coins
 	var count: int = 0
 	while cycle.needs_tutorial_income() and count < 200:
-		for click in range(7): game.mining.mine(cycle.TUTORIAL_COAL_CELL)
+		for click in range(5): game.mining.mine(cycle.TUTORIAL_COAL_CELL)
 		check(game.get_node("WorldInteractions").drop("nugget", cycle.TUTORIAL_ORE_CELL, grid.sale_cell), "A mined nugget can be sold to fund the pending purchase")
 		count += 1
 	await settle()
@@ -201,7 +201,7 @@ func run_checks() -> void:
 	await drag_cell(cycle.TUTORIAL_COAL_CELL, Vector2i(16, 1))
 	check(game.get("mining").coal_veins.has(cycle.TUTORIAL_COAL_CELL) and game.get("mining").coal_veins.size() == 1, "Dragging the vein cannot move it out of the guided route")
 	await extract_one()
-	check(game.get("mining").nuggets_at(cycle.TUTORIAL_ORE_CELL) == 1 and cycle.tutorial_step == 1, "Seven real mining clicks produce the tutorial nugget")
+	check(game.get("mining").nuggets_at(cycle.TUTORIAL_ORE_CELL) == 1 and cycle.tutorial_step == 1, "Five real mining clicks produce the tutorial nugget")
 	await drag_cell(cycle.TUTORIAL_ORE_CELL, Vector2i(16, 1))
 	check(game.get("mining").nuggets_at(cycle.TUTORIAL_ORE_CELL) == 1, "Dropping ore on an unrelated tile preserves it at the source")
 	await drag_cell(cycle.TUTORIAL_ORE_CELL, grid.sale_cell)
@@ -285,7 +285,7 @@ func run_checks() -> void:
 	await wait_shop()
 	# Earn normal post-tutorial funds for purchase checks.
 	for index in range(40):
-		for click in range(7): game.mining.mine(cycle.TUTORIAL_COAL_CELL)
+		for click in range(5): game.mining.mine(cycle.TUTORIAL_COAL_CELL)
 		game.mining.move_nugget(cycle.TUTORIAL_ORE_CELL, grid.sale_cell)
 	game.call("buy_conveyor")
 	check(game.get("placing_belt"), "Buying the conveyor research unlocks its normal store purchase")

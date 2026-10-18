@@ -135,7 +135,7 @@ func run_checks() -> void:
 	survivor.attack_timer = 0.0
 	survivor._process(0.01)
 	check(manager.base_health < health, "Enemies continue attacking while the mine is open")
-	for i in range(7): await click(cell_point(vein))
+	for i in range(5): await click(cell_point(vein))
 	check(game.mining.nuggets_at(ore) == 1, "Real mine clicks produce a nugget during the night")
 	check(guide.resupply_targets() == [ore, platform], "The lesson points from the extracted nugget to the weapon")
 	check(not mover.drop("vein", vein, Vector2i(13, 0)), "Mining at night does not unlock moving buildings")

@@ -4,7 +4,8 @@ signal changed
 signal sale_completed(kind: String)
 signal fusion_completed(kind: String)
 
-const COAL_CLICKS := 7
+const COAL_CLICKS := 5
+const BRASS_CLICKS := 7
 const ORE_KINDS := ["coal", "brass", "coal_2", "brass_2", "coal_3", "brass_3", "coal_4", "brass_4", "brass_ingot", "brass_ingot_2", "brass_ingot_3", "brass_ingot_4"]
 const DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 
@@ -111,6 +112,9 @@ func place_vein(cell: Vector2i, direction: int, kind: String = "coal") -> bool:
 	changed.emit()
 	return true
 
+func hardness(kind: String) -> int:
+	return BRASS_CLICKS if kind == "brass" else COAL_CLICKS
+
 func mine(cell: Vector2i) -> bool:
 	var kind: String = vein_at(cell)
 	if kind == "":
@@ -118,7 +122,7 @@ func mine(cell: Vector2i) -> bool:
 	var dictionary: Dictionary = brass_veins if kind == "brass" else coal_veins
 	var vein: Dictionary = dictionary[cell]
 	var progress: int = int(vein["progress"]) + 1
-	if progress >= mining_clicks:
+	if progress >= hardness(kind):
 		var destination: Vector2i = cell + DIRECTIONS[int(vein["direction"])]
 		if not grid.owned_tiles.has(destination) or not can_move_nugget(destination):
 			return false

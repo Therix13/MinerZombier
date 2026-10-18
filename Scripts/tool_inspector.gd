@@ -18,41 +18,41 @@ func _ready() -> void:
 	overlay = Control.new()
 	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(overlay)
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.48)
-	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	overlay.add_child(dim)
-	var center := CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	overlay.add_child(center)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var corner := MarginContainer.new()
+	corner.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for side in ["left", "top", "right", "bottom"]: corner.add_theme_constant_override("margin_" + side, 20)
+	overlay.add_child(corner)
 	var panel := WoodPanel.new()
-	panel.custom_minimum_size.x = 310
+	panel.custom_minimum_size.x = 232
+	panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	panel.size_flags_vertical = Control.SIZE_SHRINK_END
 	panel.add_theme_stylebox_override("panel", game.get("shop").create_style("#805733", "#392818", 5, 12))
-	center.add_child(panel)
+	corner.add_child(panel)
 	var margin := MarginContainer.new()
-	for side in ["left", "top", "right", "bottom"]: margin.add_theme_constant_override("margin_" + side, 18)
+	for side in ["left", "top", "right", "bottom"]: margin.add_theme_constant_override("margin_" + side, 12)
 	panel.add_child(margin)
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 10)
+	column.add_theme_constant_override("separation", 6)
 	margin.add_child(column)
 	var header := HBoxContainer.new()
 	column.add_child(header)
-	heading = game.get("shop").create_label("CONTENIDO", 20)
+	heading = game.get("shop").create_label("CONTENIDO", 16)
 	heading.add_theme_color_override("font_outline_color", Color("#352516"))
 	heading.add_theme_constant_override("outline_size", 3)
 	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(heading)
 	var close: Button = game.get("shop").create_button("×")
-	close.custom_minimum_size = Vector2(40, 40)
+	close.custom_minimum_size = Vector2(28, 28)
 	close.pressed.connect(close_inspector)
 	header.add_child(close)
-	status = game.get("shop").create_label("", 13, Color("#f0d5a4"))
+	status = game.get("shop").create_label("", 11, Color("#f0d5a4"))
 	column.add_child(status)
 	contents = GridContainer.new()
 	contents.columns = 2
-	contents.add_theme_constant_override("h_separation", 8)
-	contents.add_theme_constant_override("v_separation", 8)
+	contents.add_theme_constant_override("h_separation", 6)
+	contents.add_theme_constant_override("v_separation", 6)
 	column.add_child(contents)
 	overlay.hide()
 	update_layout()
@@ -152,7 +152,7 @@ func refresh() -> void:
 
 func make_slot() -> Button:
 	var slot := Button.new()
-	slot.custom_minimum_size = Vector2(126, 122)
+	slot.custom_minimum_size = Vector2(88, 86)
 	slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	slot.add_theme_stylebox_override("normal", game.get("shop").create_style("#302113", "#c09355", 2, 12))
 	slot.add_theme_stylebox_override("hover", game.get("shop").create_style("#49301a", "#e6bd79", 2, 12))
@@ -164,15 +164,16 @@ func fill_slot(slot: Button, art: Control, value: String) -> Label:
 	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	slot.add_child(margin)
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for side in ["left", "top", "right", "bottom"]: margin.add_theme_constant_override("margin_" + side, 10)
+	for side in ["left", "top", "right", "bottom"]: margin.add_theme_constant_override("margin_" + side, 6)
 	var column := VBoxContainer.new()
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_theme_constant_override("separation", 3)
 	margin.add_child(column)
 	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	art.custom_minimum_size = Vector2(40, 40)
 	art.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(art)
-	var count: Label = game.get("shop").create_label(value, 18, Color("#fff0ce"))
+	var count: Label = game.get("shop").create_label(value, 15, Color("#fff0ce"))
 	count.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	count.add_theme_color_override("font_outline_color", Color("#18130f"))
@@ -220,7 +221,7 @@ func _process(_delta: float) -> void:
 
 class WoodPanel extends PanelContainer:
 	func _draw() -> void:
-		draw_rect(Rect2(5, 68, size.x - 10, 9), Color("#ae7e48"))
+		draw_rect(Rect2(5, 46, size.x - 10, 5), Color("#ae7e48"))
 		for x in [12.0, size.x - 12.0]:
 			for y in [12.0, size.y - 12.0]:
 				draw_circle(Vector2(x, y), 4, Color("#483b2b"))

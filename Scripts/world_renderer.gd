@@ -280,7 +280,7 @@ func draw_coal_vein(
 				Rect2(
 					rect.position + Vector2(5, 41),
 					Vector2(
-						38.0 * minf(float(progress) / float(mining.mining_clicks), 1.0),
+						38.0 * minf(float(progress) / float(mining.hardness("coal")), 1.0),
 						4.0
 					)
 				),
@@ -445,7 +445,7 @@ func draw_brass_vein(center: Vector2, direction_index: int, progress: int, previ
 	draw_direction_arrow(center, direction_index)
 	if not preview:
 		draw_rect(Rect2(rect.position + Vector2(3, 36), Vector2(36, 4)), Color("#302117"))
-		draw_rect(Rect2(rect.position + Vector2(3, 36), Vector2(36.0 * minf(float(progress) / float(mining.mining_clicks), 1.0), 4)), Color("#f5d283"))
+		draw_rect(Rect2(rect.position + Vector2(3, 36), Vector2(36.0 * minf(float(progress) / float(mining.hardness("brass")), 1.0), 4)), Color("#f5d283"))
 
 func draw_brass_nugget(center: Vector2, amount: int) -> void:
 	var points := PackedVector2Array([center + Vector2(-13, -4), center + Vector2(-6, -12), center + Vector2(7, -10), center + Vector2(13, 1), center + Vector2(6, 12), center + Vector2(-9, 9)])

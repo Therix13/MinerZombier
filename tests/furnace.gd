@@ -68,7 +68,7 @@ func run_checks() -> void:
 	await mouse_move(point(c))
 	await mouse_button(point(c), true)
 	await mouse_button(point(c), false)
-	check(inspector.is_open() and inspector.inventory().is_empty() and inspector.heat_label.text == "40 / 40" and not mover.phase_allows(), "A click opens the furnace inventory and blocks world actions underneath")
+	check(inspector.is_open() and inspector.inventory().is_empty() and inspector.heat_label.text == "40 / 40" and mover.phase_allows(), "A click opens the corner inventory while world actions remain available")
 	if "--capture" in OS.get_cmdline_user_args() and DisplayServer.get_name() != "headless":
 		await settle()
 		root.get_texture().get_image().save_png("/workspace/.onboarding/display-test/furnace-inventory.png")
