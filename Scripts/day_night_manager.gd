@@ -6,6 +6,7 @@ const NIGHT_REWARD: int = 50
 const TUTORIAL_EXPANSION_BONUS: int = 500
 const TUTORIAL_COAL_CELL := Vector2i(14, 0)
 const TUTORIAL_ORE_CELL := Vector2i(15, 0)
+const TUTORIAL_FUSION_CELL := Vector2i(15, 1)
 const TUTORIAL_SALES_TARGET: int = 5
 const TUTORIAL_ACTIONS := [
 	["buy_coal", "place_coal"],
@@ -14,19 +15,21 @@ const TUTORIAL_ACTIONS := [
 	["unlock_defense"],
 	["buy_launcher", "place_launcher"],
 	["mine_coal", "load_ammo"],
+	["mine_coal", "fuse"],
 	["start_night"],
 ]
 const TUTORIAL_TITLES := [
 	"Tu primera veta", "Del carbón a las monedas", "Haz sitio para crecer",
 	"Prepara las defensas", "Tu primer Lanzapepitas",
-	"Carga la munición", "¡Todo listo!",
+	"Carga la munición", "Fusiona tus pepitas", "¡Todo listo!",
 ]
-const TUTORIAL_LAST_STEP: int = 6
+const TUTORIAL_LAST_STEP: int = 7
 
 var day: int = 1
 var is_night: bool = false
 var defeated: bool = false
 var tutorial_step: int = 0
+var fusion_taught: bool = false
 var coal_sold: int = 0
 var expansion_bonus_granted: bool = false
 var free_launcher_available: bool = true
@@ -46,6 +49,7 @@ func setup(grid_manager: RefCounted, mining_manager: RefCounted, conveyor_manage
 	launchers = launcher_manager
 	economy = economy_manager
 	mining.changed.connect(refresh_tutorial)
+	mining.fusion_completed.connect(_on_fusion)
 	mining.sale_completed.connect(_on_sale)
 	conveyors.sale_completed.connect(_on_sale)
 	conveyors.changed.connect(refresh_tutorial)
@@ -64,6 +68,7 @@ func dispose() -> void:
 	progression = null
 	if mining != null:
 		mining.changed.disconnect(refresh_tutorial)
+		mining.fusion_completed.disconnect(_on_fusion)
 		mining.sale_completed.disconnect(_on_sale)
 	if conveyors != null:
 		conveyors.changed.disconnect(refresh_tutorial)
@@ -75,6 +80,11 @@ func dispose() -> void:
 	conveyors = null
 	launchers = null
 	economy = null
+
+func _on_fusion(kind: String) -> void:
+	if is_tutorial_active() and tutorial_step == 6 and kind == "coal_2":
+		fusion_taught = true
+		refresh_tutorial()
 
 func _on_sale(kind: String) -> void:
 	if kind == "coal":
@@ -128,7 +138,7 @@ func allows_world_press(cell: Vector2i, placing: String = "") -> bool:
 		return allows_action("place_launcher") and cell == grid.defense_cell("left")
 	if not placing.is_empty():
 		return false
-	return (allows_action("mine_coal") and cell == TUTORIAL_COAL_CELL and mining.nuggets_at(TUTORIAL_ORE_CELL) == 0) or ((allows_action("sell_coal") or allows_action("load_ammo")) and cell == TUTORIAL_ORE_CELL)
+	return (allows_action("mine_coal") and cell == TUTORIAL_COAL_CELL and mining.nuggets_at(TUTORIAL_ORE_CELL) == 0) or ((allows_action("sell_coal") or allows_action("load_ammo") or allows_action("fuse")) and cell == TUTORIAL_ORE_CELL)
 
 func allows_interaction(kind: String, source: Vector2i, destination: Vector2i, dragged: bool) -> bool:
 	if is_research_tutorial_active():
@@ -138,7 +148,7 @@ func allows_interaction(kind: String, source: Vector2i, destination: Vector2i, d
 	if kind == "vein":
 		return allows_action("mine_coal") and source == TUTORIAL_COAL_CELL and source == destination and not dragged
 	if kind == "nugget" and source == TUTORIAL_ORE_CELL and dragged:
-		return (allows_action("sell_coal") and destination == grid.sale_cell) or (allows_action("load_ammo") and destination == grid.defense_cell("left"))
+		return (allows_action("fuse") and destination == TUTORIAL_FUSION_CELL) or (allows_action("sell_coal") and destination == grid.sale_cell) or (allows_action("load_ammo") and destination == grid.defense_cell("left"))
 	return false
 
 func ammo_damage() -> float:
@@ -174,6 +184,8 @@ func refresh_tutorial() -> void:
 				completed = not launchers.launchers.is_empty()
 			5:
 				completed = ammo_damage() >= 2.0
+			6:
+				completed = fusion_taught
 		if not completed:
 			break
 		tutorial_step += 1
@@ -202,6 +214,10 @@ func tutorial_text() -> String:
 			if mining.nuggets_at(TUTORIAL_ORE_CELL) > 0:
 				return "Arrastra la pepita al Lanzapepitas marcado. Necesitas cargar 4 en total."
 			return "Extrae carbón de tu veta y arrástralo al Lanzapepitas: 4 pepitas preparan la primera noche."
+		6:
+			if mining.nuggets_at(TUTORIAL_ORE_CELL) > 0:
+				return "Arrastra la pepita a la casilla dorada." if mining.nuggets_at(TUTORIAL_FUSION_CELL) == 0 else "Arrástrala sobre la otra: 2 de Nv. 1 crean 1 de Nv. 2."
+			return "Extrae una pepita. Fusiona 2 iguales para subir su nivel."
 	return "¡Preparación lista! Inicia la primera noche."
 
 func needs_defense_warning() -> bool:

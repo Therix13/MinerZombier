@@ -34,7 +34,7 @@ const ITEM_CATEGORIES := {
 	"HERRAMIENTAS": ["drill", "compactor"],
 	"AUTOMATIZACIÓN": ["straight", "corner_right", "corner_left", "junction"],
 }
-const RESOURCE_LABELS := {"coal": "CARBÓN · NIVEL 1", "brass": "LATÓN · NIVEL 1", "coal_2": "CARBÓN · NIVEL 2", "brass_2": "LATÓN · NIVEL 2"}
+const RESOURCE_LABELS := {"coal": "CARBÓN · NIVEL 1", "brass": "LATÓN · NIVEL 1", "coal_2": "CARBÓN · NIVEL 2", "brass_2": "LATÓN · NIVEL 2", "coal_3": "CARBÓN · NIVEL 3", "brass_3": "LATÓN · NIVEL 3", "coal_4": "CARBÓN · NIVEL 4", "brass_4": "LATÓN · NIVEL 4"}
 const CATEGORY_ART := {"EXPANSION": "expansion", "VETAS": "coal", "HERRAMIENTAS": "drill", "AUTOMATIZACIÓN": "junction", "DEFENSA": "launcher", "INVESTIGACIÓN": "research", "RECURSOS": "resources"}
 const RESEARCH_VIEW := {
 	"drill": ["drill", "Taladro", "Automático"],
@@ -587,6 +587,9 @@ func update_cycle() -> void:
 				else:
 					cycle_goal.text = tutorial_navigation_text()
 			6:
+				cycle_action.text = "2 × Nv. 1 → Nv. 2"
+				cycle_action.disabled = true
+			7:
 				cycle_action.text = "INICIAR PRIMERA NOCHE"
 				cycle_action.disabled = not cycle.can_start_night()
 	elif cycle.is_research_tutorial_active():
@@ -721,6 +724,8 @@ func create_art_button(kind: String, description: String, price: int = -1) -> Bu
 		"junction": "Cinta en T", "platform": "Plataformas", "launcher": "Lanzapepitas",
 		"ore:coal": "Carbón · Nv. 1", "ore:brass": "Latón · Nv. 1",
 		"ore:coal_2": "Carbón · Nv. 2", "ore:brass_2": "Latón · Nv. 2",
+		"ore:coal_3": "Carbón · Nv. 3", "ore:brass_3": "Latón · Nv. 3",
+		"ore:coal_4": "Carbón · Nv. 4", "ore:brass_4": "Latón · Nv. 4",
 	}
 	var label := create_label(short_names.get(kind, description.capitalize()) if price >= 0 or kind.begins_with("ore:") else description.capitalize(), 15)
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -975,7 +980,7 @@ func open_category(category: String) -> void:
 			catalog_grid().add_child(platforms_button)
 			platforms_button.disabled = platforms_button.disabled or not tutorial_allows_item("defense_platforms")
 			purchase_buttons["defense_platforms"] = platforms_button
-			var launcher_button := create_art_button("launcher", "Lanzapepitas", 0 if cycle != null and cycle.free_launcher_available else economy.LAUNCHER_PRICE)
+			var launcher_button := create_art_button("launcher", "Lanzapepitas · Nv. 1\nMunición: pepitas de nivel 1.", 0 if cycle != null and cycle.free_launcher_available else economy.LAUNCHER_PRICE)
 			launcher_button.disabled = not (cycle != null and cycle.free_launcher_available) and not economy.can_afford(economy.LAUNCHER_PRICE)
 			launcher_button.disabled = launcher_button.disabled or not tutorial_allows_item("launcher")
 			launcher_button.pressed.connect(request_item.bind("launcher", launcher_requested))

@@ -112,7 +112,7 @@ func tick() -> void:
 		if mining.occupied_by_compactor(destination) and mining.compactors.can_receive(destination, kind):
 			if not requests.has(destination): requests[destination] = []
 			requests[destination].append({"source": source, "kind": kind})
-		elif launchers != null and launchers.can_receive(destination):
+		elif launchers != null and launchers.can_receive(destination, kind):
 			if not requests.has(destination):
 				requests[destination] = []
 			requests[destination].append({"source": source, "kind": kind})

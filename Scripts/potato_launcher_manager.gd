@@ -52,11 +52,11 @@ func move(source: Vector2i, destination: Vector2i) -> bool:
 	changed.emit()
 	return true
 
-func can_receive(cell: Vector2i) -> bool:
-	return launchers.has(cell) and (launchers[cell]["ammo"] as Array).size() < capacity
+func can_receive(cell: Vector2i, kind: String = "") -> bool:
+	return (kind.is_empty() or kind in ["coal", "brass"]) and launchers.has(cell) and (launchers[cell]["ammo"] as Array).size() < capacity
 
 func receive(cell: Vector2i, kind: String) -> bool:
-	if not can_receive(cell) or kind not in mining.ORE_KINDS:
+	if not can_receive(cell, kind) or kind not in ["coal", "brass"]:
 		return false
 	var ammo: Array = launchers[cell]["ammo"]
 	ammo.append(kind)

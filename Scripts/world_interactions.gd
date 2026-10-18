@@ -42,7 +42,9 @@ func can_hold(cell: Vector2i, data: Dictionary) -> bool:
 		if data.has(kind): buildings += 1
 	if buildings > 1:
 		return false
-	var ore: bool = data.has("coal") or data.has("brass") or data.has("coal_2") or data.has("brass_2")
+	var ore: bool = false
+	for kind: String in game.get("mining").ORE_KINDS:
+		if data.has(kind): ore = true
 	if data.has("launcher"):
 		return grid.defense_tiles.has(cell) and not ore
 	if grid.is_defense_position(cell):
@@ -73,6 +75,10 @@ func can_drop(kind: String, source: Vector2i, destination: Vector2i) -> bool:
 		return false
 	if kind == "nugget" and game.get("mining").occupied_by_compactor(destination):
 		return game.get_node("Compactors").can_receive(destination, game.get("mining").nugget_type(source))
+	if kind == "nugget" and source != destination:
+		if game.get("launchers").launchers.has(destination):
+			return game.get("launchers").can_receive(destination, game.get("mining").nugget_type(source))
+		if game.get("mining").can_fuse(source, destination): return true
 	if game.get("cycle").is_night:
 		# Mine and reload during combat, while buildings remain in place.
 		return kind == "nugget" and (source == destination or game.get("launchers").can_receive(destination) or game.get("mining").can_move_nugget(destination))
@@ -160,6 +166,7 @@ func drop(kind: String, source: Vector2i, destination: Vector2i, direction: int 
 	var mining: RefCounted = game.get("mining")
 	var launchers: RefCounted = game.get("launchers")
 	if kind == "nugget" and source != destination:
+		if mining.can_fuse(source, destination): return mining.fuse(source, destination)
 		if mining.occupied_by_compactor(destination):
 			var ore: String = mining.nugget_type(source)
 			if not game.get_node("Compactors").receive(destination, ore): return false

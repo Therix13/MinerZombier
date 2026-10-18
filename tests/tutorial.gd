@@ -224,6 +224,13 @@ func run_checks() -> void:
 			check(game.get("mining").nuggets_at(cycle.TUTORIAL_ORE_CELL) == 1 and cycle.coal_sold == 5, "Selling is blocked while loading tutorial ammunition")
 		await drag_cell(cycle.TUTORIAL_ORE_CELL, grid.defense_cell("left"))
 	check(cycle.tutorial_step == 6 and is_equal_approx(cycle.ammo_damage(), 2.0), "Four real mining-and-loading cycles prepare the first night")
+	check(not cycle.can_start_night() and cycle.allows_action("fuse"), "First night waits for the fusion lesson")
+	await extract_one()
+	await drag_cell(cycle.TUTORIAL_ORE_CELL, cycle.TUTORIAL_FUSION_CELL)
+	check(game.mining.nugget_type(cycle.TUTORIAL_FUSION_CELL) == "coal" and cycle.tutorial_step == 6, "First tutorial nugget waits on the marked fusion cell")
+	await extract_one()
+	await drag_cell(cycle.TUTORIAL_ORE_CELL, cycle.TUTORIAL_FUSION_CELL)
+	check(game.mining.nugget_type(cycle.TUTORIAL_FUSION_CELL) == "coal_2" and cycle.tutorial_step == cycle.TUTORIAL_LAST_STEP and cycle.fusion_taught, "Dragging the second mined nugget completes the day-one fusion lesson")
 	var total_exp: int = game.get("progression").total_experience
 	await click_cell(cycle.TUTORIAL_COAL_CELL)
 	check(game.get("progression").total_experience == total_exp and game.get("mining").coal_veins[cycle.TUTORIAL_COAL_CELL]["progress"] == 0, "Final tutorial step permits only starting the night")

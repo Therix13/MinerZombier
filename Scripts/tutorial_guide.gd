@@ -135,12 +135,13 @@ func resupply_targets() -> Array[Vector2i]:
 	var controller: RefCounted = game.get("camera_controller")
 	if not resupply_active() or resupply_step != 1 or controller.defense_view or controller.transitioning:
 		return result
-	for items: Dictionary in cycle.mining.nugget_stores().values():
+	for kind: String in ["coal", "brass"]:
+		var items: Dictionary = cycle.mining.items_for(kind)
 		for cell: Vector2i in items:
 			if int(items[cell]) <= 0: continue
 			result.append(cell)
 			for platform: Vector2i in cycle.launchers.launchers:
-				if cycle.launchers.can_receive(platform):
+				if cycle.launchers.can_receive(platform, kind):
 					result.append(platform)
 					return result
 			return result
@@ -221,7 +222,13 @@ func targets() -> Array[Vector2i]:
 				result.append(cycle.TUTORIAL_COAL_CELL)
 		4:
 			if game.get("placing_launcher"): result.append(cycle.grid.defense_cell("left"))
-		6: result.append(cycle.grid.defense_cell("left"))
+		6:
+			if cycle.mining.nuggets_at(cycle.TUTORIAL_ORE_CELL) > 0:
+				result.append(cycle.TUTORIAL_ORE_CELL)
+				result.append(cycle.TUTORIAL_FUSION_CELL)
+			else:
+				result.append(cycle.TUTORIAL_COAL_CELL)
+		7: result.append(cycle.grid.defense_cell("left"))
 	return result
 
 func _draw() -> void:
@@ -233,13 +240,13 @@ func _draw() -> void:
 	for index in range(cells.size()):
 		var rect: Rect2 = cycle.grid.get_cell_rect(cells[index]).grow(-1.5)
 		var color := Color("#f0c777")
-		if cells.size() == 2 and index == 0 and (not lesson or cycle.tutorial_step in [1, 5]):
+		if cells.size() == 2 and index == 0 and (not lesson or cycle.tutorial_step in [1, 5, 6]):
 			color = Color("#b6d98e")
 		draw_rect(rect, Color(color, 0.12))
 		draw_rect(rect, Color(color, glow), false, 2.0)
-	if cells.size() == 1 and cycle.mining.vein_at(cells[0]) != "" and (not lesson or cycle.tutorial_step in [1, 5]):
+	if cells.size() == 1 and cycle.mining.vein_at(cells[0]) != "" and (not lesson or cycle.tutorial_step in [1, 5, 6]):
 		draw_mining_click(cells[0])
-	if cells.size() == 2 and (not lesson or cycle.tutorial_step in [1, 5]):
+	if cells.size() == 2 and (not lesson or cycle.tutorial_step in [1, 5, 6]):
 		var source: Vector2 = cycle.grid.get_cell_rect(cells[0]).get_center()
 		var destination: Vector2 = cycle.grid.get_cell_rect(cells[1]).get_center()
 		var direction: Vector2 = (destination - source).normalized()

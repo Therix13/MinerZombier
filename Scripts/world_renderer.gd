@@ -147,9 +147,24 @@ func _draw() -> void:
 		draw_nugget(grid.get_cell_rect(hovered_cell).get_center(), interactions.placing_resource, 1)
 
 func draw_nugget(center: Vector2, kind: String, amount: int) -> void:
-	if kind.ends_with("_2"): draw_refined_nugget(center, kind, amount)
+	if mining.ore_level(kind) >= 3: draw_cluster_nugget(center, kind, amount)
+	elif mining.ore_level(kind) == 2: draw_refined_nugget(center, kind, amount)
 	elif kind.begins_with("brass"): draw_brass_nugget(center, amount)
 	else: draw_coal_nugget(center, amount)
+
+func draw_cluster_nugget(center: Vector2, kind: String, amount: int) -> void:
+	var brass: bool = kind.begins_with("brass")
+	var level: int = mining.ore_level(kind)
+	var offsets: Array[Vector2] = [Vector2(-8, 3), Vector2(8, 3), Vector2(0, -7)]
+	if level == 4: offsets = [Vector2(-9, 6), Vector2(9, 6), Vector2(-6, -8), Vector2(7, -8)]
+	for offset: Vector2 in offsets:
+		var at: Vector2 = center + offset
+		var points := PackedVector2Array([at + Vector2(-11, 1), at + Vector2(-7, -8), at + Vector2(3, -10), at + Vector2(11, -3), at + Vector2(8, 8), at + Vector2(-4, 10)])
+		draw_colored_polygon(points, Color("#a47740") if brass else Color("#222427"))
+		points.append(points[0])
+		draw_polyline(points, Color("#62462a") if brass else Color("#101113"), 1.5)
+		draw_colored_polygon(PackedVector2Array([at + Vector2(-7, -6), at + Vector2(2, -8), at + Vector2(6, -3), at + Vector2(-3, 1)]), Color("#e2b97b") if brass else Color("#51555a"))
+	if amount > 1: draw_string(ThemeDB.fallback_font, center + Vector2(12, 20), str(amount), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#ffdb85"))
 
 func draw_refined_nugget(center: Vector2, kind: String, amount: int) -> void:
 	var brass: bool = kind.begins_with("brass")

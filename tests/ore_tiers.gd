@@ -1,0 +1,100 @@
+extends "res://tests/compactor.gd"
+
+func run_checks() -> void:
+	root.show()
+	game = load("res://main.tscn").instantiate()
+	root.add_child(game)
+	current_scene = game
+	await settle()
+	game.set_process(false)
+	game.cycle.skip_tutorial()
+	game.grid.expand()
+	game.grid.purchase_defense_platforms()
+	shop = game.shop
+	mover = game.get_node("WorldInteractions")
+	compactors = game.get_node("Compactors")
+	compactors.set_process(false)
+	var a := Vector2i(14, 1)
+	var b := Vector2i(15, 1)
+	var c := Vector2i(16, 1)
+	var platform: Vector2i = game.grid.defense_cell("left")
+	game.launchers.place(platform)
+	for material: String in ["coal", "brass"]:
+		for level in range(1, 5):
+			clear_items()
+			game.launchers.place(platform)
+			var kind: String = material if level == 1 else material + "_" + str(level)
+			put(a, {kind: 1})
+			put(b, {kind: 1})
+			var cash: int = game.economy.coins
+			var xp: int = game.progression.total_experience
+			if level < 4:
+				check(mover.drop("nugget", a, b) and game.mining.nugget_type(b) == material + "_" + str(level + 1) and game.mining.nuggets_at(a) == 0 and game.mining.nuggets_at(b) == 1, "Two %s nuggets fuse once into their next tier" % kind)
+			else:
+				check(not game.mining.fuse(a, b) and game.mining.nugget_type(a) == kind and game.mining.nugget_type(b) == kind, "Level-four fusion stops without consuming either item")
+			check(game.economy.coins == cash and game.progression.total_experience == xp, "Fusion creates no sale or EXP reward")
+			clear_items()
+			game.launchers.place(platform)
+			put(a, {kind: 1})
+			check(mover.drop("nugget", a, platform) == (level == 1) and game.mining.nuggets_at(a) == (0 if level == 1 else 1), "Level-one turret only consumes level-one %s ammo" % material)
+			clear_items()
+			game.launchers.place(platform)
+			game.conveyors.place(platform + Vector2i.DOWN, 0)
+			put(platform + Vector2i.DOWN, {kind: 1})
+			game.conveyors.tick()
+			check(game.launchers.launchers[platform]["ammo"].size() == (1 if level == 1 else 0) and game.mining.nuggets_at(platform + Vector2i.DOWN) == (0 if level == 1 else 1), "Automatic reload preserves incompatible %s" % kind)
+			clear_items()
+			compactors.place(b, 1)
+			game.conveyors.place(a, 1)
+			if level == 4:
+				check(not compactors.receive(b, kind), "Compactors reject level four without making level five")
+			else:
+				for input in range(2):
+					put(a, {kind: 1})
+					game.conveyors.tick()
+				check(compactors.machines[b]["count"] == 2 and game.mining.nuggets_at(a) == 0, "Conveyors supply exactly two %s inputs" % kind)
+				check(not compactors.receive(b, kind), "A full compactor rejects a third input")
+				compactors.process_outputs(3.9)
+				check(game.mining.nuggets_at(c) == 0, "Processing still waits four seconds")
+				compactors.process_outputs(0.1)
+				check(game.mining.nugget_type(c) == material + "_" + str(level + 1) and compactors.machines[b]["count"] == 0, "Four seconds output the correct next tier")
+				compactors.process_outputs(4.0)
+				check(game.mining.nuggets_at(c) == 1, "Idle compactors cannot duplicate their output")
+			var base: int = 7 if material == "brass" else 5
+			check(game.economy.sale_value(kind) == base * int(pow(3, level - 1)) and game.mining.material_units(kind) == int(pow(2, level - 1)), "Tier %d keeps input units and 50 percent fusion bonus" % level)
+			clear_items()
+			put(a, {kind: 1})
+			cash = game.economy.coins
+			xp = game.progression.total_experience
+			check(mover.drop("nugget", a, game.grid.sale_cell) and game.mining.nuggets_at(a) == 0 and game.economy.coins == cash + game.economy.sale_value(kind) and game.progression.total_experience == xp + game.progression.SALE_EXPERIENCE[kind], "Manual %s sales pay and award EXP exactly once" % kind)
+			var sale_belt := Vector2i(15, 0)
+			game.conveyors.place(sale_belt, 0)
+			put(sale_belt, {kind: 1})
+			cash = game.economy.coins
+			xp = game.progression.total_experience
+			game.conveyors.tick()
+			game.conveyors.tick()
+			check(game.mining.nuggets_at(sale_belt) == 0 and game.economy.coins == cash + game.economy.sale_value(kind) and game.progression.total_experience == xp + game.progression.SALE_EXPERIENCE[kind], "Conveyor %s sales cannot duplicate ore, coins, or EXP" % kind)
+	clear_items()
+	put(a, {"coal": 1})
+	put(b, {"brass": 1})
+	check(not game.mining.fuse(a, b), "Different materials never fuse")
+	game.mining.brass_nuggets.erase(b)
+	put(b, {"coal_2": 1})
+	check(not game.mining.fuse(a, b), "Different levels never fuse")
+	clear_items()
+	compactors.place(b, 1)
+	game.mining.place_vein(a, 1)
+	for i in range(14): game.mining.mine(a)
+	check(compactors.machines[b]["count"] == 0, "Veins still cannot feed compactors directly")
+	game.economy.toggle_developer_mode()
+	game.shop.open_shop()
+	await wait_shop()
+	game.shop.open_category("RECURSOS")
+	check(game.shop.resource_buttons.size() == 8, "DEV resources include both materials at all four levels")
+	game.shop.close_shop()
+	await wait_shop()
+	print("RESULT: ", passed, " passed; ", failed, " failed; ore tiers")
+	game.queue_free()
+	await settle()
+	quit(0 if failed == 0 else 1)

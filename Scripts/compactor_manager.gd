@@ -3,7 +3,7 @@ extends Node2D
 signal changed
 
 const PRICE: int = 300
-const INPUT_COUNT: int = 4
+const INPUT_COUNT: int = 2
 const PROCESS_TIME: float = 4.0
 const DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 
@@ -48,7 +48,7 @@ func place(cell: Vector2i, output_direction: int) -> bool:
 	return true
 
 func can_receive(cell: Vector2i, kind: String) -> bool:
-	if not machines.has(cell) or kind not in ["coal", "brass"]: return false
+	if not machines.has(cell) or mining.next_tier(kind).is_empty(): return false
 	var data: Dictionary = machines[cell]
 	return int(data["count"]) < INPUT_COUNT and (data["kind"] == "" or data["kind"] == kind)
 
@@ -68,14 +68,14 @@ func process_outputs(delta: float = 0.0) -> void:
 		queue_redraw()
 		if float(data["elapsed"]) < PROCESS_TIME: continue
 		var destination: Vector2i = cell + DIRECTIONS[int(data["direction"])]
-		var kind: String = str(data["kind"]) + "_2"
+		var kind: String = mining.next_tier(str(data["kind"]))
 		var launchers: RefCounted = game.get("launchers")
 		var belts: RefCounted = game.get("conveyors")
 		if destination == grid.sale_cell:
 			data["count"] = 0
 			data["kind"] = ""
 			mining.sale_completed.emit(kind)
-		elif launchers.can_receive(destination):
+		elif launchers.can_receive(destination, kind):
 			if not launchers.receive(destination, kind): continue
 			data["count"] = 0
 			data["kind"] = ""
@@ -86,6 +86,7 @@ func process_outputs(delta: float = 0.0) -> void:
 		else:
 			continue
 		data["elapsed"] = 0.0
+		mining.fusion_completed.emit(kind)
 		mining.changed.emit()
 		changed.emit()
 
@@ -153,9 +154,9 @@ func draw_machine(center: Vector2, data: Dictionary) -> void:
 	draw_line(center + Vector2(16, -9), center + Vector2(16, 10), Color("#333c40"), 4)
 	var count: int = int(data["count"])
 	for index in range(INPUT_COUNT):
-		draw_circle(center + Vector2(-12 + index * 8, 16), 2, Color("#eac978") if index < count else Color("#303638"))
+		draw_circle(center + Vector2(-5 + index * 10, 16), 2, Color("#eac978") if index < count else Color("#303638"))
 	if count > 0:
-		draw_circle(center + Vector2(0, -1), 5, Color("#dbb36b") if data["kind"] == "brass" else Color("#29292d"))
+		draw_circle(center + Vector2(0, -1), 5, Color("#dbb36b") if str(data["kind"]).begins_with("brass") else Color("#29292d"))
 	if count == INPUT_COUNT:
 		draw_rect(Rect2(center + Vector2(-12, -3), Vector2(24, 4)), Color("#303638"))
 		draw_rect(Rect2(center + Vector2(-12, -3), Vector2(24 * clampf(float(data.get("elapsed", 0.0)) / PROCESS_TIME, 0, 1), 4)), Color("#eac978"))

@@ -2,9 +2,10 @@ extends RefCounted
 
 signal changed
 signal sale_completed(kind: String)
+signal fusion_completed(kind: String)
 
 const COAL_CLICKS := 7
-const ORE_KINDS := ["coal", "brass", "coal_2", "brass_2"]
+const ORE_KINDS := ["coal", "brass", "coal_2", "brass_2", "coal_3", "brass_3", "coal_4", "brass_4"]
 const DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 
 var drills: RefCounted
@@ -18,6 +19,10 @@ var coal_nuggets: Dictionary = {}
 var brass_nuggets: Dictionary = {}
 var coal_level2_nuggets: Dictionary = {}
 var brass_level2_nuggets: Dictionary = {}
+var coal_level3_nuggets: Dictionary = {}
+var brass_level3_nuggets: Dictionary = {}
+var coal_level4_nuggets: Dictionary = {}
+var brass_level4_nuggets: Dictionary = {}
 
 func setup(grid_manager: RefCounted) -> void:
 	grid = grid_manager
@@ -36,16 +41,40 @@ func vein_at(cell: Vector2i) -> String:
 	return ""
 
 func nuggets_at(cell: Vector2i) -> int:
-	return int(coal_nuggets.get(cell, 0)) + int(brass_nuggets.get(cell, 0)) + int(coal_level2_nuggets.get(cell, 0)) + int(brass_level2_nuggets.get(cell, 0))
+	var count: int = 0
+	for items: Dictionary in nugget_stores().values(): count += int(items.get(cell, 0))
+	return count
 
 func nugget_stores() -> Dictionary:
-	return {"coal": coal_nuggets, "brass": brass_nuggets, "coal_2": coal_level2_nuggets, "brass_2": brass_level2_nuggets}
+	return {"coal": coal_nuggets, "brass": brass_nuggets, "coal_2": coal_level2_nuggets, "brass_2": brass_level2_nuggets, "coal_3": coal_level3_nuggets, "brass_3": brass_level3_nuggets, "coal_4": coal_level4_nuggets, "brass_4": brass_level4_nuggets}
 
 func items_for(kind: String) -> Dictionary:
 	return nugget_stores().get(kind, {})
 
 func material_units(kind: String) -> int:
-	return 4 if kind.ends_with("_2") else 1
+	return int(pow(2, ore_level(kind) - 1))
+
+func ore_level(kind: String) -> int:
+	return int(kind.get_slice("_", 1)) if kind.contains("_") else 1
+
+func next_tier(kind: String) -> String:
+	if kind not in ORE_KINDS or ore_level(kind) >= 4: return ""
+	return kind.get_slice("_", 0) + "_" + str(ore_level(kind) + 1)
+
+func can_fuse(source: Vector2i, destination: Vector2i) -> bool:
+	var kind: String = nugget_type(source)
+	return source != destination and not next_tier(kind).is_empty() and nugget_type(destination) == kind and nuggets_at(source) == 1 and nuggets_at(destination) == 1 and grid.owned_tiles.has(destination) and not grid.is_defense_position(destination) and vein_at(destination).is_empty() and not occupied_by_compactor(destination) and (drills == null or not drills.drills.has(destination))
+
+func fuse(source: Vector2i, destination: Vector2i) -> bool:
+	if not can_fuse(source, destination): return false
+	var kind: String = nugget_type(source)
+	remove_one_nugget(source, kind)
+	remove_one_nugget(destination, kind)
+	var result: String = next_tier(kind)
+	items_for(result)[destination] = 1
+	fusion_completed.emit(result)
+	changed.emit()
+	return true
 
 func occupied_by_compactor(cell: Vector2i) -> bool:
 	return is_instance_valid(compactors) and compactors.machines.has(cell)
@@ -105,6 +134,9 @@ func move_vein(source: Vector2i, destination: Vector2i, direction: int) -> void:
 func move_nugget(source: Vector2i, destination: Vector2i) -> void:
 	var kind: String = nugget_type(source)
 	if source == destination or kind == "":
+		return
+	if can_fuse(source, destination):
+		fuse(source, destination)
 		return
 	if destination == grid.sale_cell:
 		remove_one_nugget(source, kind)

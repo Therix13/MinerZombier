@@ -10,7 +10,7 @@ const LEVEL_EXPERIENCE_GROWTH: float = 1.6
 const POINTS_PER_LEVEL: int = 1
 const POINTS_PER_NIGHT: int = 1
 const ZOMBIE_EXPERIENCE: int = 25
-const SALE_EXPERIENCE := {"coal": 1, "brass": 2, "coal_2": 4, "brass_2": 8}
+const SALE_EXPERIENCE := {"coal": 1, "brass": 2, "coal_2": 2, "brass_2": 4, "coal_3": 4, "brass_3": 8, "coal_4": 8, "brass_4": 16}
 const RESEARCHES := {
 	"drill": {
 		"name": "Taladro", "branch": "MINERÍA", "cost": 1, "level": 2,
@@ -34,7 +34,7 @@ const RESEARCHES := {
 	},
 	"compactor": {
 		"name": "Compactador", "branch": "PROCESAMIENTO", "cost": 1, "level": 3,
-		"requires": ["drill"], "description": "Convierte 4 pepitas iguales en una de nivel 2.",
+		"requires": ["drill"], "description": "Fusiona 2 pepitas del mismo material y nivel. Hasta nivel 4.",
 	},
 }
 const BASE_ITEMS := ["coal", "launcher", "defense_platforms"]

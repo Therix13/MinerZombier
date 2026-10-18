@@ -18,8 +18,9 @@ var developer_mode: bool = false
 
 func sale_value(kind: String) -> int:
 	var base: int = BRASS_SELL_PRICE if kind.begins_with("brass") else COAL_SELL_PRICE
-	# Four inputs plus a 50% processing bonus.
-	return base * 6 if kind.ends_with("_2") else base
+	# Each tier combines two inputs and adds a 50% processing bonus.
+	var level: int = int(kind.get_slice("_", 1)) if kind.contains("_") else 1
+	return base * int(pow(3, level - 1))
 
 func can_afford(price: int) -> bool:
 	return developer_mode or coins >= price

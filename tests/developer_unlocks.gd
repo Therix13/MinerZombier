@@ -63,14 +63,16 @@ func run_checks() -> void:
 	check(player.unlocked.is_empty() and player.research_points == 0, "DEV access never buys or permanently records free research")
 	shop.show_categories()
 	check(shop.category_buttons.has("RECURSOS"), "DEV adds its Resources category to the real menu")
-	for index in range(4):
+	for index in range(8):
 		var kind: String = game.mining.ORE_KINDS[index]
 		shop.open_category("RECURSOS")
-		check(shop.resource_buttons.size() == 4 and shop.resource_buttons.has(kind), "Resources offers every existing material and level")
+		check(shop.resource_buttons.size() == 8 and shop.resource_buttons.has(kind), "Resources offers every existing material and level")
+		await settle()
+		shop.shop_scroll.ensure_control_visible(shop.resource_buttons[kind])
 		await settle()
 		await click_control(shop.resource_buttons[kind])
 		await wait_shop()
-		var at := Vector2i(14 + index, 1)
+		var at := Vector2i(14 + index % 4, 1 + index / 4)
 		check(mover.placing_resource == kind and game.economy.coins == 0, "Selecting " + kind + " is free")
 		await put_resource(at)
 		check(game.mining.nugget_type(at) == kind and game.mining.nuggets_at(at) == 1 and not mover.placement_active(), "A real grid click places the selected " + kind)
@@ -83,6 +85,7 @@ func run_checks() -> void:
 	check(game.mining.nugget_type(Vector2i(14, 1)) == "coal" and mover.placing_resource == "brass_2", "Debug placement cannot overwrite an occupied cell")
 	await key(KEY_ESCAPE)
 	check(not mover.placement_active() and not display.menu_open, "ESC cancels the resource tool without opening pause")
+	for kind: String in ["coal_3", "brass_3", "coal_4", "brass_4"]: game.mining.items_for(kind).clear()
 	mover.select_resource("coal_2")
 	await hold_shift(true)
 	await put_resource(Vector2i(14, 2))

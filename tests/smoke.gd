@@ -65,6 +65,9 @@ func run_checks() -> void:
 	check(launchers.call("place", defense_cell), "Place launcher on defense platform")
 	for i in range(4):
 		launchers.call("receive", defense_cell, "coal")
+	mining.items_for("coal")[Vector2i(13, 3)] = 1
+	mining.items_for("coal")[Vector2i(14, 3)] = 1
+	check(mining.fuse(Vector2i(13, 3), Vector2i(14, 3)), "The first-day fusion lesson creates level-two coal")
 	check(cycle.call("can_start_night"), "Tutorial and ammunition unlock first night")
 	game.call("start_night")
 	var zombies: Array[Node] = get_nodes_in_group("zombies")
