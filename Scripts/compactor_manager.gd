@@ -4,6 +4,7 @@ signal changed
 
 const PRICE: int = 300
 const INPUT_COUNT: int = 4
+const PROCESS_TIME: float = 4.0
 const DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 
 var game: Node2D
@@ -34,8 +35,7 @@ func _exit_tree() -> void:
 func on_sale_completed(kind: String) -> void:
 	if kind not in mining.ORE_KINDS: return
 	var economy: RefCounted = game.get("economy")
-	var price: int = economy.BRASS_SELL_PRICE if kind.begins_with("brass") else economy.COAL_SELL_PRICE
-	economy.add(price * mining.material_units(kind))
+	economy.add(economy.sale_value(kind))
 	game.get("progression").award_sale(kind)
 
 func can_place(cell: Vector2i) -> bool:
@@ -43,7 +43,7 @@ func can_place(cell: Vector2i) -> bool:
 
 func place(cell: Vector2i, output_direction: int) -> bool:
 	if not can_place(cell): return false
-	machines[cell] = {"direction": posmod(output_direction, 4), "kind": "", "count": 0}
+	machines[cell] = {"direction": posmod(output_direction, 4), "kind": "", "count": 0, "elapsed": 0.0}
 	changed.emit()
 	return true
 
@@ -56,13 +56,17 @@ func receive(cell: Vector2i, kind: String) -> bool:
 	if not can_receive(cell, kind): return false
 	machines[cell]["kind"] = kind
 	machines[cell]["count"] = int(machines[cell]["count"]) + 1
+	if int(machines[cell]["count"]) == INPUT_COUNT: machines[cell]["elapsed"] = 0.0
 	changed.emit()
 	return true
 
-func process_outputs() -> void:
+func process_outputs(delta: float = 0.0) -> void:
 	for cell: Vector2i in machines:
 		var data: Dictionary = machines[cell]
 		if int(data["count"]) != INPUT_COUNT: continue
+		data["elapsed"] = minf(PROCESS_TIME, float(data.get("elapsed", 0.0)) + maxf(delta, 0.0))
+		queue_redraw()
+		if float(data["elapsed"]) < PROCESS_TIME: continue
 		var destination: Vector2i = cell + DIRECTIONS[int(data["direction"])]
 		var kind: String = str(data["kind"]) + "_2"
 		var launchers: RefCounted = game.get("launchers")
@@ -81,6 +85,7 @@ func process_outputs() -> void:
 			data["kind"] = ""
 		else:
 			continue
+		data["elapsed"] = 0.0
 		mining.changed.emit()
 		changed.emit()
 
@@ -106,9 +111,9 @@ func cancel_placement() -> void:
 func other_placement() -> bool:
 	return game.get("placing_coal") or game.get("placing_brass") or game.get("placing_belt") or game.get("placing_drill") or game.get("placing_launcher")
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if placing and (other_placement() or not game.get("cycle").allows_action("buy_compactor") or game.get("cycle").is_night or game.get("cycle").defeated): cancel_placement()
-	if not game.get("cycle").defeated: process_outputs()
+	if not game.get("cycle").defeated: process_outputs(delta)
 	if placing or (game.get("holding_object") and game.get("held_object_type") == "compactor"): queue_redraw()
 
 func _input(event: InputEvent) -> void:
@@ -167,6 +172,9 @@ func draw_machine(center: Vector2, data: Dictionary) -> void:
 		draw_circle(center + Vector2(-12 + index * 8, 16), 2, Color("#eac978") if index < count else Color("#303638"))
 	if count > 0:
 		draw_circle(center + Vector2(0, -1), 5, Color("#dbb36b") if data["kind"] == "brass" else Color("#29292d"))
+	if count == INPUT_COUNT:
+		draw_rect(Rect2(center + Vector2(-12, -3), Vector2(24, 4)), Color("#303638"))
+		draw_rect(Rect2(center + Vector2(-12, -3), Vector2(24 * clampf(float(data.get("elapsed", 0.0)) / PROCESS_TIME, 0, 1), 4)), Color("#eac978"))
 	var output := Vector2(DIRECTIONS[int(data["direction"])])
 	var tip := center + output * 21
 	var side := Vector2(-output.y, output.x)

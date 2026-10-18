@@ -11,10 +11,15 @@ const LAUNCHER_PRICE := 200
 const DEFENSE_TILE_PRICE := 100
 const COAL_SELL_PRICE := 5
 const BRASS_VEIN_PRICE := 150
-const BRASS_SELL_PRICE := 3
+const BRASS_SELL_PRICE := 7
 
 var coins: int = START_COINS
 var developer_mode: bool = false
+
+func sale_value(kind: String) -> int:
+	var base: int = BRASS_SELL_PRICE if kind.begins_with("brass") else COAL_SELL_PRICE
+	# Four inputs plus a 50% processing bonus.
+	return base * 6 if kind.ends_with("_2") else base
 
 func can_afford(price: int) -> bool:
 	return developer_mode or coins >= price

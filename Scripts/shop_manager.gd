@@ -73,6 +73,7 @@ var purchase_buttons: Dictionary = {}
 var fallback_display: CanvasLayer
 var known_research_level: int = 1
 var research_notice: PanelContainer
+var research_notice_backdrop: ColorRect
 var research_notice_label: Label
 var research_notice_timer: Timer
 var notice_research_ids: Array[String] = []
@@ -251,31 +252,41 @@ func rebuild_catalog() -> void:
 	shop_scroll.set_deferred("scroll_vertical", scroll)
 
 func build_research_notice() -> void:
+	research_notice_backdrop = ColorRect.new()
+	research_notice_backdrop.name = "ResearchNoticeBackdrop"
+	research_notice_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	research_notice_backdrop.color = Color(0, 0, 0, 0.65)
+	research_notice_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	research_notice_backdrop.z_index = 120
+	add_child(research_notice_backdrop)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	research_notice_backdrop.add_child(center)
 	research_notice = PanelContainer.new()
 	research_notice.name = "NewResearchNotice"
-	research_notice.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	research_notice.offset_left = -210
-	research_notice.offset_right = 210
-	research_notice.offset_top = 18
+	research_notice.custom_minimum_size = Vector2(420, 100)
 	research_notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	research_notice.z_index = 120
 	var style := create_style("#192920", "#d5b078", 1, 9)
 	style.content_margin_left = 14
 	style.content_margin_right = 14
 	style.content_margin_top = 10
 	style.content_margin_bottom = 10
 	research_notice.add_theme_stylebox_override("panel", style)
-	add_child(research_notice)
+	center.add_child(research_notice)
 	research_notice_label = create_label("", 15, Color("#efd5a2"))
 	research_notice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	research_notice_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	research_notice_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	research_notice.add_child(research_notice_label)
 	research_notice.hide()
+	research_notice_backdrop.hide()
 	research_notice_timer = Timer.new()
 	research_notice_timer.one_shot = true
-	research_notice_timer.wait_time = 5.0
+	research_notice_timer.wait_time = 3.0
 	research_notice_timer.timeout.connect(func() -> void:
 		research_notice.hide()
+		research_notice_backdrop.hide()
 		notice_research_ids.clear())
 	add_child(research_notice_timer)
 
@@ -288,6 +299,7 @@ func announce_researches(research_ids: Array[String]) -> void:
 	research_notice_label.text = "Nuevas investigaciones\n" + " · ".join(names)
 	research_notice_timer.stop()
 	research_notice.hide()
+	research_notice_backdrop.hide()
 	update_notice_visibility()
 
 func update_notice_visibility() -> void:
@@ -295,9 +307,11 @@ func update_notice_visibility() -> void:
 	var victory: Control = get_parent().get_parent().get("night_victory_overlay")
 	if victory != null and victory.visible:
 		research_notice.hide()
+		research_notice_backdrop.hide()
 		research_notice_timer.stop()
 	elif not research_notice.visible:
 		research_notice.show()
+		research_notice_backdrop.show()
 		research_notice_timer.start()
 
 func open_research() -> void:

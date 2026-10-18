@@ -4,7 +4,7 @@ func dismiss_notice(shop: Control) -> void:
 	shop.research_notice_timer.wait_time = 0.05
 	shop.research_notice_timer.start()
 	await create_timer(0.1).timeout
-	shop.research_notice_timer.wait_time = 5.0
+	shop.research_notice_timer.wait_time = 3.0
 
 func run_checks() -> void:
 	root.show()
@@ -47,6 +47,9 @@ func run_checks() -> void:
 	await settle()
 	check(shop.research_buttons.keys() == ["drill", "straight_belt"], "Level two reveals only drill and straight-conveyor research")
 	check(shop.research_notice.visible and shop.notice_research_ids == ["drill", "straight_belt"], "Crossing the threshold shows one notice with exactly the new researches")
+	await settle()
+	check(shop.research_notice.get_global_rect().get_center().distance_to(shop.get_global_rect().get_center()) < 2 and shop.research_notice_backdrop.visible and shop.research_notice_backdrop.color.a > 0.5, "The alert is centered over a dimmed background")
+	check(is_equal_approx(shop.research_notice_timer.wait_time, 3.0), "Alerts close after three seconds")
 	check(shop.research_notice.mouse_filter == Control.MOUSE_FILTER_IGNORE and shop.research_notice_label.mouse_filter == Control.MOUSE_FILTER_IGNORE and not paused, "The brief notice neither captures clicks nor pauses gameplay")
 	check(not shop.research_buttons.has("brass") and not shop.research_buttons.has("compactor") and not shop.research_buttons.has("junction_belt"), "Future-level research creates no controls")
 	if DisplayServer.get_name() != "headless" and "--capture" in args:
@@ -59,7 +62,7 @@ func run_checks() -> void:
 	game.research_technology("straight_belt")
 	check(shop.item_buttons.keys() == ["coal", "straight", "drill"], "An unlock refreshes an already open store immediately")
 	await dismiss_notice(shop)
-	check(not shop.research_notice.visible and shop.notice_research_ids.is_empty(), "The timer removes the notice and its accumulated research list")
+	check(not shop.research_notice.visible and not shop.research_notice_backdrop.visible and shop.notice_research_ids.is_empty(), "The timer removes the notice and its accumulated research list")
 	shop.open_category("INVESTIGACIÓN")
 	var card_id: int = shop.research_buttons["drill"].get_instance_id()
 	player.add_experience(1)
@@ -76,7 +79,7 @@ func run_checks() -> void:
 	check(not shop.research_notice.visible and not shop.notice_research_ids.is_empty(), "Victory temporarily defers an unread research notification")
 	game.night_victory_overlay.hide()
 	await settle()
-	check(shop.research_notice.visible and shop.research_notice_timer.time_left > 4.5, "Dismissing victory reveals the notice with its full reading time")
+	check(shop.research_notice.visible and shop.research_notice_timer.time_left > 2.5, "Dismissing victory reveals the notice with its full reading time")
 	await dismiss_notice(shop)
 	player.add_experience(205)
 	check(player.level == 5 and not shop.research_notice.visible, "A level with no new research causes no empty notification")
