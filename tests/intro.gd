@@ -57,7 +57,7 @@ func click_skip() -> void:
 	var button: Button = intro.skip_button
 	var point: Vector2 = root.get_screen_transform() * (button.get_global_transform_with_canvas() * (button.size * 0.5))
 	if DisplayServer.get_name() != "headless":
-		Input.warp_mouse(root.get_screen_transform().affine_inverse() * point)
+		Input.warp_mouse(point)
 	var motion := InputEventMouseMotion.new()
 	motion.position = point
 	Input.parse_input_event(motion)
@@ -104,10 +104,21 @@ func run_checks() -> void:
 	check(intro.layer < game.display_settings.layer, "Pause and display settings remain above the introduction")
 	check(Engine.has_meta(IntroScript.SESSION_KEY), "A session marks its introduction as seen")
 	check(pristine(), "Cinematic armies and buildings never enter the playable game state")
+	check(intro.film.renderer.get_script() == preload("res://Scripts/world_renderer.gd") and intro.film.zone.get_script() == preload("res://Scripts/defense_zone.gd"), "The film reuses the actual gameplay renderer and battlefield")
+	check(intro.film.actors.size() == 80 and intro.film.actors[0].get_script().get_base_script() == preload("res://Scripts/zombie.gd"), "The horde uses the same zombie models as gameplay without registering combat targets")
 	await go_to(2.0, "intro-title")
 	check(intro.title.text == "Día 0: El Comienzo De Todo" and intro.title.visible and intro.title.modulate.a == 1.0, "Opening card has the requested white title on black")
+	await go_to(5.6, "intro-base")
+	check(intro.film.drills.drills.size() == 5 and intro.film.compactors.machines.size() == 2 and intro.film.launchers.launchers.size() == 6, "The opening reveal shows an advanced mine built from playable machines and defenses")
 	await go_to(9.0, "intro-battle")
 	check(not intro.title.visible and intro.fade.color.a == 0.0, "Opening card transitions into the battle")
+	var visible_enemies: int = 0
+	for actor in intro.film.actors:
+		if Rect2(0, 64, 1280, 574).has_point(intro.film.world.transform * actor.position): visible_enemies += 1
+	check(visible_enemies >= 30, "The battle camera keeps the approaching horde inside the cinematic frame")
+	if DisplayServer.get_name() != "headless":
+		var picture: Image = root.get_texture().get_image()
+		check(picture.get_pixel(10, 600).get_luminance() > 0.05 and picture.get_pixel(1270, 600).get_luminance() > 0.05 and picture.get_pixel(10, 650).get_luminance() < 0.01, "Mine tiles cover wide-shot edges while letterbox bars remain black")
 	await send_key(KEY_P)
 	await send_key(KEY_R)
 	await send_key(KEY_F10)
@@ -127,7 +138,8 @@ func run_checks() -> void:
 	if DisplayServer.get_name() != "headless":
 		check(skip_is_drawn(), "Skip text remains visibly drawn after returning from pause and settings")
 	await go_to(24.4, "intro-overrun")
-	check(intro.film.zombie_position(0).x < 340.0, "The horde visibly overruns the defenses and reaches the mine before the fall")
+	check(is_instance_valid(intro.film.hits[0]), "Damage effects remain valid when scrubbing or pausing the movie")
+	check(intro.film.zombie_position(0).y >= 160.0, "The horde visibly overruns the defenses and reaches the mine before the fall")
 	await go_to(26.6, "intro-ruins")
 	check(intro.film.abandoned and not intro.film.daylight, "The defeated mine becomes an abandoned ruin")
 	await go_to(30.7, "intro-three-years")
