@@ -79,12 +79,6 @@ func mine(cell: Vector2i) -> bool:
 	var progress: int = int(vein["progress"]) + 1
 	if progress >= mining_clicks:
 		var destination: Vector2i = cell + DIRECTIONS[int(vein["direction"])]
-		if occupied_by_compactor(destination):
-			if not compactors.receive(destination, kind): return false
-			vein["progress"] = 0
-			dictionary[cell] = vein
-			changed.emit()
-			return true
 		if not grid.owned_tiles.has(destination) or not can_move_nugget(destination):
 			return false
 		if conveyors != null and conveyors.belts.has(destination) and not conveyors.accepts_from(destination, cell):
