@@ -162,9 +162,20 @@ func run_checks() -> void:
 	check(player.unlocked.size() == 5 and player.is_item_unlocked("junction"), "All five researches unlock only their intended items")
 	var level: int = player.level
 	var experience: int = player.total_experience
+	points = player.research_points
 	cycle.is_night = true
 	cycle.complete_night()
 	check(player.level == level and player.total_experience == experience and player.unlocked.size() == 5, "Unlocks and EXP survive a day change without a fake sale reward")
+	check(player.research_points == points + 1, "A completed night grants exactly one extra research point")
+	cycle.complete_night()
+	check(player.research_points == points + 1 and cycle.day == 3, "Duplicate completion callbacks do not repeat the reward or advance the day")
+	cycle.is_night = true
+	cycle.complete_night()
+	check(player.research_points == points + 2 and cycle.day == 4, "Later nights grant the same research reward")
+	cycle.is_night = true
+	cycle.lose_night()
+	cycle.complete_night()
+	check(player.research_points == points + 2, "Losing a night never grants the victory research reward")
 	root.size = Vector2i(800, 600)
 	await settle()
 	var scroll: ScrollContainer = shop.shop_scroll

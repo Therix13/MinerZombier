@@ -140,6 +140,7 @@ func ensure_tutorial_guide() -> void:
 
 func set_progression(player_progression: RefCounted) -> void:
 	progression = player_progression
+	cycle.set_progression(progression)
 	# Legacy scene scripts must also treat research solely as item unlocks.
 	var game: Node = get_parent().get_parent()
 	for connection in progression.technology_unlocked.get_connections():
@@ -155,8 +156,13 @@ func _process(_delta: float) -> void:
 		return
 	# Preserve research locks even with older scenes that handle purchases themselves.
 	var game: Node = get_parent().get_parent()
-	var item: String = "brass" if game.get("placing_brass") else ("drill" if game.get("placing_drill") else (str(game.get("belt_shape")) if game.get("placing_belt") else ""))
-	if not item.is_empty() and not progression.is_item_unlocked(item):
+	var item: String = ""
+	if game.get("placing_coal"): item = "coal"
+	elif game.get("placing_launcher"): item = "launcher"
+	elif game.get("placing_brass"): item = "brass"
+	elif game.get("placing_drill"): item = "drill"
+	elif game.get("placing_belt"): item = str(game.get("belt_shape"))
+	if not item.is_empty() and (not progression.is_item_unlocked(item) or (cycle != null and cycle.is_research_tutorial_active())):
 		game.cancel_placement()
 
 func build_progression_panel() -> void:
@@ -217,7 +223,7 @@ func build_research_content() -> void:
 	if progression == null:
 		return
 	research_summary = create_label("", 17, Color("#d6edb4"))
-	research_summary.tooltip_text = "Cada nivel otorga 1 punto de investigación.\nEXP: zombi +%d · carbón vendido +%d · latón vendido +%d." % [progression.ZOMBIE_EXPERIENCE, progression.SALE_EXPERIENCE["coal"], progression.SALE_EXPERIENCE["brass"]]
+	research_summary.tooltip_text = "Cada nivel y cada noche superada otorgan 1 PI.\nEXP: zombi +%d · carbón vendido +%d · latón vendido +%d." % [progression.ZOMBIE_EXPERIENCE, progression.SALE_EXPERIENCE["coal"], progression.SALE_EXPERIENCE["brass"]]
 	shop_content.add_child(research_summary)
 	var previous_branch: String = ""
 	var row: HBoxContainer
@@ -463,6 +469,11 @@ func update_cycle() -> void:
 			6:
 				cycle_action.text = "INICIAR PRIMERA NOCHE"
 				cycle_action.disabled = not cycle.can_start_night()
+	elif cycle.is_research_tutorial_active():
+		cycle_heading.text = "INVESTIGACIÓN"
+		cycle_title.text = "Tu primer desbloqueo"
+		cycle_goal.text = "Tienes %d PI. %s" % [progression.research_points, tutorial_navigation_text()]
+		cycle_action.hide()
 	elif cycle.defeated:
 		cycle_title.text = "Base destruida"
 		cycle_goal.text = "La entrada ha caído. Vuelve a empezar."
@@ -482,13 +493,15 @@ func update_cycle() -> void:
 			cycle_goal.text = "Alto riesgo de perder. Coloca al menos 2 torretas."
 			cycle_goal.add_theme_color_override("font_color", Color("#edbb76"))
 	shop_button.disabled = (tutorial and tutorial_purchase().is_empty()) or cycle.is_night or cycle.defeated
-	view_button.disabled = tutorial or cycle.defeated
+	view_button.disabled = cycle.is_guided_tutorial_active() or cycle.defeated
 	var guide: Node = get_parent().get_parent().get_node_or_null("TutorialGuide")
 	if guide != null and guide.resupply_active():
 		guide.apply_resupply_card(self)
 	update_progression()
 
 func tutorial_purchase() -> Dictionary:
+	if cycle != null and cycle.is_research_tutorial_active():
+		return {"category": "INVESTIGACIÓN", "item": "research", "instruction": "Desbloquea un objeto a tu elección."}
 	if cycle == null or not cycle.is_tutorial_active():
 		return {}
 	var game: Node = get_parent().get_parent()
@@ -519,9 +532,12 @@ func tutorial_ui_target() -> Control:
 	if not shop_open: return shop_button
 	if shop_title.text != purchase["category"]:
 		return category_buttons.get(purchase["category"])
+	if purchase["item"] == "research":
+		return research_summary
 	return purchase_buttons.get(purchase["item"])
 
 func tutorial_allows_item(item: String) -> bool:
+	if cycle != null and cycle.is_research_tutorial_active(): return false
 	if cycle == null or not cycle.is_tutorial_active(): return true
 	var purchase: Dictionary = tutorial_purchase()
 	return shop_open and not shop_animating and not purchase.is_empty() and purchase["item"] == item and shop_title.text == purchase["category"]
@@ -709,14 +725,14 @@ func show_categories() -> void:
 	shop_content.add_child(create_label("CATEGORIAS", 20, Color("#f3ca85")))
 	for category in CATEGORIES:
 		var button := create_button(category + "  >")
-		button.disabled = cycle != null and cycle.is_tutorial_active() and tutorial_purchase().get("category", "") != category
+		button.disabled = cycle != null and cycle.is_guided_tutorial_active() and tutorial_purchase().get("category", "") != category
 		button.pressed.connect(open_category.bind(category))
 		category_buttons[category] = button
 		shop_content.add_child(button)
 	if cycle != null: update_cycle()
 
 func open_category(category: String) -> void:
-	if shop_animating or (cycle != null and cycle.is_tutorial_active() and tutorial_purchase().get("category", "") != category):
+	if shop_animating or (cycle != null and cycle.is_guided_tutorial_active() and tutorial_purchase().get("category", "") != category):
 		return
 	shop_title.text = category
 	fixed_back_button.show()

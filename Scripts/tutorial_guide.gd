@@ -31,6 +31,9 @@ func _ready() -> void:
 	on_step_changed()
 
 func on_step_changed() -> void:
+	if cycle.is_research_tutorial_active():
+		game.cancel_placement.call_deferred()
+		clear_interaction()
 	if not cycle.is_tutorial_active():
 		queue_redraw()
 		return
@@ -168,7 +171,11 @@ func is_over_control(control: Control, position: Vector2) -> bool:
 	return Rect2(Vector2.ZERO, control.size).has_point(local)
 
 func _input(event: InputEvent) -> void:
-	if not cycle.is_tutorial_active():
+	if not cycle.is_guided_tutorial_active():
+		return
+	# Victory must be dismissible before the day-two lesson takes input.
+	var victory: Control = game.get("night_victory_overlay")
+	if victory != null and victory.visible:
 		return
 	if event is InputEventKey:
 		# Pause, display settings, and keyboard navigation remain accessible.

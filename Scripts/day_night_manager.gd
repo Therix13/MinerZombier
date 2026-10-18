@@ -30,6 +30,8 @@ var tutorial_step: int = 0
 var coal_sold: int = 0
 var expansion_bonus_granted: bool = false
 var free_launcher_available: bool = true
+var research_tutorial_pending: bool = false
+var progression: RefCounted
 var grid: RefCounted
 var mining: RefCounted
 var conveyors: RefCounted
@@ -49,7 +51,16 @@ func setup(grid_manager: RefCounted, mining_manager: RefCounted, conveyor_manage
 	launchers.changed.connect(refresh_tutorial)
 	refresh_tutorial()
 
+func set_progression(player_progression: RefCounted) -> void:
+	if progression != null:
+		progression.research_unlocked.disconnect(_on_research_unlocked)
+	progression = player_progression
+	progression.research_unlocked.connect(_on_research_unlocked)
+
 func dispose() -> void:
+	if progression != null:
+		progression.research_unlocked.disconnect(_on_research_unlocked)
+	progression = null
 	if mining != null:
 		mining.changed.disconnect(refresh_tutorial)
 		mining.sale_completed.disconnect(_on_sale)
@@ -74,7 +85,20 @@ func _on_sale(kind: String) -> void:
 func is_tutorial_active() -> bool:
 	return day == 1 and not is_night and not defeated
 
+func is_research_tutorial_active() -> bool:
+	return research_tutorial_pending and day == 2 and not is_night and not defeated
+
+func is_guided_tutorial_active() -> bool:
+	return is_tutorial_active() or is_research_tutorial_active()
+
+func _on_research_unlocked(_research_id: String) -> void:
+	if is_research_tutorial_active():
+		research_tutorial_pending = false
+		changed.emit()
+
 func allows_action(action: String) -> bool:
+	if is_research_tutorial_active():
+		return action == "research"
 	if not is_tutorial_active():
 		return true
 	return action in TUTORIAL_ACTIONS[clampi(tutorial_step, 0, TUTORIAL_LAST_STEP)]
@@ -83,6 +107,8 @@ func tutorial_title() -> String:
 	return TUTORIAL_TITLES[clampi(tutorial_step, 0, TUTORIAL_LAST_STEP)]
 
 func allows_world_press(cell: Vector2i, placing: String = "") -> bool:
+	if is_research_tutorial_active():
+		return false
 	if not is_tutorial_active():
 		return true
 	if placing == "coal":
@@ -96,6 +122,8 @@ func allows_world_press(cell: Vector2i, placing: String = "") -> bool:
 	return (allows_action("mine_coal") and cell == TUTORIAL_COAL_CELL and mining.nuggets_at(TUTORIAL_ORE_CELL) == 0) or ((allows_action("sell_coal") or allows_action("load_ammo")) and cell == TUTORIAL_ORE_CELL)
 
 func allows_interaction(kind: String, source: Vector2i, destination: Vector2i, dragged: bool) -> bool:
+	if is_research_tutorial_active():
+		return false
 	if not is_tutorial_active():
 		return true
 	if kind == "vein":
@@ -171,7 +199,7 @@ func needs_defense_warning() -> bool:
 	return day == 4 and not is_night and not defeated and launchers.launchers.size() < 2
 
 func can_start_night() -> bool:
-	return not is_night and not defeated and not launchers.launchers.is_empty() and has_ammo() and (day > 1 or tutorial_step >= TUTORIAL_LAST_STEP)
+	return not is_night and not defeated and not is_research_tutorial_active() and not launchers.launchers.is_empty() and has_ammo() and (day > 1 or tutorial_step >= TUTORIAL_LAST_STEP)
 
 func start_night() -> bool:
 	if not can_start_night():
@@ -185,6 +213,10 @@ func complete_night() -> void:
 		return
 	is_night = false
 	day += 1
+	if day == 2:
+		research_tutorial_pending = true
+	if progression != null:
+		progression.award_night()
 	economy.add(NIGHT_REWARD)
 	changed.emit()
 

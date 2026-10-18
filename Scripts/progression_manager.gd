@@ -8,6 +8,7 @@ signal research_unlocked(research_id: String)
 const BASE_LEVEL_EXPERIENCE: int = 50
 const LEVEL_EXPERIENCE_GROWTH: float = 1.6
 const POINTS_PER_LEVEL: int = 1
+const POINTS_PER_NIGHT: int = 1
 const ZOMBIE_EXPERIENCE: int = 25
 const SALE_EXPERIENCE := {"coal": 1, "brass": 2}
 const RESEARCHES := {
@@ -63,6 +64,10 @@ func add_experience(amount: int) -> void:
 
 func award_sale(kind: String) -> void:
 	add_experience(int(SALE_EXPERIENCE.get(kind, 0)))
+
+func award_night() -> void:
+	research_points += POINTS_PER_NIGHT
+	changed.emit()
 
 func has_technology(technology_id: String) -> bool:
 	return has_research(technology_id)
