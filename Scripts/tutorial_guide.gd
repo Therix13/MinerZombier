@@ -53,9 +53,12 @@ func focus_objective() -> void:
 	controller.dragging = false
 	var camera: Camera2D = game.get("camera")
 	var view_size: Vector2 = get_viewport().get_visible_rect().size
-	var zoom: float = clampf(view_size.x / (12.0 * cycle.grid.TILE_SIZE), controller.min_zoom, controller.max_zoom)
+	# Leave room around the centered defense platforms for the tutorial card.
+	var columns: float = 16.0 if cycle.tutorial_step >= 3 else 12.0
+	var zoom: float = clampf(view_size.x / (columns * cycle.grid.TILE_SIZE), controller.min_zoom, controller.max_zoom)
 	camera.zoom = Vector2.ONE * zoom
-	camera.position = Vector2(14.5 * cycle.grid.TILE_SIZE, 162.0 if cycle.tutorial_step >= 3 else cycle.grid.GRID_OFFSET_Y + 20.0)
+	var center_x: float = cycle.grid.get_cell_rect(cycle.grid.sale_cell).get_center().x
+	camera.position = Vector2(center_x, 162.0 if cycle.tutorial_step >= 3 else cycle.grid.GRID_OFFSET_Y + 20.0)
 	controller.clamp_position()
 	camera.force_update_scroll()
 	game.get("shop").set_view_mode(false)
