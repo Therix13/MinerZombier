@@ -18,9 +18,10 @@ var developer_mode: bool = false
 
 func sale_value(kind: String) -> int:
 	var base: int = BRASS_SELL_PRICE if kind.begins_with("brass") else COAL_SELL_PRICE
-	# Each tier combines two inputs and adds a 50% processing bonus.
-	var level: int = int(kind.get_slice("_", 1)) if kind.contains("_") else 1
-	return base * int(pow(3, level - 1))
+	# A level-one ingot preserves the value of its level-four ore input.
+	var suffix: String = kind.get_slice("_", kind.get_slice_count("_") - 1)
+	var level: int = int(suffix) if suffix.is_valid_int() else 1
+	return base * (27 if "_ingot" in kind else 1) * int(pow(3, level - 1))
 
 func can_afford(price: int) -> bool:
 	return developer_mode or coins >= price

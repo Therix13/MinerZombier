@@ -91,7 +91,7 @@ func run_checks() -> void:
 	game.shop.open_shop()
 	await wait_shop()
 	game.shop.open_category("RECURSOS")
-	check(game.shop.resource_buttons.size() == 8, "DEV resources include both materials at all four levels")
+	check(game.shop.resource_buttons.size() == 12, "DEV resources include both materials at all four levels")
 	game.shop.close_shop()
 	await wait_shop()
 	print("RESULT: ", passed, " passed; ", failed, " failed; ore tiers")

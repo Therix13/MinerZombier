@@ -4,6 +4,9 @@ signal changed
 
 const PRICE: int = 350
 const CAPACITY: int = 40
+const PROCESS_TIME: float = 4.0
+const FUEL_COST: int = 1
+const DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 const FUEL_VALUES := {"coal": 1, "coal_2": 3, "coal_3": 8, "coal_4": 20}
 var machines: Dictionary = {}
 var game: Node2D
@@ -26,22 +29,96 @@ func can_place(cell: Vector2i) -> bool:
 
 func place(cell: Vector2i) -> bool:
 	if not can_place(cell): return false
-	machines[cell] = {"fuel": 0}
+	machines[cell] = {"fuel": 0, "input": "", "output": "", "elapsed": 0.0, "burning": false}
 	changed.emit()
 	return true
 
+func can_receive_state(data: Dictionary, kind: String) -> bool:
+	if kind == "coal_4": return int(data["fuel"]) + FUEL_VALUES[kind] <= CAPACITY
+	return kind == "brass_4" and str(data.get("input", "")).is_empty() and str(data.get("output", "")).is_empty()
+
 func can_receive(cell: Vector2i, kind: String) -> bool:
-	return machines.has(cell) and FUEL_VALUES.has(kind) and int(machines[cell]["fuel"]) + int(FUEL_VALUES[kind]) <= CAPACITY
+	return machines.has(cell) and can_receive_state(machines[cell], kind)
 
 func receive(cell: Vector2i, kind: String) -> bool:
 	if not can_receive(cell, kind): return false
-	machines[cell]["fuel"] = int(machines[cell]["fuel"]) + int(FUEL_VALUES[kind])
-	# Coal is converted irreversibly; only its fuel value remains.
-	machines[cell].erase("fuel_items")
+	if kind == "coal_4":
+		machines[cell]["fuel"] = int(machines[cell]["fuel"]) + FUEL_VALUES[kind]
+		machines[cell].erase("fuel_items")
+	else:
+		machines[cell]["input"] = kind
+		machines[cell]["elapsed"] = 0.0
+		machines[cell]["burning"] = false
 	changed.emit()
 	return true
 
-func _process(_delta: float) -> void:
+func plan_inputs(cell: Vector2i, candidates: Array) -> Array:
+	# Reserve both fuel space and the material slot before belts remove anything.
+	var reserved: Dictionary = machines[cell].duplicate(true)
+	var accepted: Array = []
+	for candidate: Dictionary in candidates:
+		var kind: String = candidate["kind"]
+		if not can_receive_state(reserved, kind): continue
+		accepted.append(candidate)
+		if kind == "coal_4": reserved["fuel"] = int(reserved["fuel"]) + FUEL_VALUES[kind]
+		else: reserved["input"] = kind
+	return accepted
+
+func stored_items(cell: Vector2i) -> Dictionary:
+	var items: Dictionary = {}
+	if not machines.has(cell): return items
+	for slot in ["input", "output"]:
+		var kind: String = machines[cell].get(slot, "")
+		if not kind.is_empty(): items[kind] = int(items.get(kind, 0)) + 1
+	return items
+
+func remove_material(cell: Vector2i, kind: String) -> bool:
+	if not machines.has(cell): return false
+	for slot in ["input", "output"]:
+		if machines[cell].get(slot, "") != kind: continue
+		machines[cell][slot] = ""
+		machines[cell]["elapsed"] = 0.0
+		machines[cell]["burning"] = false
+		changed.emit()
+		return true
+	return false
+
+func process_smelting(delta: float) -> void:
+	for cell: Vector2i in machines:
+		var data: Dictionary = machines[cell]
+		if not str(data.get("output", "")).is_empty():
+			try_output(cell)
+			continue
+		if str(data.get("input", "")).is_empty(): continue
+		if not data.get("burning", false):
+			if int(data["fuel"]) < FUEL_COST: continue
+			data["fuel"] = int(data["fuel"]) - FUEL_COST
+			data["burning"] = true
+			changed.emit()
+		data["elapsed"] = minf(PROCESS_TIME, float(data.get("elapsed", 0.0)) + maxf(delta, 0.0))
+		if float(data["elapsed"]) < PROCESS_TIME: continue
+		data["input"] = ""
+		data["output"] = "brass_ingot"
+		data["elapsed"] = 0.0
+		data["burning"] = false
+		changed.emit()
+		try_output(cell)
+
+func try_output(cell: Vector2i) -> void:
+	var kind: String = machines[cell].get("output", "")
+	if kind.is_empty(): return
+	var belts: RefCounted = game.get("conveyors")
+	for direction: Vector2i in DIRECTIONS:
+		var at: Vector2i = cell + direction
+		if not belts.belts.has(at) or not mining.can_move_nugget(at) or not belts.accepts_from(at, cell): continue
+		mining.items_for(kind)[at] = 1
+		machines[cell]["output"] = ""
+		mining.changed.emit()
+		changed.emit()
+		return
+
+func _process(delta: float) -> void:
+	if not game.get("cycle").defeated: process_smelting(delta)
 	var mover: Node = game.get_node_or_null("WorldInteractions")
 	if mover != null and (mover.placing_furnace or game.get("held_object_type") == "furnace"): queue_redraw()
 

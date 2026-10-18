@@ -5,7 +5,7 @@ signal sale_completed(kind: String)
 signal fusion_completed(kind: String)
 
 const COAL_CLICKS := 7
-const ORE_KINDS := ["coal", "brass", "coal_2", "brass_2", "coal_3", "brass_3", "coal_4", "brass_4"]
+const ORE_KINDS := ["coal", "brass", "coal_2", "brass_2", "coal_3", "brass_3", "coal_4", "brass_4", "brass_ingot", "brass_ingot_2", "brass_ingot_3", "brass_ingot_4"]
 const DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 
 var drills: RefCounted
@@ -24,6 +24,7 @@ var coal_level3_nuggets: Dictionary = {}
 var brass_level3_nuggets: Dictionary = {}
 var coal_level4_nuggets: Dictionary = {}
 var brass_level4_nuggets: Dictionary = {}
+var ingots: Dictionary = {"brass_ingot": {}, "brass_ingot_2": {}, "brass_ingot_3": {}, "brass_ingot_4": {}}
 
 func setup(grid_manager: RefCounted) -> void:
 	grid = grid_manager
@@ -48,20 +49,23 @@ func nuggets_at(cell: Vector2i) -> int:
 	return count
 
 func nugget_stores() -> Dictionary:
-	return {"coal": coal_nuggets, "brass": brass_nuggets, "coal_2": coal_level2_nuggets, "brass_2": brass_level2_nuggets, "coal_3": coal_level3_nuggets, "brass_3": brass_level3_nuggets, "coal_4": coal_level4_nuggets, "brass_4": brass_level4_nuggets}
+	return {"coal": coal_nuggets, "brass": brass_nuggets, "coal_2": coal_level2_nuggets, "brass_2": brass_level2_nuggets, "coal_3": coal_level3_nuggets, "brass_3": brass_level3_nuggets, "coal_4": coal_level4_nuggets, "brass_4": brass_level4_nuggets, "brass_ingot": ingots["brass_ingot"], "brass_ingot_2": ingots["brass_ingot_2"], "brass_ingot_3": ingots["brass_ingot_3"], "brass_ingot_4": ingots["brass_ingot_4"]}
 
 func items_for(kind: String) -> Dictionary:
 	return nugget_stores().get(kind, {})
 
 func material_units(kind: String) -> int:
-	return int(pow(2, ore_level(kind) - 1))
+	return (8 if "_ingot" in kind else 1) * int(pow(2, ore_level(kind) - 1))
 
 func ore_level(kind: String) -> int:
-	return int(kind.get_slice("_", 1)) if kind.contains("_") else 1
+	var suffix: String = kind.get_slice("_", kind.get_slice_count("_") - 1)
+	return int(suffix) if suffix.is_valid_int() else 1
 
 func next_tier(kind: String) -> String:
 	if kind not in ORE_KINDS or ore_level(kind) >= 4: return ""
-	return kind.get_slice("_", 0) + "_" + str(ore_level(kind) + 1)
+	var level: int = ore_level(kind)
+	var base: String = kind.trim_suffix("_%d" % level) if level > 1 else kind
+	return base + "_" + str(level + 1)
 
 func can_fuse(source: Vector2i, destination: Vector2i) -> bool:
 	var kind: String = nugget_type(source)

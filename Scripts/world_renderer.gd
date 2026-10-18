@@ -147,10 +147,34 @@ func _draw() -> void:
 		draw_nugget(grid.get_cell_rect(hovered_cell).get_center(), interactions.placing_resource, 1)
 
 func draw_nugget(center: Vector2, kind: String, amount: int) -> void:
-	if mining.ore_level(kind) >= 3: draw_cluster_nugget(center, kind, amount)
+	if "_ingot" in kind: draw_ingot(center, kind, amount)
+	elif mining.ore_level(kind) >= 3: draw_cluster_nugget(center, kind, amount)
 	elif mining.ore_level(kind) == 2: draw_refined_nugget(center, kind, amount)
 	elif kind.begins_with("brass"): draw_brass_nugget(center, amount)
 	else: draw_coal_nugget(center, amount)
+
+func draw_ingot(center: Vector2, kind: String, amount: int) -> void:
+	var level: int = mining.ore_level(kind)
+	var w: float = [10.0, 13.0, 16.0, 20.0][level - 1]
+	var h: float = [7.0, 9.0, 12.0, 16.0][level - 1]
+	var outline: PackedVector2Array
+	if level == 4:
+		outline = PackedVector2Array([center + Vector2(-w, -h + 3), center + Vector2(-2, -h), center + Vector2(w, -h + 3), center + Vector2(w, h - 2), center + Vector2(1, h + 2), center + Vector2(-w, h - 2)])
+	else:
+		outline = PackedVector2Array([center + Vector2(-w + 4, -h), center + Vector2(w - 4, -h), center + Vector2(w, h - 2), center + Vector2(w - 2, h), center + Vector2(-w + 2, h), center + Vector2(-w, h - 2)])
+	draw_colored_polygon(outline, Color("#c47739"))
+	draw_colored_polygon(PackedVector2Array([center + Vector2(-w + 4, -h), center + Vector2(w - 4, -h), center + Vector2(w - 1, -h + 4), center + Vector2(-w + 1, -h + 4)]), Color("#f4b67a"))
+	draw_colored_polygon(PackedVector2Array([center + Vector2(w - 5, -h + 4), center + Vector2(w - 1, -h + 2), center + Vector2(w - 1, h - 2), center + Vector2(w - 5, h)]), Color("#985526"))
+	if level == 4:
+		draw_colored_polygon(PackedVector2Array([center + Vector2(-w, -h + 3), center + Vector2(-2, -h), center + Vector2(w, -h + 3), center + Vector2(1, -h + 8)]), Color("#f3b178"))
+		draw_colored_polygon(PackedVector2Array([center + Vector2(1, -h + 8), center + Vector2(w, -h + 3), center + Vector2(w, h - 2), center + Vector2(1, h + 2)]), Color("#ab622f"))
+		draw_circle(center + Vector2(8, 1), 1, Color("#bd7538"))
+	var closed: PackedVector2Array = outline.duplicate()
+	closed.append(outline[0])
+	draw_polyline(closed, Color("#2e2014"), 2.5, true)
+	draw_line(center + Vector2(-w + 7, -h + 5), center + Vector2(-w + 4, h - 3), Color("#ffd9a1"), 2, true)
+	draw_line(center + Vector2(-w + 10, -h + 5), center + Vector2(-w + 7, h - 3), Color("#e99b59"), 1, true)
+	if amount > 1: draw_string(ThemeDB.fallback_font, center + Vector2(12, 20), str(amount), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#ffdb85"))
 
 func draw_cluster_nugget(center: Vector2, kind: String, amount: int) -> void:
 	var brass: bool = kind.begins_with("brass")

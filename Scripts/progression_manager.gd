@@ -10,7 +10,7 @@ const LEVEL_EXPERIENCE_GROWTH: float = 1.6
 const POINTS_PER_LEVEL: int = 1
 const POINTS_PER_NIGHT: int = 1
 const ZOMBIE_EXPERIENCE: int = 25
-const SALE_EXPERIENCE := {"coal": 1, "brass": 2, "coal_2": 2, "brass_2": 4, "coal_3": 4, "brass_3": 8, "coal_4": 8, "brass_4": 16}
+const SALE_EXPERIENCE := {"coal": 1, "brass": 2, "coal_2": 2, "brass_2": 4, "coal_3": 4, "brass_3": 8, "coal_4": 8, "brass_4": 16, "brass_ingot": 16, "brass_ingot_2": 32, "brass_ingot_3": 64, "brass_ingot_4": 128}
 const RESEARCHES := {
 	"drill": {
 		"name": "Taladro", "branch": "MINERÍA", "cost": 1, "level": 2,
@@ -38,7 +38,7 @@ const RESEARCHES := {
 	},
 	"furnace": {
 		"name": "Horno", "branch": "PROCESAMIENTO", "cost": 1, "level": 3,
-		"requires": ["drill"], "description": "Desbloquea el horno. Almacena hasta 40 de combustible.",
+		"requires": ["drill"], "description": "Funde latón de Nv. 4 en lingotes usando carbón de Nv. 4.",
 	},
 }
 const BASE_ITEMS := ["coal", "launcher", "defense_platforms"]

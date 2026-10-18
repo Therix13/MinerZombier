@@ -128,6 +128,9 @@ func sell(kind: String, source: Vector2i) -> bool:
 	elif kind == "compactor" and int(data["compactor"]["count"]) > 0:
 		var ore: String = data["compactor"]["kind"]
 		data[ore] = int(data.get(ore, 0)) + int(data["compactor"]["count"])
+	if kind == "furnace":
+		for ore: String in game.get_node("Furnaces").stored_items(source):
+			data[ore] = int(data.get(ore, 0)) + 1
 	if kind == "vein":
 		data.erase("coal_vein")
 		data.erase("brass_vein")

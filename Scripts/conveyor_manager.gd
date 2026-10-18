@@ -130,12 +130,8 @@ func tick() -> void:
 		var destination: Vector2i = destination_key
 		var candidates: Array = requests[destination]
 		if mining.occupied_by_furnace(destination):
-			var remaining_fuel: int = mining.furnaces.CAPACITY - int(mining.furnaces.machines[destination]["fuel"])
-			for candidate in candidates:
-				var value: int = mining.furnaces.FUEL_VALUES[candidate["kind"]]
-				if value > remaining_fuel: continue
+			for candidate: Dictionary in mining.furnaces.plan_inputs(destination, candidates):
 				transfers.append({"source": candidate["source"], "destination": destination, "kind": candidate["kind"]})
-				remaining_fuel -= value
 			continue
 		if mining.occupied_by_compactor(destination):
 			var machine: Dictionary = mining.compactors.machines[destination]

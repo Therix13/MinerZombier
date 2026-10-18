@@ -37,7 +37,7 @@ const ITEM_CATEGORIES := {
 	"HERRAMIENTAS": ["drill", "compactor", "furnace"],
 	"AUTOMATIZACIÓN": ["straight", "corner_right", "corner_left", "junction"],
 }
-const RESOURCE_LABELS := {"coal": "CARBÓN · NIVEL 1", "brass": "LATÓN · NIVEL 1", "coal_2": "CARBÓN · NIVEL 2", "brass_2": "LATÓN · NIVEL 2", "coal_3": "CARBÓN · NIVEL 3", "brass_3": "LATÓN · NIVEL 3", "coal_4": "CARBÓN · NIVEL 4", "brass_4": "LATÓN · NIVEL 4"}
+const RESOURCE_LABELS := {"coal": "CARBÓN · NIVEL 1", "brass": "LATÓN · NIVEL 1", "coal_2": "CARBÓN · NIVEL 2", "brass_2": "LATÓN · NIVEL 2", "coal_3": "CARBÓN · NIVEL 3", "brass_3": "LATÓN · NIVEL 3", "coal_4": "CARBÓN · NIVEL 4", "brass_4": "LATÓN · NIVEL 4", "brass_ingot": "LINGOTE DE LATÓN · NIVEL 1", "brass_ingot_2": "LINGOTE DE LATÓN · NIVEL 2", "brass_ingot_3": "LINGOTE DE LATÓN · NIVEL 3", "brass_ingot_4": "LINGOTE DE LATÓN · NIVEL 4"}
 const CATEGORY_ART := {"EXPANSION": "expansion", "VETAS": "coal", "HERRAMIENTAS": "drill", "AUTOMATIZACIÓN": "junction", "DEFENSA": "launcher", "INVESTIGACIÓN": "research", "RECURSOS": "resources"}
 const RESEARCH_VIEW := {
 	"drill": ["drill", "Taladro", "Automático"],
@@ -745,6 +745,8 @@ func create_art_button(kind: String, description: String, price: int = -1) -> Bu
 		"ore:coal_2": "Carbón · Nv. 2", "ore:brass_2": "Latón · Nv. 2",
 		"ore:coal_3": "Carbón · Nv. 3", "ore:brass_3": "Latón · Nv. 3",
 		"ore:coal_4": "Carbón · Nv. 4", "ore:brass_4": "Latón · Nv. 4",
+		"ore:brass_ingot": "Lingote · Nv. 1", "ore:brass_ingot_2": "Lingote · Nv. 2",
+		"ore:brass_ingot_3": "Lingote · Nv. 3", "ore:brass_ingot_4": "Lingote · Nv. 4",
 	}
 	var label := create_label(short_names.get(kind, description.capitalize()) if price >= 0 or kind.begins_with("ore:") else description.capitalize(), 15)
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL

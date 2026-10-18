@@ -90,6 +90,7 @@ func exists() -> bool:
 func inventory() -> Dictionary:
 	var items: Array = []
 	match kind:
+		"furnace": return game.get_node("Furnaces").stored_items(cell)
 		"launcher": items = game.get("launchers").launchers[cell]["ammo"]
 		"compactor":
 			var data: Dictionary = game.get_node("Compactors").machines[cell]
@@ -106,6 +107,9 @@ func refresh() -> void:
 	match kind:
 		"furnace":
 			status.text = "Horno · Nv. 1"
+			var data: Dictionary = game.get_node("Furnaces").machines[cell]
+			if not str(data.get("input", "")).is_empty():
+				status.text += " · %.1f / 4 s" % float(data.get("elapsed", 0.0)) if data.get("burning", false) else " · Sin combustible"
 			if heat_label != null: heat_label.text = "%d / 40" % int(game.get_node("Furnaces").machines[cell]["fuel"])
 		"compactor":
 			var data: Dictionary = game.get_node("Compactors").machines[cell]
@@ -124,7 +128,7 @@ func refresh() -> void:
 		child.queue_free()
 	if kind == "furnace":
 		var heat := make_slot()
-		heat.tooltip_text = "Combustible. El carbón convertido ya no puede retirarse."
+		heat.tooltip_text = "Carbón Nv. 4: +20 combustible. El carbón convertido ya no puede retirarse."
 		var flame := SlotSymbol.new()
 		flame.flame = true
 		flame.custom_minimum_size = Vector2(48, 48)
@@ -132,7 +136,7 @@ func refresh() -> void:
 		contents.add_child(heat)
 	for item: String in items:
 		var button := make_slot()
-		button.tooltip_text = game.get("shop").RESOURCE_LABELS.get(item, item) + "\nRetirar una pepita."
+		button.tooltip_text = game.get("shop").RESOURCE_LABELS.get(item, item) + "\nRetirar una unidad."
 		var art: Control = game.get("shop").create_item_preview("ore:" + item)
 		fill_slot(button, art, str(items[item]))
 		button.pressed.connect(withdraw.bind(item))
@@ -140,7 +144,7 @@ func refresh() -> void:
 		withdraw_buttons[item] = button
 	if items.is_empty():
 		var empty := make_slot()
-		empty.tooltip_text = "Sin materiales almacenados."
+		empty.tooltip_text = "Entrada: pepita de latón Nv. 4." if kind == "furnace" else "Sin materiales almacenados."
 		var tray := SlotSymbol.new()
 		tray.custom_minimum_size = Vector2(48, 48)
 		fill_slot(empty, tray, "—")
@@ -192,6 +196,8 @@ func withdraw(item: String) -> bool:
 		return false
 	withdrawal_blocked = false
 	match kind:
+		"furnace":
+			if not game.get_node("Furnaces").remove_material(cell, item): return false
 		"compactor":
 			var machine: Node = game.get_node("Compactors")
 			machine.machines[cell]["count"] = int(machine.machines[cell]["count"]) - 1

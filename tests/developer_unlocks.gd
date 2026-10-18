@@ -63,10 +63,10 @@ func run_checks() -> void:
 	check(player.unlocked.is_empty() and player.research_points == 0, "DEV access never buys or permanently records free research")
 	shop.show_categories()
 	check(shop.category_buttons.has("RECURSOS"), "DEV adds its Resources category to the real menu")
-	for index in range(8):
+	for index in range(12):
 		var kind: String = game.mining.ORE_KINDS[index]
 		shop.open_category("RECURSOS")
-		check(shop.resource_buttons.size() == 8 and shop.resource_buttons.has(kind), "Resources offers every existing material and level")
+		check(shop.resource_buttons.size() == 12 and shop.resource_buttons.has(kind), "Resources offers every existing material and level")
 		await settle()
 		shop.shop_scroll.ensure_control_visible(shop.resource_buttons[kind])
 		await settle()
