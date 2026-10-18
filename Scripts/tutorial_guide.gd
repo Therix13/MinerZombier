@@ -123,13 +123,13 @@ func apply_resupply_card(shop: Control) -> void:
 	match resupply_step:
 		0:
 			shop.cycle_title.text = "Sin munición"
-			shop.cycle_goal.text = "Pulsa MINA para recargar."
+			shop.cycle_goal.text = "Pulsa el pico para bajar a la mina."
 		1:
 			shop.cycle_title.text = "Recarga el arma"
 			shop.cycle_goal.text = "Extrae una pepita y arrástrala al arma."
 		2:
 			shop.cycle_title.text = "¡Arma recargada!"
-			shop.cycle_goal.text = "Pulsa DEFENSIVA para regresar."
+			shop.cycle_goal.text = "Pulsa el escudo para volver a defender."
 	shop.cycle_action.hide()
 
 func resupply_targets() -> Array[Vector2i]:

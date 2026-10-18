@@ -101,10 +101,12 @@ func run_checks() -> void:
 	check(player.level == 2 and player.experience == 4 and player.research_points == 1, "Zombie kills provide the level and research point")
 	manager._process(0.01)
 	check(shop.level_label.text.contains("NIVEL 2") and shop.experience_bar.value == 4, "Subtle XP HUD shows the new level")
+	check(shop.research_points_label.get_parsed_text().contains(str(player.research_points)) and shop.research_texture != null, "Research points appear beside the level with the bottle icon")
+	check(shop.view_button.text.is_empty() and shop.view_button.size.x <= 48 and shop.view_icon != null, "A compact icon replaces the view-switch text")
 	var panel: Control = shop.progression_panel
 	var hud: Rect2 = panel.get_global_transform_with_canvas() * Rect2(Vector2.ZERO, panel.size)
 	var factor: float = game.ui_layer.scale.x
-	check(is_equal_approx(hud.position.x, 20.0 * factor) and is_equal_approx(hud.size.x, 200.0 * factor) and is_equal_approx(hud.end.y, root.get_visible_rect().size.y - 20.0 * factor), "The short XP bar sits at the bottom left")
+	check(is_equal_approx(hud.position.x, 20.0 * factor) and is_equal_approx(hud.size.x, 200.0 * factor) and is_equal_approx(hud.position.y, 20.0 * factor), "The short XP bar sits at the top left")
 	shop.open_shop()
 	await create_timer(0.4).timeout
 	shop.open_category("VETAS")
@@ -116,7 +118,7 @@ func run_checks() -> void:
 	shop.open_category("INVESTIGACIÓN")
 	await settle()
 	check(shop.shop_title.text == "INVESTIGACIÓN" and shop.research_buttons.keys() == ["drill", "straight_belt"], "Research only shows the two unlocks allowed at level two")
-	check(not shop.progression_panel.visible, "The XP HUD stays hidden while the shop is open")
+	check(shop.progression_panel.visible, "The top-left XP HUD stays visible while the shop is open")
 	var before_coins: int = game.economy.coins
 	shop.research_buttons["drill"].pressed.emit()
 	check(player.has_research("drill") and player.research_points == 0 and player.is_item_unlocked("drill"), "Research button permanently unlocks a new store item")

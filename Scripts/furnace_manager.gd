@@ -26,7 +26,7 @@ func can_place(cell: Vector2i) -> bool:
 
 func place(cell: Vector2i) -> bool:
 	if not can_place(cell): return false
-	machines[cell] = {"fuel": 0, "fuel_items": []}
+	machines[cell] = {"fuel": 0}
 	changed.emit()
 	return true
 
@@ -36,17 +36,8 @@ func can_receive(cell: Vector2i, kind: String) -> bool:
 func receive(cell: Vector2i, kind: String) -> bool:
 	if not can_receive(cell, kind): return false
 	machines[cell]["fuel"] = int(machines[cell]["fuel"]) + int(FUEL_VALUES[kind])
-	machines[cell]["fuel_items"].append(kind)
-	changed.emit()
-	return true
-
-func remove_fuel(cell: Vector2i, kind: String) -> bool:
-	if not machines.has(cell): return false
-	var items: Array = machines[cell]["fuel_items"]
-	var index: int = items.find(kind)
-	if index < 0: return false
-	items.remove_at(index)
-	machines[cell]["fuel"] = int(machines[cell]["fuel"]) - int(FUEL_VALUES[kind])
+	# Coal is converted irreversibly; only its fuel value remains.
+	machines[cell].erase("fuel_items")
 	changed.emit()
 	return true
 

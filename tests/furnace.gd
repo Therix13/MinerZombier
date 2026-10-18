@@ -39,10 +39,10 @@ func run_checks() -> void:
 	check(furnace.machines.has(c) and not mover.placing_furnace, "A real click places the furnace")
 	check(not game.mining.can_place_vein(c) and not game.drills.can_place(c) and not game.conveyors.can_place(c) and not compactors.can_place(c) and not game.mining.can_move_nugget(c), "All construction and loose-ore placement respects the furnace footprint")
 	for kind: String in furnace.FUEL_VALUES:
-		furnace.machines[c] = {"fuel": 0, "fuel_items": []}
+		furnace.machines[c] = {"fuel": 0}
 		put(a, {kind: 1})
 		check(mover.drop("nugget", a, c) and furnace.machines[c]["fuel"] == furnace.FUEL_VALUES[kind] and game.mining.nuggets_at(a) == 0, "Manual %s adds exactly %d fuel" % [kind, furnace.FUEL_VALUES[kind]])
-	furnace.machines[c] = {"fuel": 0, "fuel_items": []}
+	furnace.machines[c] = {"fuel": 0}
 	for kind: String in ["brass", "brass_2", "brass_3", "brass_4"]:
 		put(a, {kind: 1})
 		check(not mover.drop("nugget", a, c) and game.mining.nugget_type(a) == kind, "Nonfuel %s is preserved outside the furnace" % kind)
@@ -53,13 +53,13 @@ func run_checks() -> void:
 	game.mining.coal_nuggets.clear()
 	game.conveyors.place(a, 1)
 	game.conveyors.place(b, 3)
-	furnace.machines[c] = {"fuel": 30, "fuel_items": ["coal_4", "coal_3", "coal", "coal"]}
+	furnace.machines[c] = {"fuel": 30}
 	put(a, {"coal_3": 1})
 	put(b, {"coal_2": 1})
 	game.conveyors.tick()
 	check(furnace.machines[c]["fuel"] == 38 and game.mining.nuggets_at(a) == 0 and game.mining.nugget_type(b) == "coal_2", "Competing belts respect remaining fuel capacity and preserve rejected coal")
 	game.mining.coal_level2_nuggets.clear()
-	furnace.machines[c] = {"fuel": 0, "fuel_items": []}
+	furnace.machines[c] = {"fuel": 0}
 	for i in range(2): furnace.receive(c, "coal_4")
 	var saved: Dictionary = furnace.machines[c].duplicate(true)
 	check(mover.drop("furnace", c, Vector2i(15, 2)) and furnace.machines[Vector2i(15, 2)] == saved, "Moving a fueled furnace preserves its full inventory")
@@ -67,12 +67,11 @@ func run_checks() -> void:
 	await mouse_move(point(c))
 	await mouse_button(point(c), true)
 	await mouse_button(point(c), false)
-	check(inspector.is_open() and inspector.inventory().get("coal_4") == 2 and not mover.phase_allows(), "A click opens the furnace inventory and blocks world actions underneath")
+	check(inspector.is_open() and inspector.inventory().is_empty() and inspector.heat_label.text == "40 / 40" and not mover.phase_allows(), "A click opens the furnace inventory and blocks world actions underneath")
 	if "--capture" in OS.get_cmdline_user_args() and DisplayServer.get_name() != "headless":
 		await settle()
 		root.get_texture().get_image().save_png("/workspace/.onboarding/display-test/furnace-inventory.png")
-	await click_control(inspector.withdraw_buttons["coal_4"])
-	check(furnace.machines[c]["fuel"] == 20 and inspector.inventory().get("coal_4") == 1 and game.mining.coal_level4_nuggets.size() == 1, "Clicking inventory returns one original coal nugget and subtracts its exact fuel")
+	check(not inspector.withdraw_buttons.has("coal_4") and not inspector.withdraw("coal_4") and furnace.machines[c]["fuel"] == 40 and game.mining.coal_level4_nuggets.is_empty(), "Converted fuel is neither stored coal nor withdrawable material")
 	await key(KEY_ESCAPE)
 	check(not inspector.is_open() and not display.menu_open, "ESC closes the inventory without opening pause")
 	game.economy.toggle_developer_mode()
@@ -81,7 +80,7 @@ func run_checks() -> void:
 	game.research_technology("furnace")
 	check(game.progression.is_item_unlocked("furnace"), "Normal research can unlock the furnace")
 	var cash: int = game.economy.coins
-	check(mover.sell("furnace", c) and game.economy.coins == cash + 175 and not furnace.machines.has(c) and game.mining.items_for("coal_4").get(c) == 1, "Reselling a furnace pays half and returns its remaining stored coal")
+	check(mover.sell("furnace", c) and game.economy.coins == cash + 175 and not furnace.machines.has(c) and game.mining.nuggets_at(c) == 0, "Reselling a furnace never refunds consumed coal")
 	clear_items()
 	compactors.place(c, 1)
 	compactors.receive(c, "brass_2")
@@ -109,12 +108,12 @@ func run_checks() -> void:
 	check(inspector.withdraw("brass") and game.launchers.launchers[platform]["ammo"].is_empty() and game.mining.brass_nuggets.size() == 1 and not inspector.withdraw("brass"), "The weapon inventory returns ammo once without duplication")
 	inspector.close_inspector()
 	clear_items()
-	furnace.place(c)
-	furnace.receive(c, "coal_4")
+	compactors.place(c, 1)
+	compactors.receive(c, "coal_3")
 	for at: Vector2i in game.grid.owned_tiles:
 		if game.mining.can_move_nugget(at): game.mining.items_for("coal")[at] = 1
-	inspector.open_tool("furnace", c)
-	check(not inspector.withdraw("coal_4") and furnace.machines[c]["fuel"] == 20 and inspector.inventory().get("coal_4") == 1, "A full grid cannot lose or duplicate withdrawn fuel")
+	inspector.open_tool("compactor", c)
+	check(not inspector.withdraw("coal_3") and compactors.machines[c]["count"] == 1 and inspector.inventory().get("coal_3") == 1, "A full grid cannot lose or duplicate withdrawn materials")
 	inspector.close_inspector()
 	clear_items()
 	var balance: int = game.economy.coins

@@ -73,6 +73,8 @@ var cycle_action: Button
 var progression: RefCounted
 var progression_panel: PanelContainer
 var level_label: Label
+var research_points_label: RichTextLabel
+var view_icon: ViewIcon
 var experience_bar: ProgressBar
 var research_summary: RichTextLabel
 var research_texture: Texture2D
@@ -209,11 +211,11 @@ func _process(_delta: float) -> void:
 
 func build_progression_panel() -> void:
 	progression_panel = PanelContainer.new()
-	progression_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	progression_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	progression_panel.offset_left = 20.0
 	progression_panel.offset_right = 220.0
-	progression_panel.offset_top = -58.0
-	progression_panel.offset_bottom = -20.0
+	progression_panel.offset_top = 20.0
+	progression_panel.offset_bottom = 58.0
 	progression_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	progression_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	add_child(progression_panel)
@@ -227,13 +229,18 @@ func build_progression_panel() -> void:
 	column.add_child(row)
 	level_label = create_label("", 14, Color("#d6edb4"))
 	level_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	level_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	level_label.size_flags_horizontal = Control.SIZE_FILL
 	level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	level_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	level_label.add_theme_color_override("font_outline_color", Color("#152019"))
 	level_label.add_theme_constant_override("outline_size", 3)
 	row.add_child(level_label)
 	level_label.custom_minimum_size.y = 24
+	research_points_label = create_research_label("", 14, Color("#d6edb4"))
+	research_points_label.custom_minimum_size = Vector2(66, 24)
+	research_points_label.add_theme_color_override("font_outline_color", Color("#152019"))
+	research_points_label.add_theme_constant_override("outline_size", 3)
+	row.add_child(research_points_label)
 	experience_bar = ProgressBar.new()
 	experience_bar.custom_minimum_size.y = 6
 	experience_bar.show_percentage = false
@@ -246,10 +253,11 @@ func update_progression() -> void:
 	if progression == null:
 		return
 	level_label.text = "NIVEL %d" % progression.level
+	set_research_text(research_points_label, "{research} %d" % progression.research_points)
 	experience_bar.max_value = progression.experience_to_next_level()
 	experience_bar.value = progression.experience
 	experience_bar.tooltip_text = "EXP %d / %d\nZombi +%d · venta de carbón +%d · venta de latón +%d." % [progression.experience, progression.experience_to_next_level(), progression.ZOMBIE_EXPERIENCE, progression.SALE_EXPERIENCE["coal"], progression.SALE_EXPERIENCE["brass"]]
-	progression_panel.visible = not shop_open and not shop_animating
+	progression_panel.visible = true
 	if progression.level > known_research_level:
 		var old_ids: Array[String] = progression.visible_researches(known_research_level)
 		var new_ids: Array[String] = []
@@ -753,6 +761,12 @@ func create_art_button(kind: String, description: String, price: int = -1) -> Bu
 	button.set_meta("item_art", art)
 	return button
 
+func create_item_preview(kind: String, minimum: Vector2 = Vector2(48, 48)) -> Control:
+	var preview := ItemPreview.new()
+	preview.kind = kind
+	preview.custom_minimum_size = minimum
+	return preview
+
 func create_research_label(value: String, font_size: int = 17, color: Color = Color("#f0e0c8")) -> RichTextLabel:
 	var label := RichTextLabel.new()
 	label.fit_content = true
@@ -880,20 +894,26 @@ func build_interface() -> void:
 	shop_content.add_theme_constant_override("separation", 12)
 	scroll.add_child(shop_content)
 	show_categories()
-	view_button = create_button("DEFENSIVA")
+	view_button = create_button("")
+	view_button.custom_minimum_size = Vector2(44, 42)
+	view_button.tooltip_text = "Ver defensas (P)"
 	view_button.name = "BotonDefensiva"
 	view_button.anchor_left = 0.0
 	view_button.anchor_right = 0.0
 	view_button.anchor_top = 0.0
 	view_button.anchor_bottom = 0.0
-	view_button.offset_left = 20.0
-	view_button.offset_right = 200.0
+	view_button.offset_left = 236.0
+	view_button.offset_right = 280.0
 	view_button.offset_top = 20.0
-	view_button.offset_bottom = 78.0
+	view_button.offset_bottom = 62.0
 	view_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	view_button.focus_mode = Control.FOCUS_NONE
 	view_button.pressed.connect(request_view_toggle)
 	add_child(view_button)
+	view_icon = ViewIcon.new()
+	view_button.add_child(view_icon)
+	view_icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	view_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 func request_view_toggle() -> void:
 	if cycle != null and cycle.is_night:
@@ -903,7 +923,9 @@ func request_view_toggle() -> void:
 		view_toggle_requested.emit()
 
 func set_view_mode(defense_enabled: bool) -> void:
-	view_button.text = "MINA" if defense_enabled else "DEFENSIVA"
+	view_button.tooltip_text = "Ver mina (P)" if defense_enabled else "Ver defensas (P)"
+	view_icon.mine = defense_enabled
+	view_icon.queue_redraw()
 
 func update_money(amount: int) -> void:
 	money_label.text = "∞ DEV" if economy.developer_mode else str(amount)
@@ -1114,6 +1136,22 @@ func finish_animation() -> void:
 		money_box.show()
 	if cycle != null:
 		update_cycle()
+
+class ViewIcon extends Control:
+	var mine: bool = false
+
+	func _draw() -> void:
+		var factor: float = minf(size.x, size.y) / 40.0
+		draw_set_transform(size * 0.5, 0, Vector2.ONE * factor)
+		if mine:
+			draw_line(Vector2(-8, 10), Vector2(7, -8), Color("#d1ad66"), 4, true)
+			draw_polyline(PackedVector2Array([Vector2(-10, -3), Vector2(-4, -10), Vector2(5, -11), Vector2(12, -5)]), Color("#e8d6ac"), 4, true)
+		else:
+			var shield := PackedVector2Array([Vector2(-10, -11), Vector2(10, -11), Vector2(9, 2), Vector2(5, 8), Vector2(0, 12), Vector2(-5, 8), Vector2(-9, 2), Vector2(-10, -11)])
+			draw_colored_polygon(shield, Color("#6f895b"))
+			draw_polyline(shield, Color("#f2cf86"), 2, true)
+			draw_line(Vector2(0, -7), Vector2(0, 6), Color("#f2cf86"), 2, true)
+			draw_line(Vector2(-5, -1), Vector2(5, -1), Color("#f2cf86"), 2, true)
 
 class ResearchIcon extends Control:
 	var kind: String = "lock"

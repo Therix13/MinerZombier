@@ -2,10 +2,10 @@ extends CanvasLayer
 
 var game: Node2D
 var overlay: Control
-var contents: VBoxContainer
+var contents: GridContainer
 var heading: Label
 var status: Label
-var fuel_bar: ProgressBar
+var heat_label: Label
 var kind: String = ""
 var cell: Vector2i
 var last_contents: String = ""
@@ -26,9 +26,9 @@ func _ready() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	overlay.add_child(center)
-	var panel := PanelContainer.new()
-	panel.custom_minimum_size.x = 360
-	panel.add_theme_stylebox_override("panel", game.get("shop").create_style("#352516", "#a87843", 3, 12))
+	var panel := WoodPanel.new()
+	panel.custom_minimum_size.x = 310
+	panel.add_theme_stylebox_override("panel", game.get("shop").create_style("#805733", "#392818", 5, 12))
 	center.add_child(panel)
 	var margin := MarginContainer.new()
 	for side in ["left", "top", "right", "bottom"]: margin.add_theme_constant_override("margin_" + side, 18)
@@ -38,23 +38,21 @@ func _ready() -> void:
 	margin.add_child(column)
 	var header := HBoxContainer.new()
 	column.add_child(header)
-	heading = game.get("shop").create_label("", 22)
+	heading = game.get("shop").create_label("CONTENIDO", 20)
+	heading.add_theme_color_override("font_outline_color", Color("#352516"))
+	heading.add_theme_constant_override("outline_size", 3)
 	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(heading)
 	var close: Button = game.get("shop").create_button("×")
 	close.custom_minimum_size = Vector2(40, 40)
 	close.pressed.connect(close_inspector)
 	header.add_child(close)
-	status = game.get("shop").create_label("", 16)
+	status = game.get("shop").create_label("", 13, Color("#f0d5a4"))
 	column.add_child(status)
-	fuel_bar = ProgressBar.new()
-	fuel_bar.max_value = 40
-	fuel_bar.show_percentage = false
-	fuel_bar.add_theme_stylebox_override("background", game.get("shop").create_style("#211d17", "#211d17", 0, 4))
-	fuel_bar.add_theme_stylebox_override("fill", game.get("shop").create_style("#d98a38", "#d98a38", 0, 4))
-	fuel_bar.custom_minimum_size.y = 8
-	column.add_child(fuel_bar)
-	contents = VBoxContainer.new()
+	contents = GridContainer.new()
+	contents.columns = 2
+	contents.add_theme_constant_override("h_separation", 8)
+	contents.add_theme_constant_override("v_separation", 8)
 	column.add_child(contents)
 	overlay.hide()
 	update_layout()
@@ -74,7 +72,7 @@ func open_tool(tool_kind: String, at: Vector2i) -> void:
 	kind = tool_kind
 	cell = at
 	if not exists(): return
-	heading.text = {"furnace": "HORNO · NV. 1", "compactor": "COMPACTADOR", "drill": "TALADRO", "launcher": "LANZAPEPITAS"}[kind]
+	heading.text = "CONTENIDO"
 	last_contents = ""
 	withdrawal_blocked = false
 	update_layout()
@@ -92,7 +90,6 @@ func exists() -> bool:
 func inventory() -> Dictionary:
 	var items: Array = []
 	match kind:
-		"furnace": items = game.get_node("Furnaces").machines[cell]["fuel_items"]
 		"launcher": items = game.get("launchers").launchers[cell]["ammo"]
 		"compactor":
 			var data: Dictionary = game.get_node("Compactors").machines[cell]
@@ -106,34 +103,78 @@ func refresh() -> void:
 		close_inspector()
 		return
 	var items: Dictionary = inventory()
-	fuel_bar.visible = kind == "furnace"
 	match kind:
 		"furnace":
-			fuel_bar.value = game.get_node("Furnaces").machines[cell]["fuel"]
-			status.text = "Combustible · %d / 40" % int(fuel_bar.value)
+			status.text = "Horno · Nv. 1"
+			if heat_label != null: heat_label.text = "%d / 40" % int(game.get_node("Furnaces").machines[cell]["fuel"])
 		"compactor":
 			var data: Dictionary = game.get_node("Compactors").machines[cell]
-			status.text = "Material · %d / 2" % int(data["count"])
+			status.text = "Compactador"
 			if int(data["count"]) == 2: status.text += " · %.1f / 4 s" % float(data["elapsed"])
-		"launcher": status.text = "Munición · %d / %d" % [game.get("launchers").launchers[cell]["ammo"].size(), game.get("launchers").capacity]
-		"drill": status.text = "Sin materiales almacenados."
-	if withdrawal_blocked: status.text += "\nNo hay casillas libres."
+		"launcher": status.text = "Lanzapepitas"
+		"drill": status.text = "Taladro"
+	if withdrawal_blocked: status.text += " · Sin espacio libre."
 	var signature: String = var_to_str(items)
 	if signature == last_contents: return
 	last_contents = signature
 	withdraw_buttons.clear()
+	heat_label = null
 	for child in contents.get_children():
 		contents.remove_child(child)
 		child.queue_free()
+	if kind == "furnace":
+		var heat := make_slot()
+		heat.tooltip_text = "Combustible. El carbón convertido ya no puede retirarse."
+		var flame := SlotSymbol.new()
+		flame.flame = true
+		flame.custom_minimum_size = Vector2(48, 48)
+		heat_label = fill_slot(heat, flame, "%d / 40" % int(game.get_node("Furnaces").machines[cell]["fuel"]))
+		contents.add_child(heat)
 	for item: String in items:
-		var button: Button = game.get("shop").create_art_button("ore:" + item, item)
-		button.get_meta("price_label").text = "×%d · Retirar" % items[item]
-		button.get_meta("price_label").show()
-		button.tooltip_text = "Retirar una pepita a una casilla libre."
+		var button := make_slot()
+		button.tooltip_text = game.get("shop").RESOURCE_LABELS.get(item, item) + "\nRetirar una pepita."
+		var art: Control = game.get("shop").create_item_preview("ore:" + item)
+		fill_slot(button, art, str(items[item]))
 		button.pressed.connect(withdraw.bind(item))
 		contents.add_child(button)
 		withdraw_buttons[item] = button
-	if items.is_empty() and kind != "drill": contents.add_child(game.get("shop").create_label("Vacío", 15))
+	if items.is_empty():
+		var empty := make_slot()
+		empty.tooltip_text = "Sin materiales almacenados."
+		var tray := SlotSymbol.new()
+		tray.custom_minimum_size = Vector2(48, 48)
+		fill_slot(empty, tray, "—")
+		contents.add_child(empty)
+
+func make_slot() -> Button:
+	var slot := Button.new()
+	slot.custom_minimum_size = Vector2(126, 122)
+	slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slot.add_theme_stylebox_override("normal", game.get("shop").create_style("#302113", "#c09355", 2, 12))
+	slot.add_theme_stylebox_override("hover", game.get("shop").create_style("#49301a", "#e6bd79", 2, 12))
+	slot.add_theme_stylebox_override("pressed", game.get("shop").create_style("#21180f", "#e6bd79", 2, 12))
+	return slot
+
+func fill_slot(slot: Button, art: Control, value: String) -> Label:
+	var margin := MarginContainer.new()
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot.add_child(margin)
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	for side in ["left", "top", "right", "bottom"]: margin.add_theme_constant_override("margin_" + side, 10)
+	var column := VBoxContainer.new()
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_theme_constant_override("separation", 3)
+	margin.add_child(column)
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	art.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(art)
+	var count: Label = game.get("shop").create_label(value, 18, Color("#fff0ce"))
+	count.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	count.add_theme_color_override("font_outline_color", Color("#18130f"))
+	count.add_theme_constant_override("outline_size", 3)
+	column.add_child(count)
+	return count
 
 func withdraw(item: String) -> bool:
 	if not is_open() or not exists() or not inventory().has(item) or get_tree().paused or game.get("cycle").defeated or game.get("cycle").is_guided_tutorial_active(): return false
@@ -151,8 +192,6 @@ func withdraw(item: String) -> bool:
 		return false
 	withdrawal_blocked = false
 	match kind:
-		"furnace":
-			if not game.get_node("Furnaces").remove_fuel(cell, item): return false
 		"compactor":
 			var machine: Node = game.get_node("Compactors")
 			machine.machines[cell]["count"] = int(machine.machines[cell]["count"]) - 1
@@ -172,3 +211,24 @@ func _process(_delta: float) -> void:
 	if is_open():
 		if game.get("cycle").defeated or game.get("cycle").is_guided_tutorial_active() or (game.get("night_victory_overlay") != null and game.get("night_victory_overlay").visible): close_inspector()
 		else: refresh()
+
+class WoodPanel extends PanelContainer:
+	func _draw() -> void:
+		draw_rect(Rect2(5, 68, size.x - 10, 9), Color("#ae7e48"))
+		for x in [12.0, size.x - 12.0]:
+			for y in [12.0, size.y - 12.0]:
+				draw_circle(Vector2(x, y), 4, Color("#483b2b"))
+				draw_circle(Vector2(x - 1, y - 1), 3, Color("#a9a593"))
+
+class SlotSymbol extends Control:
+	var flame: bool = false
+
+	func _draw() -> void:
+		var factor: float = minf(size.x, size.y) / 52.0
+		draw_set_transform(size * 0.5, 0, Vector2.ONE * factor)
+		if flame:
+			draw_colored_polygon(PackedVector2Array([Vector2(0, -23), Vector2(-9, -8), Vector2(-8, -2), Vector2(-14, -7), Vector2(-17, 6), Vector2(-12, 18), Vector2(0, 22), Vector2(13, 15), Vector2(16, 3), Vector2(7, -7), Vector2(5, 4), Vector2(0, 0)]), Color("#f08b22"))
+			draw_colored_polygon(PackedVector2Array([Vector2(0, -4), Vector2(-7, 7), Vector2(-4, 16), Vector2(4, 17), Vector2(9, 8), Vector2(4, 3), Vector2(3, 8)]), Color("#ffcf48"))
+		else:
+			draw_rect(Rect2(-17, -13, 34, 29), Color("#533d25"), false, 2)
+			draw_line(Vector2(-11, 9), Vector2(11, 9), Color("#82623c"), 2)
