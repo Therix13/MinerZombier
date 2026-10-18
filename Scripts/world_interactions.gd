@@ -111,6 +111,7 @@ func resale_value(kind: String, source: Vector2i) -> int:
 		"launcher": price = economy.LAUNCHER_PRICE
 		"compactor": price = game.get_node("Compactors").PRICE
 		"furnace": price = game.get_node("Furnaces").PRICE
+	if kind == "vein": price *= 1 << (game.get("mining").vein_level(source) - 1)
 	return floori(price * 0.5)
 
 func can_sell(kind: String, source: Vector2i) -> bool:
@@ -141,6 +142,7 @@ func sell(kind: String, source: Vector2i) -> bool:
 	return true
 
 func swaps_contents(kind: String, source: Vector2i, destination: Vector2i) -> bool:
+	if kind == "vein" and game.get("mining").can_fuse_veins(source, destination): return false
 	if kind == "nugget" and game.get("mining").occupied_by_machine(destination): return false
 	if game.get("cycle").is_night:
 		return false
@@ -174,6 +176,7 @@ func drop(kind: String, source: Vector2i, destination: Vector2i, direction: int 
 	if destination == grid.sale_cell and kind != "nugget": return sell(kind, source)
 	var mining: RefCounted = game.get("mining")
 	var launchers: RefCounted = game.get("launchers")
+	if kind == "vein" and mining.can_fuse_veins(source, destination): return mining.fuse_veins(source, destination)
 	if kind == "nugget" and source != destination:
 		if mining.can_fuse(source, destination): return mining.fuse(source, destination)
 		if mining.occupied_by_furnace(destination):

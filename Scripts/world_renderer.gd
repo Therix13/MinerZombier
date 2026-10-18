@@ -84,12 +84,12 @@ func _draw() -> void:
 		if holding_object and dragging_object and held_object_type == "vein" and cell == held_object_cell:
 			continue
 		var vein: Dictionary = mining.brass_veins[cell]
-		draw_brass_vein(grid.get_cell_rect(cell).get_center(), int(vein["direction"]), int(vein["progress"]), false)
+		draw_vein(grid.get_cell_rect(cell).get_center(), "brass", vein)
 	for cell in mining.coal_veins:
 		if holding_object and dragging_object and held_object_type == "vein" and cell == held_object_cell:
 			continue
 		var vein: Dictionary = mining.coal_veins[cell]
-		draw_coal_vein(grid.get_cell_rect(cell).get_center(), int(vein["direction"]), int(vein["progress"]), false)
+		draw_vein(grid.get_cell_rect(cell).get_center(), "coal", vein)
 	for cell in launchers.launchers:
 		if holding_object and dragging_object and held_object_type == "launcher" and cell == held_object_cell:
 			continue
@@ -137,10 +137,9 @@ func _draw() -> void:
 		if held_object_type == "vein" and mining.vein_at(held_object_cell) != "":
 			var kind: String = mining.vein_at(held_object_cell)
 			var vein: Dictionary = mining.brass_veins[held_object_cell] if kind == "brass" else mining.coal_veins[held_object_cell]
-			if kind == "brass":
-				draw_brass_vein(drag_world_position, placement_direction, int(vein["progress"]), true)
-			else:
-				draw_coal_vein(drag_world_position, placement_direction, int(vein["progress"]), true)
+			var preview_data: Dictionary = vein.duplicate()
+			preview_data["direction"] = placement_direction
+			draw_vein(drag_world_position, kind, preview_data, true)
 		elif held_object_type == "drill":
 			draw_drill(drag_world_position, placement_direction, true)
 		elif held_object_type == "belt":
@@ -241,6 +240,21 @@ func draw_refined_nugget(center: Vector2, kind: String, amount: int) -> void:
 
 func preview_allowed(kind: String) -> bool:
 	return tutorial == null or tutorial.allows_world_press(hovered_cell, kind)
+
+func draw_vein(center: Vector2, kind: String, data: Dictionary, preview: bool = false) -> void:
+	if kind == "brass": draw_brass_vein(center, int(data["direction"]), int(data["progress"]), preview)
+	else: draw_coal_vein(center, int(data["direction"]), int(data["progress"]), preview)
+	var level: int = clampi(int(data.get("level", 1)), 1, 4)
+	if level == 1: return
+	var tint: Color = [Color("#c29a6b"), Color("#c9d8df"), Color("#ffe08a")][level - 2]
+	if preview: tint.a = 0.75
+	draw_rect(Rect2(center - Vector2(22,22), Vector2(44,44)), tint, false, 1.5)
+	var marks := PackedVector2Array()
+	for index in range(level):
+		var x: float = (index - (level - 1) * 0.5) * 5
+		marks.append(center + Vector2(x,-19))
+		marks.append(center + Vector2(x,-15))
+	draw_multiline(marks, tint, 2)
 
 func draw_coal_vein(
 	center: Vector2,

@@ -33,6 +33,7 @@ func _ready() -> void:
 		sounds[kind] = make_effect(kind)
 	for i in range(12): voices.append(make_player(null))
 	game.get("mining").struck.connect(on_struck)
+	game.get("mining").vein_fused.connect(func(cell: Vector2i): feedback("finish", cell))
 	game.get("conveyors").transported.connect(on_transport)
 	game.get("launchers").fired.connect(func(cell: Vector2i): feedback("shot", cell))
 	game.get("mining").fusion_completed.connect(func(_kind: String): request_sound("finish"))

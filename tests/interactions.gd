@@ -95,6 +95,8 @@ func run_checks() -> void:
 			put(b, samples[second])
 			if first == 3 or second == 3:
 				check(not mover.can_drop(types[first], a, b) and not mover.drop(types[first], a, b, 3) and mover.cell_data(a) == samples[first] and mover.cell_data(b) == samples[second], "Swap %d/%d cannot displace a loaded belt in either cell" % [first, second])
+			elif first == second and types[first] == "vein":
+				check(mover.drop("vein", a, b, 3) and mover.cell_data(a).is_empty() and game.mining.vein_level(b) == 2, "Matching level-one veins fuse rather than swap")
 			else:
 				check(mover.can_drop(types[first], a, b) and mover.drop(types[first], a, b, 3) and mover.cell_data(a) == samples[second] and mover.cell_data(b) == samples[first], "Swap %d/%d preserves both complete items and their resources" % [first, second])
 	check(game.economy.coins == coins and game.progression.total_experience == 0, "Swapping never grants coins or EXP")
@@ -167,7 +169,7 @@ func run_checks() -> void:
 	labels.clear()
 	for child in display.settings_page.get_children():
 		if child is Label: labels.append(child.text)
-	check(labels == ["AJUSTES DE PANTALLA", "Modo de ventana", "Resolución"], "Settings contains only the title and requested labels")
+	check(labels == ["AJUSTES", "Modo de ventana", "Resolución"], "Settings retains the current heading and window labels alongside audio controls")
 	check(display.mode_selector.item_count == 3 and display.resolution_selector.item_count == 4, "All window modes and resolutions remain selectable")
 	if DisplayServer.get_name() != "headless" and "--capture" in args:
 		root.get_texture().get_image().save_png(OS.get_user_data_dir().path_join("clean-settings.png"))
