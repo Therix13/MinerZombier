@@ -3,6 +3,7 @@ extends Node
 var game: Node2D
 var grid: RefCounted
 var shift_batch: bool = false
+var placing_resource: String = ""
 
 func _ready() -> void:
 	game = get_parent() as Node2D
@@ -208,9 +209,10 @@ func clear_drag() -> void:
 	game.get_node("Compactors").queue_redraw()
 
 func placement_active() -> bool:
-	return game.get("placing_coal") or game.get("placing_brass") or game.get("placing_belt") or game.get("placing_drill") or game.get("placing_launcher") or game.get_node("Compactors").placing
+	return not placing_resource.is_empty() or game.get("placing_coal") or game.get("placing_brass") or game.get("placing_belt") or game.get("placing_drill") or game.get("placing_launcher") or game.get_node("Compactors").placing
 
 func selected_item() -> String:
+	if not placing_resource.is_empty(): return "resource:" + placing_resource
 	if game.get("placing_coal"): return "coal"
 	if game.get("placing_brass"): return "brass"
 	if game.get("placing_belt"): return game.get("belt_shape")
@@ -218,6 +220,19 @@ func selected_item() -> String:
 	if game.get("placing_launcher"): return "launcher"
 	if game.get_node("Compactors").placing: return "compactor"
 	return ""
+
+func selection_available() -> bool:
+	if not placing_resource.is_empty(): return game.get("economy").developer_mode
+	return game.get("progression").is_item_unlocked(selected_item())
+
+func select_resource(kind: String) -> bool:
+	var cycle: RefCounted = game.get("cycle")
+	if not game.get("economy").developer_mode or kind not in game.get("mining").ORE_KINDS or get_tree().paused or cycle.is_night or cycle.defeated or cycle.is_guided_tutorial_active(): return false
+	cancel_active()
+	placing_resource = kind
+	game.get("shop").close_shop()
+	game.redraw_world()
+	return true
 
 func item_price(item: String) -> int:
 	var economy: RefCounted = game.get("economy")
@@ -259,6 +274,16 @@ func select_item(item: String) -> bool:
 	return true
 
 func place_selected(cell: Vector2i) -> bool:
+	if not placing_resource.is_empty():
+		var cycle: RefCounted = game.get("cycle")
+		var mining: RefCounted = game.get("mining")
+		if not selection_available() or not phase_allows() or cycle.is_night or cycle.is_guided_tutorial_active() or not mining.can_move_nugget(cell): return false
+		mining.items_for(placing_resource)[cell] = 1
+		mining.changed.emit()
+		if Input.is_key_pressed(KEY_SHIFT): shift_batch = true
+		else: cancel_active()
+		game.redraw_world()
+		return true
 	var item: String = selected_item()
 	var cycle: RefCounted = game.get("cycle")
 	var placing: String = item if item in ["coal", "launcher"] else ("belt" if game.get("placing_belt") else "other")
@@ -299,11 +324,16 @@ func cancel_active() -> bool:
 	if not placement_active() and not game.get("holding_object"): return false
 	game.cancel_placement()
 	game.get_node("Compactors").cancel_placement()
+	placing_resource = ""
 	shift_batch = false
 	clear_drag()
 	return true
 
 func _process(_delta: float) -> void:
+	var cycle: RefCounted = game.get("cycle")
+	if not placing_resource.is_empty() and (not game.get("economy").developer_mode or cycle.is_night or cycle.defeated or cycle.is_guided_tutorial_active()):
+		cancel_active()
+		return
 	if not placement_active():
 		shift_batch = false
 		return

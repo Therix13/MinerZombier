@@ -141,6 +141,10 @@ func _draw() -> void:
 			if swap_bundle and conveyors.belts.has(held_object_cell):
 				draw_conveyor(drag_world_position, conveyors.belt_direction(held_object_cell), true, conveyors.belt_shape(held_object_cell))
 			draw_nugget(drag_world_position, mining.nugget_type(held_object_cell), 1)
+	if is_instance_valid(interactions) and not interactions.placing_resource.is_empty() and interactions.phase_allows():
+		var valid: bool = mining.can_move_nugget(hovered_cell)
+		draw_rect(grid.get_cell_rect(hovered_cell).grow(-2), Color("#ffe18a") if valid else Color("#df7770"), false, 2)
+		draw_nugget(grid.get_cell_rect(hovered_cell).get_center(), interactions.placing_resource, 1)
 
 func draw_nugget(center: Vector2, kind: String, amount: int) -> void:
 	if kind.ends_with("_2"): draw_refined_nugget(center, kind, amount)

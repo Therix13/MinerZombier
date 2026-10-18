@@ -34,6 +34,7 @@ const ITEM_CATEGORIES := {
 	"HERRAMIENTAS": ["drill", "compactor"],
 	"AUTOMATIZACIÓN": ["straight", "corner_right", "corner_left", "junction"],
 }
+const RESOURCE_LABELS := {"coal": "CARBÓN · NIVEL 1", "brass": "LATÓN · NIVEL 1", "coal_2": "CARBÓN · NIVEL 2", "brass_2": "LATÓN · NIVEL 2"}
 const RESEARCH_VIEW := {
 	"drill": ["drill", "Taladro", "Automático"],
 	"brass": ["ore", "Latón", "Nueva veta"],
@@ -73,6 +74,7 @@ var research_buttons: Dictionary = {}
 var research_status: Dictionary = {}
 var research_details: Dictionary = {}
 var item_buttons: Dictionary = {}
+var resource_buttons: Dictionary = {}
 var category_buttons: Dictionary = {}
 var purchase_buttons: Dictionary = {}
 var fallback_display: CanvasLayer
@@ -807,9 +809,12 @@ func update_money(amount: int) -> void:
 	if progression != null:
 		progression.developer_mode = economy.developer_mode
 		var interactions: Node = get_parent().get_parent().get_node_or_null("WorldInteractions")
-		if interactions != null and interactions.placement_active() and not progression.is_item_unlocked(interactions.selected_item()):
+		if interactions != null and interactions.placement_active() and not interactions.selection_available():
 			interactions.cancel_active()
 	if shop_open:
+		if shop_title.text == "RECURSOS":
+			if not economy.developer_mode: show_categories()
+			return
 		if shop_title.text == "INVESTIGACIÓN":
 			return
 		if shop_title.text in ITEM_CATEGORIES:
@@ -822,6 +827,7 @@ func update_money(amount: int) -> void:
 
 func clear_content() -> void:
 	item_buttons.clear()
+	resource_buttons.clear()
 	category_buttons.clear()
 	purchase_buttons.clear()
 	research_buttons.clear()
@@ -838,7 +844,9 @@ func show_categories() -> void:
 	shop_scroll.scroll_vertical = 0
 	clear_content()
 	shop_content.add_child(create_label("CATEGORIAS", 20, Color("#f3ca85")))
-	for category in CATEGORIES:
+	var categories: Array = CATEGORIES.duplicate()
+	if economy.developer_mode: categories.append("RECURSOS")
+	for category in categories:
 		var button := create_button(category + "  >")
 		button.disabled = cycle != null and cycle.is_guided_tutorial_active() and tutorial_purchase().get("category", "") != category
 		button.pressed.connect(open_category.bind(category))
@@ -847,6 +855,7 @@ func show_categories() -> void:
 	if cycle != null: update_cycle()
 
 func open_category(category: String) -> void:
+	if category == "RECURSOS" and not economy.developer_mode: return
 	if shop_animating or (cycle != null and cycle.is_guided_tutorial_active() and tutorial_purchase().get("category", "") != category):
 		return
 	shop_title.text = category
@@ -854,6 +863,13 @@ func open_category(category: String) -> void:
 	shop_scroll.scroll_vertical = 0
 	clear_content()
 	match category:
+		"RECURSOS":
+			var interactions: Node = get_parent().get_parent().get_node("WorldInteractions")
+			for kind: String in RESOURCE_LABELS:
+				var button := create_button(RESOURCE_LABELS[kind])
+				button.pressed.connect(interactions.select_resource.bind(kind))
+				resource_buttons[kind] = button
+				shop_content.add_child(button)
 		"INVESTIGACIÓN":
 			build_research_content()
 		"EXPANSION":

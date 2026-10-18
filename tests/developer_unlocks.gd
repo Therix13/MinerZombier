@@ -1,5 +1,19 @@
 extends "res://tests/compactor.gd"
 
+func hold_shift(pressed: bool) -> void:
+	var event := InputEventKey.new()
+	event.keycode = KEY_SHIFT
+	event.physical_keycode = KEY_SHIFT
+	event.pressed = pressed
+	event.shift_pressed = pressed
+	Input.parse_input_event(event)
+	await settle()
+
+func put_resource(cell: Vector2i) -> void:
+	await mouse_move(point(cell))
+	await mouse_button(point(cell), true)
+	await mouse_button(point(cell), false)
+
 func run_checks() -> void:
 	root.show()
 	var args := OS.get_cmdline_user_args()
@@ -27,6 +41,9 @@ func run_checks() -> void:
 	var player: RefCounted = game.progression
 	shop.open_shop()
 	await wait_shop()
+	check(not shop.category_buttons.has("RECURSOS") and not mover.select_resource("coal"), "Resource spawning is absent and inaccessible outside DEV")
+	shop.open_category("RECURSOS")
+	check(shop.shop_title.text == "TIENDA", "Calling the resource category directly cannot bypass DEV")
 	shop.open_category("HERRAMIENTAS")
 	check(shop.item_buttons.is_empty() and player.visible_researches().is_empty(), "Normal level-one play hides unresearched tools and future research")
 	game.economy.toggle_developer_mode()
@@ -44,6 +61,51 @@ func run_checks() -> void:
 		check(shop.research_buttons[id].disabled and player.has_research(id), "DEV research is already unlocked: " + id)
 	game.research_technology("compactor")
 	check(player.unlocked.is_empty() and player.research_points == 0, "DEV access never buys or permanently records free research")
+	shop.show_categories()
+	check(shop.category_buttons.has("RECURSOS"), "DEV adds its Resources category to the real menu")
+	for index in range(4):
+		var kind: String = game.mining.ORE_KINDS[index]
+		shop.open_category("RECURSOS")
+		check(shop.resource_buttons.size() == 4 and shop.resource_buttons.has(kind), "Resources offers every existing material and level")
+		await settle()
+		await click_control(shop.resource_buttons[kind])
+		await wait_shop()
+		var at := Vector2i(14 + index, 1)
+		check(mover.placing_resource == kind and game.economy.coins == 0, "Selecting " + kind + " is free")
+		await put_resource(at)
+		check(game.mining.nugget_type(at) == kind and game.mining.nuggets_at(at) == 1 and not mover.placement_active(), "A real grid click places the selected " + kind)
+		shop.open_shop()
+		await wait_shop()
+	check(player.total_experience == 0 and player.research_points == 0 and game.economy.coins == 0, "Debug spawning grants no coins, EXP, or research rewards")
+	mover.select_resource("brass_2")
+	await wait_shop()
+	await put_resource(Vector2i(14, 1))
+	check(game.mining.nugget_type(Vector2i(14, 1)) == "coal" and mover.placing_resource == "brass_2", "Debug placement cannot overwrite an occupied cell")
+	await key(KEY_ESCAPE)
+	check(not mover.placement_active() and not display.menu_open, "ESC cancels the resource tool without opening pause")
+	mover.select_resource("coal_2")
+	await hold_shift(true)
+	await put_resource(Vector2i(14, 2))
+	await put_resource(Vector2i(15, 2))
+	await hold_shift(false)
+	check(game.mining.nugget_type(Vector2i(14, 2)) == "coal_2" and game.mining.nugget_type(Vector2i(15, 2)) == "coal_2" and not mover.placement_active(), "Shift places multiple resources and releasing it cancels the tool")
+	var belt_cell := Vector2i(16, 2)
+	game.conveyors.place(belt_cell, 0)
+	mover.select_resource("brass_2")
+	await put_resource(belt_cell)
+	check(game.conveyors.belts.has(belt_cell) and game.mining.nugget_type(belt_cell) == "brass_2", "DEV can place a refined nugget directly on an empty belt for factory testing")
+	mover.select_resource("coal")
+	game.cycle.is_night = true
+	await settle()
+	check(not mover.placement_active(), "Starting combat cancels a pending debug placement instead of blocking normal mine input")
+	game.cycle.is_night = false
+	clear_items()
+	shop.open_shop()
+	await wait_shop()
+	shop.open_category("RECURSOS")
+	game.economy.toggle_developer_mode()
+	check(shop.shop_title.text == "TIENDA" and not shop.category_buttons.has("RECURSOS") and shop.resource_buttons.is_empty(), "Leaving DEV removes an open Resources page and its controls")
+	game.economy.toggle_developer_mode()
 	shop.close_shop()
 	await wait_shop()
 	await buy_from_shop()
@@ -62,7 +124,9 @@ func run_checks() -> void:
 	game.research_technology("drill")
 	await key(KEY_F10)
 	check(player.is_item_unlocked("compactor") and player.unlocked.keys() == ["drill"], "DEV access coexists with legitimate research")
+	mover.select_resource("coal")
 	await key(KEY_F10)
+	check(mover.placing_resource.is_empty() and not mover.select_resource("coal"), "Leaving DEV cancels resource previews and disables spawning immediately")
 	check(player.is_item_unlocked("drill") and not player.is_item_unlocked("compactor") and player.unlocked.keys() == ["drill"], "Real research survives switching DEV on and off")
 	shop.open_shop()
 	await wait_shop()
