@@ -476,7 +476,7 @@ func update_cycle() -> void:
 		cycle_action.text = "INICIAR NOCHE"
 		cycle_action.disabled = not cycle.can_start_night() or shop_open or shop_animating
 	shop_button.disabled = tutorial or cycle.is_night or cycle.defeated
-	view_button.disabled = tutorial or cycle.is_night or cycle.defeated
+	view_button.disabled = tutorial or cycle.defeated
 	update_progression()
 
 func create_style(background: String, border: String, border_size: int, radius: int) -> StyleBoxFlat:
@@ -616,8 +616,15 @@ func build_interface() -> void:
 	view_button.offset_bottom = 78.0
 	view_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	view_button.focus_mode = Control.FOCUS_NONE
-	view_button.pressed.connect(view_toggle_requested.emit)
+	view_button.pressed.connect(request_view_toggle)
 	add_child(view_button)
+
+func request_view_toggle() -> void:
+	if cycle != null and cycle.is_night:
+		# Older built-in main scripts still lock navigation during combat.
+		get_parent().get_parent().get_node("WorldInteractions").toggle_night_view()
+	else:
+		view_toggle_requested.emit()
 
 func set_view_mode(defense_enabled: bool) -> void:
 	view_button.text = "MINA" if defense_enabled else "DEFENSIVA"

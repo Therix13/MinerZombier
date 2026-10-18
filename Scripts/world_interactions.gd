@@ -51,11 +51,22 @@ func phase_allows() -> bool:
 	var cycle: RefCounted = game.get("cycle")
 	var shop: Control = game.get("shop")
 	var victory: Control = game.get("night_victory_overlay")
-	return not get_tree().paused and not cycle.is_night and not cycle.defeated and not shop.shop_open and not shop.shop_animating and (victory == null or not victory.visible)
+	return not get_tree().paused and not cycle.defeated and not shop.shop_open and not shop.shop_animating and (victory == null or not victory.visible)
+
+func toggle_night_view() -> void:
+	if not game.get("cycle").is_night or not phase_allows():
+		return
+	clear_drag()
+	var controller: RefCounted = game.get("camera_controller")
+	controller.set_defense_view(not controller.defense_view)
+	game.get("shop").set_view_mode(controller.defense_view)
 
 func can_drop(kind: String, source: Vector2i, destination: Vector2i) -> bool:
 	if not phase_allows() or (not grid.owned_tiles.has(source) and not grid.defense_tiles.has(source)) or not has_kind(source, kind) or not game.get("cycle").allows_interaction(kind, source, destination, true):
 		return false
+	if game.get("cycle").is_night:
+		# Mine and reload during combat, while buildings remain in place.
+		return kind == "nugget" and (source == destination or game.get("launchers").can_receive(destination) or game.get("mining").can_move_nugget(destination))
 	if source == destination:
 		return true
 	if kind == "nugget":
@@ -66,6 +77,8 @@ func can_drop(kind: String, source: Vector2i, destination: Vector2i) -> bool:
 	return can_hold(destination, cell_data(source)) and can_hold(source, cell_data(destination))
 
 func swaps_contents(kind: String, source: Vector2i, destination: Vector2i) -> bool:
+	if game.get("cycle").is_night:
+		return false
 	return source != destination and not cell_data(destination).is_empty() and not (kind == "nugget" and (destination == grid.sale_cell or game.get("launchers").can_receive(destination))) and can_drop(kind, source, destination)
 
 func rotate_data(data: Dictionary, direction: int) -> void:
@@ -104,7 +117,7 @@ func drop(kind: String, source: Vector2i, destination: Vector2i, direction: int 
 				mining.changed.emit()
 				return true
 			return false
-		if cell_data(destination).is_empty():
+		if cell_data(destination).is_empty() or game.get("cycle").is_night:
 			mining.move_nugget(source, destination)
 			return true
 	var origin: Dictionary = cell_data(source)
@@ -138,9 +151,18 @@ func clear_drag() -> void:
 	game.redraw_world()
 
 func _input(event: InputEvent) -> void:
+	if game.get("cycle").is_night and event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_P or event.physical_keycode == KEY_P):
+		toggle_night_view()
+		get_viewport().set_input_as_handled()
+		return
 	if game.get("cycle").is_tutorial_active() or not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_LEFT or event.pressed or not game.get("holding_object"):
 		return
 	if not game.get("dragging_object") and event.position.distance_to(game.get("drag_start_position")) < 8.0:
+		if game.get("cycle").is_night:
+			if phase_allows() and game.get("held_object_type") == "vein":
+				game.get("mining").mine(game.get("held_object_cell"))
+			clear_drag()
+			get_viewport().set_input_as_handled()
 		return
 	var destination: Vector2i = world_cell(event.position)
 	drop(game.get("held_object_type"), game.get("held_object_cell"), destination, game.get("placement_direction"))
@@ -155,6 +177,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	var cell: Vector2i = world_cell(event.position)
 	var kind: String = pick_kind(cell, event.position)
 	if kind.is_empty(): return
+	if game.get("cycle").is_night and (kind not in ["vein", "nugget"] or (game.get("camera_controller").defense_view and grid.is_valid_cell(cell))):
+		return
 	game.set("held_object_type", kind)
 	game.set("held_object_cell", cell)
 	game.set("holding_object", true)
