@@ -126,6 +126,18 @@ func tick() -> void:
 	for destination_key in requests:
 		var destination: Vector2i = destination_key
 		var candidates: Array = requests[destination]
+		if mining.occupied_by_compactor(destination):
+			var machine: Dictionary = mining.compactors.machines[destination]
+			var remaining: int = mining.compactors.INPUT_COUNT - int(machine["count"])
+			var material: String = machine["kind"]
+			# Each incoming belt may deliver on this tick, up to the batch capacity.
+			for candidate in candidates:
+				if remaining <= 0: break
+				if not material.is_empty() and candidate["kind"] != material: continue
+				material = candidate["kind"]
+				transfers.append({"source": candidate["source"], "destination": destination, "kind": material})
+				remaining -= 1
+			continue
 		var selected: Dictionary = candidates[0]
 		if belt_shape(destination) == JUNCTION:
 			var last_entry: int = int(last_junction_entry.get(destination, 0))
