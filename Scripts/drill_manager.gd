@@ -23,7 +23,7 @@ func dispose() -> void:
 	conveyors = null
 
 func can_place(cell: Vector2i) -> bool:
-	return grid.owned_tiles.has(cell) and grid.is_valid_cell(cell) and not grid.is_defense_position(cell) and not drills.has(cell) and mining.vein_at(cell) == "" and mining.nuggets_at(cell) == 0 and not conveyors.belts.has(cell) and not mining.occupied_by_compactor(cell)
+	return grid.owned_tiles.has(cell) and grid.is_valid_cell(cell) and not grid.is_defense_position(cell) and not drills.has(cell) and mining.vein_at(cell) == "" and mining.nuggets_at(cell) == 0 and not conveyors.belts.has(cell) and not mining.occupied_by_machine(cell)
 
 func points_to_vein(cell: Vector2i, direction: int) -> bool:
 	return mining.vein_at(cell + DIRECTIONS[direction]) != ""

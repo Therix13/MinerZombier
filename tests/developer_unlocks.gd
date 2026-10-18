@@ -47,8 +47,8 @@ func run_checks() -> void:
 	shop.open_category("HERRAMIENTAS")
 	check(shop.item_buttons.is_empty() and player.visible_researches().is_empty(), "Normal level-one play hides unresearched tools and future research")
 	game.economy.toggle_developer_mode()
-	check(shop.item_buttons.keys() == ["drill", "compactor"] and shop.money_label.text == "∞ DEV", "Enabling DEV immediately refreshes the already open store")
-	check(player.level == 1 and player.research_points == 0 and player.unlocked.is_empty() and player.visible_researches().size() == 6, "DEV exposes every research tier without changing real level, points, or unlocks")
+	check(shop.item_buttons.keys() == ["drill", "compactor", "furnace"] and shop.money_label.text == "∞ DEV", "Enabling DEV immediately refreshes the already open store")
+	check(player.level == 1 and player.research_points == 0 and player.unlocked.is_empty() and player.visible_researches().size() == 7, "DEV exposes every research tier without changing real level, points, or unlocks")
 	check(not player.is_item_unlocked("unknown") and not player.has_research("unknown"), "DEV still refuses unknown item and research identifiers")
 	for category: String in shop.ITEM_CATEGORIES:
 		shop.open_category(category)
@@ -56,7 +56,7 @@ func run_checks() -> void:
 		for item in shop.item_buttons:
 			check(not shop.item_buttons[item]["button"].disabled, "DEV makes " + item + " selectable with zero coins")
 	shop.open_category("INVESTIGACIÓN")
-	check(shop.research_buttons.size() == 6, "The DEV research menu shows all six unlocks")
+	check(shop.research_buttons.size() == 7, "The DEV research menu shows all seven unlocks")
 	for id in shop.research_buttons:
 		check(shop.research_buttons[id].disabled and player.has_research(id), "DEV research is already unlocked: " + id)
 	game.research_technology("compactor")

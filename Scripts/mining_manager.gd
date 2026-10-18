@@ -11,6 +11,7 @@ const DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 var drills: RefCounted
 var conveyors: RefCounted
 var compactors: Node2D
+var furnaces: Node2D
 var grid: RefCounted
 var mining_clicks: int = COAL_CLICKS
 var coal_veins: Dictionary = {}
@@ -31,6 +32,7 @@ func dispose() -> void:
 	drills = null
 	conveyors = null
 	compactors = null
+	furnaces = null
 	grid = null
 
 func vein_at(cell: Vector2i) -> String:
@@ -63,7 +65,7 @@ func next_tier(kind: String) -> String:
 
 func can_fuse(source: Vector2i, destination: Vector2i) -> bool:
 	var kind: String = nugget_type(source)
-	return source != destination and not next_tier(kind).is_empty() and nugget_type(destination) == kind and nuggets_at(source) == 1 and nuggets_at(destination) == 1 and grid.owned_tiles.has(destination) and not grid.is_defense_position(destination) and vein_at(destination).is_empty() and not occupied_by_compactor(destination) and (drills == null or not drills.drills.has(destination))
+	return source != destination and not next_tier(kind).is_empty() and nugget_type(destination) == kind and nuggets_at(source) == 1 and nuggets_at(destination) == 1 and grid.owned_tiles.has(destination) and not grid.is_defense_position(destination) and vein_at(destination).is_empty() and not occupied_by_machine(destination) and (drills == null or not drills.drills.has(destination))
 
 func fuse(source: Vector2i, destination: Vector2i) -> bool:
 	if not can_fuse(source, destination): return false
@@ -79,6 +81,12 @@ func fuse(source: Vector2i, destination: Vector2i) -> bool:
 func occupied_by_compactor(cell: Vector2i) -> bool:
 	return is_instance_valid(compactors) and compactors.machines.has(cell)
 
+func occupied_by_furnace(cell: Vector2i) -> bool:
+	return is_instance_valid(furnaces) and furnaces.machines.has(cell)
+
+func occupied_by_machine(cell: Vector2i) -> bool:
+	return occupied_by_compactor(cell) or occupied_by_furnace(cell)
+
 func nugget_type(cell: Vector2i) -> String:
 	var inventories: Dictionary = nugget_stores()
 	for kind: String in ORE_KINDS:
@@ -86,10 +94,10 @@ func nugget_type(cell: Vector2i) -> String:
 	return ""
 
 func can_place_vein(cell: Vector2i) -> bool:
-	return grid.owned_tiles.has(cell) and grid.is_valid_cell(cell) and not grid.is_defense_position(cell) and (drills == null or not drills.drills.has(cell)) and vein_at(cell) == "" and nuggets_at(cell) == 0 and (conveyors == null or not conveyors.belts.has(cell)) and cell != grid.sale_cell and not occupied_by_compactor(cell)
+	return grid.owned_tiles.has(cell) and grid.is_valid_cell(cell) and not grid.is_defense_position(cell) and (drills == null or not drills.drills.has(cell)) and vein_at(cell) == "" and nuggets_at(cell) == 0 and (conveyors == null or not conveyors.belts.has(cell)) and cell != grid.sale_cell and not occupied_by_machine(cell)
 
 func can_move_nugget(cell: Vector2i) -> bool:
-	return grid.owned_tiles.has(cell) and (grid.is_valid_cell(cell) or grid.is_ammo_cell(cell)) and not grid.is_defense_position(cell) and (drills == null or not drills.drills.has(cell)) and vein_at(cell) == "" and nuggets_at(cell) == 0 and not occupied_by_compactor(cell)
+	return grid.owned_tiles.has(cell) and (grid.is_valid_cell(cell) or grid.is_ammo_cell(cell)) and not grid.is_defense_position(cell) and (drills == null or not drills.drills.has(cell)) and vein_at(cell) == "" and nuggets_at(cell) == 0 and not occupied_by_machine(cell)
 
 func place_vein(cell: Vector2i, direction: int, kind: String = "coal") -> bool:
 	if not grid.owned_tiles.has(cell) or not can_place_vein(cell):

@@ -36,9 +36,13 @@ const RESEARCHES := {
 		"name": "Compactador", "branch": "PROCESAMIENTO", "cost": 1, "level": 3,
 		"requires": ["drill"], "description": "Fusiona 2 pepitas del mismo material y nivel. Hasta nivel 4.",
 	},
+	"furnace": {
+		"name": "Horno", "branch": "PROCESAMIENTO", "cost": 1, "level": 3,
+		"requires": ["drill"], "description": "Desbloquea el horno. Almacena hasta 40 de combustible.",
+	},
 }
 const BASE_ITEMS := ["coal", "launcher", "defense_platforms"]
-const ITEM_RESEARCH := {"straight": "straight_belt", "drill": "drill", "brass": "brass", "corner": "curved_belts", "corner_right": "curved_belts", "corner_left": "curved_belts", "junction": "junction_belt", "compactor": "compactor"}
+const ITEM_RESEARCH := {"straight": "straight_belt", "drill": "drill", "brass": "brass", "corner": "curved_belts", "corner_right": "curved_belts", "corner_left": "curved_belts", "junction": "junction_belt", "compactor": "compactor", "furnace": "furnace"}
 # Older scenes can still refer to these names. They now resolve item unlocks.
 const TECHNOLOGIES := RESEARCHES
 

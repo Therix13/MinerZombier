@@ -124,7 +124,7 @@ func run_checks() -> void:
 	check(shop.research_buttons["drill"].disabled and shop.research_buttons["drill"].tooltip_text.contains("Desbloqueado"), "Unlocked cards show their completed state")
 	check(mining.mining_clicks == 7 and game.drills.drill_interval == 0.6 and belts.move_interval == 4.0 and game.launchers.damage_multiplier == 0.5, "Research does not change global construction statistics")
 	player.add_experience(76)
-	check(shop.research_buttons.size() == 5 and not shop.research_buttons.has("junction_belt"), "Reaching level three reveals its new research cards immediately")
+	check(shop.research_buttons.size() == 6 and not shop.research_buttons.has("junction_belt"), "Reaching level three reveals its new research cards immediately")
 	var button_id: int = shop.research_buttons["drill"].get_instance_id()
 	player.add_experience(1)
 	game.economy.add(1)

@@ -13,6 +13,7 @@ signal defense_platforms_unlocked
 signal view_toggle_requested
 signal launcher_requested
 signal drill_requested
+signal furnace_requested
 signal compactor_requested
 signal night_requested
 signal restart_requested
@@ -22,6 +23,8 @@ const DisplaySettingsScript = preload("res://Scripts/display_settings.gd")
 const TutorialGuideScript = preload("res://Scripts/tutorial_guide.gd")
 const IntroCinematicScript = preload("res://Scripts/intro_cinematic.gd")
 const WorldInteractionsScript = preload("res://Scripts/world_interactions.gd")
+const FurnaceScript = preload("res://Scripts/furnace_manager.gd")
+const InspectorScript = preload("res://Scripts/tool_inspector.gd")
 const CompactorScript = preload("res://Scripts/compactor_manager.gd")
 
 const PANEL_WIDTH := 340.0
@@ -31,7 +34,7 @@ const ANIMATION_TIME := 0.3
 const CATEGORIES := ["EXPANSION", "VETAS", "HERRAMIENTAS", "AUTOMATIZACIÓN", "DEFENSA", "INVESTIGACIÓN"]
 const ITEM_CATEGORIES := {
 	"VETAS": ["coal", "brass"],
-	"HERRAMIENTAS": ["drill", "compactor"],
+	"HERRAMIENTAS": ["drill", "compactor", "furnace"],
 	"AUTOMATIZACIÓN": ["straight", "corner_right", "corner_left", "junction"],
 }
 const RESOURCE_LABELS := {"coal": "CARBÓN · NIVEL 1", "brass": "LATÓN · NIVEL 1", "coal_2": "CARBÓN · NIVEL 2", "brass_2": "LATÓN · NIVEL 2", "coal_3": "CARBÓN · NIVEL 3", "brass_3": "LATÓN · NIVEL 3", "coal_4": "CARBÓN · NIVEL 4", "brass_4": "LATÓN · NIVEL 4"}
@@ -42,7 +45,8 @@ const RESEARCH_VIEW := {
 	"straight_belt": ["belt", "Cinta", "Transportadora"],
 	"curved_belts": ["curve", "Curvas", "Izquierda · derecha"],
 	"junction_belt": ["junction", "Unión en T", "3 entradas"],
-	"compactor": ["compactor", "Compactador", "4 → 1 · Nivel 2"],
+	"compactor": ["compactor", "Compactador", "2 → 1"],
+	"furnace": ["furnace", "Horno", "40 combustible"],
 }
 
 var economy: RefCounted
@@ -96,6 +100,7 @@ func setup(economy_manager: RefCounted, grid_manager: RefCounted) -> void:
 	build_interface()
 	economy.money_changed.connect(update_money)
 	update_money(economy.coins)
+	furnace_requested.connect(func() -> void: get_parent().get_parent().get_node("WorldInteractions").select_item("furnace"))
 	compactor_requested.connect(func() -> void: get_parent().get_parent().get_node("Compactors").buy())
 	# Older scenes can have a built-in main script. Updating main.gd alone
 	# does not update those scenes, so install the pause menu here as well.
@@ -104,6 +109,10 @@ func setup(economy_manager: RefCounted, grid_manager: RefCounted) -> void:
 
 func ensure_interactions() -> void:
 	var game: Node = get_parent().get_parent()
+	if not game.has_node("Furnaces"):
+		var furnaces := FurnaceScript.new()
+		furnaces.name = "Furnaces"
+		game.add_child(furnaces)
 	if not game.has_node("Compactors"):
 		var compactors := CompactorScript.new()
 		compactors.name = "Compactors"
@@ -112,6 +121,10 @@ func ensure_interactions() -> void:
 		var interactions := WorldInteractionsScript.new()
 		interactions.name = "WorldInteractions"
 		game.add_child(interactions)
+	if not game.has_node("ToolInspector"):
+		var inspector := InspectorScript.new()
+		inspector.name = "ToolInspector"
+		game.add_child(inspector)
 
 func ensure_pause_menu() -> void:
 	var ui_layer: CanvasLayer = get_parent() as CanvasLayer
@@ -253,7 +266,7 @@ func update_progression() -> void:
 
 func visible_shop_items(category: String = "") -> Array[String]:
 	var result: Array[String] = []
-	for item: String in ["coal", "brass", "straight", "corner_right", "corner_left", "junction", "drill", "compactor"]:
+	for item: String in ["coal", "brass", "straight", "corner_right", "corner_left", "junction", "drill", "compactor", "furnace"]:
 		if not category.is_empty() and item not in ITEM_CATEGORIES.get(category, []): continue
 		if progression == null or progression.is_item_unlocked(item): result.append(item)
 	return result
@@ -717,7 +730,7 @@ func create_art_button(kind: String, description: String, price: int = -1) -> Bu
 	row.add_child(art)
 	var short_names := {
 		"expansion": "Ampliar base", "coal": "Carbón", "brass": "Latón",
-		"drill": "Taladro", "compactor": "Compactador", "straight": "Cinta recta",
+		"drill": "Taladro", "compactor": "Compactador", "furnace": "Horno", "straight": "Cinta recta",
 		"corner_right": "Cinta L derecha", "corner_left": "Cinta L izquierda",
 		"junction": "Cinta en T", "platform": "Plataformas", "launcher": "Lanzapepitas",
 		"ore:coal": "Carbón · Nv. 1", "ore:brass": "Latón · Nv. 1",
@@ -981,6 +994,7 @@ func open_category(category: String) -> void:
 		"HERRAMIENTAS":
 			add_item_button("TALADRO AUTOMÁTICO · 200", economy.DRILL_PRICE, "drill", drill_requested)
 			add_item_button("COMPACTADOR · 300", CompactorScript.PRICE, "compactor", compactor_requested)
+			add_item_button("HORNO · 350", FurnaceScript.PRICE, "furnace", furnace_requested)
 		"AUTOMATIZACIÓN":
 			add_item_button("CINTA RECTA · 50", economy.CONVEYOR_PRICE, "straight", conveyor_requested)
 			add_item_button("CINTA EN L DERECHA · 50", economy.CONVEYOR_PRICE, "corner_right", corner_conveyor_requested)
@@ -1179,6 +1193,8 @@ class ItemPreview extends Control:
 	func _ready() -> void:
 		if kind == "compactor":
 			model = CompactorArt.new()
+		elif kind == "furnace":
+			model = FurnaceArt.new()
 		else:
 			model = ItemArt.new()
 			model.kind = kind
@@ -1189,6 +1205,13 @@ class ItemPreview extends Control:
 	func layout_model() -> void:
 		model.position = size * 0.5
 		model.scale = Vector2.ONE * minf(size.x, size.y) / 54.0
+
+class FurnaceArt extends "res://Scripts/furnace_manager.gd":
+	func _ready() -> void:
+		set_process(false)
+
+	func _draw() -> void:
+		draw_machine(Vector2.ZERO, {"fuel": 20})
 
 class CompactorArt extends "res://Scripts/compactor_manager.gd":
 	func _ready() -> void:
