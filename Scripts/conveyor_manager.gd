@@ -1,5 +1,6 @@
 extends RefCounted
 
+signal transported(source: Vector2i, destination: Vector2i, kind: String)
 signal changed
 signal sale_completed(kind: String)
 
@@ -164,8 +165,10 @@ func tick() -> void:
 		return
 	for transfer in transfers:
 		mining.remove_one_nugget(transfer["source"], transfer["kind"])
+		transported.emit(transfer["source"], transfer.get("destination", grid.sale_cell), transfer["kind"])
 	for transfer in sales:
 		mining.remove_one_nugget(transfer["source"], transfer["kind"])
+		transported.emit(transfer["source"], transfer.get("destination", grid.sale_cell), transfer["kind"])
 		sale_completed.emit(transfer["kind"])
 	for transfer in transfers:
 		if mining.occupied_by_furnace(transfer["destination"]):

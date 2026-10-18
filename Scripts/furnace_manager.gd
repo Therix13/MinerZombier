@@ -1,5 +1,6 @@
 extends Node2D
 
+signal smelted(cell: Vector2i)
 signal changed
 
 const PRICE: int = 350
@@ -100,6 +101,7 @@ func process_smelting(delta: float) -> void:
 		if float(data["elapsed"]) < PROCESS_TIME: continue
 		data["input"] = ""
 		data["output"] = "brass_ingot"
+		smelted.emit(cell)
 		data["elapsed"] = PROCESS_TIME
 		data["burning"] = false
 		changed.emit()

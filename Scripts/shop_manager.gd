@@ -128,6 +128,11 @@ func ensure_interactions() -> void:
 		inspector.name = "ToolInspector"
 		game.add_child(inspector)
 
+	if not game.has_node("WorkshopRhythm"):
+		var rhythm := preload("res://Scripts/workshop_rhythm.gd").new()
+		rhythm.name = "WorkshopRhythm"
+		game.add_child(rhythm)
+
 func ensure_pause_menu() -> void:
 	var ui_layer: CanvasLayer = get_parent() as CanvasLayer
 	if ui_layer == null or ui_layer.get_parent() == null:

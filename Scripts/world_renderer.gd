@@ -65,7 +65,11 @@ func _draw() -> void:
 			if holding_object and dragging_object and (held_object_type == "belt" or swap_bundle) and cell == held_object_cell: continue
 			var amount: int = int(items[cell])
 			if holding_object and dragging_object and held_object_type == "nugget" and cell == held_object_cell and kind == mining.nugget_type(cell): amount -= 1
-			if amount > 0: draw_nugget(grid.get_cell_rect(cell).get_center(), kind, amount)
+			if amount > 0:
+				var center: Vector2 = grid.get_cell_rect(cell).get_center()
+				var rhythm: Node = get_parent().get_node_or_null("WorkshopRhythm")
+				if rhythm != null: center = rhythm.nugget_position(cell, kind, center)
+				draw_nugget(center, kind, amount)
 	for cell in mining.brass_veins:
 		if holding_object and dragging_object and held_object_type == "vein" and cell == held_object_cell:
 			continue

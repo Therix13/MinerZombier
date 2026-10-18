@@ -1,5 +1,6 @@
 extends RefCounted
 
+signal struck(cell: Vector2i)
 signal changed
 signal sale_completed(kind: String)
 signal fusion_completed(kind: String)
@@ -133,6 +134,7 @@ func mine(cell: Vector2i) -> bool:
 		progress = 0
 	vein["progress"] = progress
 	dictionary[cell] = vein
+	struck.emit(cell)
 	changed.emit()
 	return true
 

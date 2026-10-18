@@ -1,5 +1,6 @@
 extends RefCounted
 
+signal fired(cell: Vector2i)
 signal changed
 
 const CAPACITY: int = 5
@@ -100,6 +101,7 @@ func advance(delta: float) -> void:
 		elif nearest.has_method("apply_damage"):
 			nearest.call("apply_damage", damage)
 		shots.append({"from": center, "to": target_position, "time": 0.16, "kind": kind})
+		fired.emit(cell)
 		visual_changed = true
 	if visual_changed:
 		changed.emit()
