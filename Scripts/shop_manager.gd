@@ -489,7 +489,7 @@ func build_research_content() -> void:
 	if progression == null:
 		return
 	research_summary = create_research_label("", 17, Color("#d6edb4"))
-	research_summary.tooltip_text = "Cada nivel y cada noche superada otorgan 1 punto de investigación.\nEXP: zombi +%d · carbón vendido +%d · latón vendido +%d." % [progression.ZOMBIE_EXPERIENCE, progression.SALE_EXPERIENCE["coal"], progression.SALE_EXPERIENCE["brass"]]
+	research_summary.tooltip_text = "Subir de nivel otorga 1 punto de investigación. Superar noches no otorga puntos.\nEXP: zombi +%d · carbón vendido +%d · latón vendido +%d." % [progression.ZOMBIE_EXPERIENCE, progression.SALE_EXPERIENCE["coal"], progression.SALE_EXPERIENCE["brass"]]
 	shop_content.add_child(research_summary)
 	var previous_branch: String = ""
 	var row: HBoxContainer
@@ -778,7 +778,7 @@ func update_cycle() -> void:
 
 func tutorial_purchase() -> Dictionary:
 	if cycle != null and cycle.is_research_tutorial_active():
-		return {"category": "INVESTIGACIÓN", "item": "research", "instruction": "Desbloquea un objeto a tu elección."}
+		return {"category": "INVESTIGACIÓN", "item": "research", "instruction": "Investiga la veta de latón." if progression.level == 2 else "Desbloquea un objeto a tu elección."}
 	if cycle == null or not cycle.is_tutorial_active() or cycle.needs_tutorial_income():
 		return {}
 	var game: Node = get_parent().get_parent()

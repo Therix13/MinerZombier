@@ -38,9 +38,10 @@ func run_checks() -> void:
 	game.get("launchers").place(platform)
 	for count in range(5): game.get("launchers").receive(platform, "coal")
 	cycle.tutorial_step = cycle.TUTORIAL_LAST_STEP
+	cycle.barrier_broken = true
 	game.start_night()
 	await finish_wave()
-	check(cycle.day == 2 and player.level == 2 and player.research_points == 2, "First victory combines the level-up point with the nightly point")
+	check(cycle.day == 2 and player.level == 2 and player.research_points == 1, "First victory grants only the level-up point")
 	check(game.get("night_victory_overlay").visible, "Victory stays visible before the research lesson")
 	await click_control(game.get("night_victory_continue_button"))
 	check(not game.get("night_victory_overlay").visible and cycle.is_research_tutorial_active(), "Real victory-button input reaches the day-two lesson")
@@ -69,7 +70,7 @@ func run_checks() -> void:
 	await click_control(shop.shop_button)
 	await wait_shop()
 	await click_control(shop.category_buttons["INVESTIGACIÓN"])
-	check(not shop.research_buttons["drill"].disabled and not shop.research_buttons["straight_belt"].disabled, "The player can choose either initial item research")
+	check(shop.research_buttons.keys() == ["brass"] and not shop.research_buttons["brass"].disabled, "Only the brass vein can be researched at level two")
 	shop.close_shop()
 	await wait_shop()
 	check(cycle.is_research_tutorial_active() and not cycle.can_start_night(), "Opening and closing research without spending a point does not finish the lesson")
@@ -79,8 +80,8 @@ func run_checks() -> void:
 	if DisplayServer.get_name() != "headless" and "--capture" in args:
 		await RenderingServer.frame_post_draw
 		root.get_texture().get_image().save_png("/workspace/.onboarding/display-test/research-day-two.png")
-	await click_control(shop.research_buttons["drill"])
-	check(player.has_research("drill") and not player.has_research("straight_belt") and player.research_points == 1, "Choosing the drill spends one point without forcing conveyor research")
+	await click_control(shop.research_buttons["brass"])
+	check(player.has_research("brass") and not player.has_research("drill") and player.research_points == 0, "Researching brass spends the level-up point without requiring the level-three drill")
 	check(not cycle.is_research_tutorial_active() and cycle.can_start_night() and not shop.view_button.disabled, "Either valid choice unlocks normal play and the next night")
 	shop.show_categories()
 	for category: String in shop.category_buttons:
@@ -89,10 +90,10 @@ func run_checks() -> void:
 	await wait_shop()
 	game.start_night()
 	await finish_wave()
-	check(cycle.day == 3 and player.level == 2 and player.research_points == 2, "The next victory grants another point even without a new level")
+	check(cycle.day == 3 and player.level == 2 and player.research_points == 0, "The next victory grants no point when the player has not leveled up")
 	check(not cycle.research_tutorial_pending, "The research lesson does not repeat on later days")
 	cycle.complete_night()
-	check(cycle.day == 3 and player.research_points == 2, "Repeated victory notifications cannot duplicate the nightly point")
+	check(cycle.day == 3 and player.research_points == 0, "Repeated victory notifications cannot grant research points")
 	game.free()
 	await settle()
 	print("RESULT: ", passed, " passed; ", failed, " failed; research tutorial=", scene)

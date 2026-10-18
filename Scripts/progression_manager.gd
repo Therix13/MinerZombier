@@ -8,22 +8,22 @@ signal research_unlocked(research_id: String)
 const BASE_LEVEL_EXPERIENCE: int = 50
 const LEVEL_EXPERIENCE_GROWTH: float = 1.6
 const POINTS_PER_LEVEL: int = 1
-const POINTS_PER_NIGHT: int = 1
+const POINTS_PER_NIGHT: int = 0
 const ZOMBIE_EXPERIENCE: int = 25
 const SALE_EXPERIENCE := {"coal": 1, "brass": 2, "coal_2": 2, "brass_2": 4, "coal_3": 4, "brass_3": 8, "coal_4": 8, "brass_4": 16, "brass_ingot": 16, "brass_ingot_2": 32, "brass_ingot_3": 64, "brass_ingot_4": 128}
 const RESEARCHES := {
 	"saw": {"name": "Sierra", "branch": "PROCESAMIENTO", "cost": 1, "level": 3, "requires": ["furnace"], "description": "Corta una pepita o lingote de Nv. 2–4 en dos del nivel anterior."},
 	"iron": {"name": "Hierro", "branch": "MINERÍA", "cost": 1, "level": 4, "requires": ["furnace"], "description": "Desbloquea vetas de hierro y sus lingotes."},
 	"drill": {
-		"name": "Taladro", "branch": "MINERÍA", "cost": 1, "level": 2,
+		"name": "Taladro", "branch": "MINERÍA", "cost": 1, "level": 3,
 		"requires": [], "description": "Desbloquea el taladro automático en la tienda.",
 	},
 	"brass": {
-		"name": "Latón", "branch": "MINERÍA", "cost": 1, "level": 3,
-		"requires": ["drill"], "description": "Desbloquea la veta de latón en la tienda.",
+		"name": "Latón", "branch": "MINERÍA", "cost": 1, "level": 2,
+		"requires": [], "description": "Desbloquea la veta de latón en la tienda.",
 	},
 	"straight_belt": {
-		"name": "Cinta transportadora", "branch": "LOGÍSTICA", "cost": 1, "level": 2,
+		"name": "Cinta transportadora", "branch": "LOGÍSTICA", "cost": 1, "level": 3,
 		"requires": [], "description": "Desbloquea la cinta recta en la tienda.",
 	},
 	"curved_belts": {
@@ -81,6 +81,7 @@ func award_sale(kind: String) -> void:
 	add_experience(int(SALE_EXPERIENCE.get(kind.replace("iron", "brass"), 0)))
 
 func award_night() -> void:
+	if POINTS_PER_NIGHT == 0: return
 	research_points += POINTS_PER_NIGHT
 	changed.emit()
 
