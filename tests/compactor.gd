@@ -81,7 +81,7 @@ func run_checks() -> void:
 		shop.close_shop()
 		await wait_shop()
 	await buy_from_shop()
-	check(compactors.placing and game.economy.coins == coins - compactors.PRICE, "A real shop click purchases the compactor at its listed price")
+	check(compactors.placing and game.economy.coins == coins, "A real shop click selects the compactor without charging")
 	await key(KEY_BACKSPACE)
 	check(not compactors.placing and game.economy.coins == coins, "Cancelling machine placement refunds the purchase exactly once")
 	await key(KEY_BACKSPACE)

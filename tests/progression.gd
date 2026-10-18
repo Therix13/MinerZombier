@@ -134,7 +134,7 @@ func run_checks() -> void:
 	shop.open_category("BASE")
 	check(not shop.item_buttons["drill"]["button"].disabled and not shop.item_buttons["brass"]["button"].disabled, "Unlocked items become purchasable without reopening the game")
 	shop.item_buttons["drill"]["button"].pressed.emit()
-	check(game.placing_drill and game.economy.coins == before_coins + 1 - 200, "An unlocked store item still costs its normal coins")
+	check(game.placing_drill and game.economy.coins == before_coins + 1, "Selecting an unlocked store item leaves coins available until placement")
 	game.cancel_placement()
 	await create_timer(0.4).timeout
 	shop.open_shop()

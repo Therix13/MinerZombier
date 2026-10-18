@@ -214,6 +214,91 @@ func clear_drag() -> void:
 func placement_active() -> bool:
 	return game.get("placing_coal") or game.get("placing_brass") or game.get("placing_belt") or game.get("placing_drill") or game.get("placing_launcher") or game.get_node("Compactors").placing
 
+func selected_item() -> String:
+	if game.get("placing_coal"): return "coal"
+	if game.get("placing_brass"): return "brass"
+	if game.get("placing_belt"): return game.get("belt_shape")
+	if game.get("placing_drill"): return "drill"
+	if game.get("placing_launcher"): return "launcher"
+	if game.get_node("Compactors").placing: return "compactor"
+	return ""
+
+func item_price(item: String) -> int:
+	var economy: RefCounted = game.get("economy")
+	match item:
+		"coal": return economy.COAL_VEIN_PRICE
+		"brass": return economy.BRASS_VEIN_PRICE
+		"straight", "corner_right", "corner_left", "junction": return economy.CONVEYOR_PRICE
+		"drill": return economy.DRILL_PRICE
+		"launcher": return 0 if game.get("cycle").free_launcher_available else economy.LAUNCHER_PRICE
+		"compactor": return game.get_node("Compactors").PRICE
+	return -1
+
+func select_item(item: String) -> bool:
+	var cycle: RefCounted = game.get("cycle")
+	var shop: Control = game.get("shop")
+	var action: String = "buy_conveyor" if item in ["straight", "corner_right", "corner_left", "junction"] else "buy_" + item
+	if get_tree().paused or cycle.is_night or cycle.defeated or not cycle.allows_action(action) or not shop.tutorial_allows_item(item) or not game.get("progression").is_item_unlocked(item): return false
+	var price: int = item_price(item)
+	if price < 0 or not game.get("economy").can_afford(price): return false
+	cancel_active()
+	game.set("placement_paid", false)
+	game.set("placement_direction", 1)
+	match item:
+		"coal": game.set("placing_coal", true)
+		"brass": game.set("placing_brass", true)
+		"straight", "corner_right", "corner_left", "junction":
+			game.set("placing_belt", true)
+			game.set("belt_shape", item)
+		"drill": game.set("placing_drill", true)
+		"launcher":
+			game.set("placing_launcher", true)
+			game.set("placing_free_launcher", cycle.free_launcher_available)
+		"compactor":
+			game.get_node("Compactors").placing = true
+			game.get_node("Compactors").paid = false
+			game.get_node("Compactors").direction = 1
+	shop.close_shop()
+	game.redraw_world()
+	return true
+
+func place_selected(cell: Vector2i) -> bool:
+	var item: String = selected_item()
+	var cycle: RefCounted = game.get("cycle")
+	var placing: String = item if item in ["coal", "launcher"] else ("belt" if game.get("placing_belt") else "other")
+	if item.is_empty() or not phase_allows() or cycle.is_night or not cycle.allows_world_press(cell, placing): return false
+	var valid: bool = false
+	match item:
+		"coal", "brass": valid = game.get("mining").can_place_vein(cell) and not game.get("launchers").launchers.has(cell)
+		"straight", "corner_right", "corner_left", "junction": valid = game.get("conveyors").can_place(cell)
+		"drill": valid = game.get("drills").can_place(cell) and not game.get("launchers").launchers.has(cell)
+		"launcher": valid = game.get("launchers").can_place(cell)
+		"compactor": valid = game.get_node("Compactors").can_place(cell)
+	if not valid: return false
+	var economy: RefCounted = game.get("economy")
+	var price: int = item_price(item)
+	# Compatibility with older embedded controllers that prepaid a direct buy call.
+	var prepaid: bool = game.get_node("Compactors").paid if item == "compactor" else game.get("placement_paid")
+	if not prepaid and not economy.spend(price): return false
+	var direction: int = game.get("placement_direction")
+	match item:
+		"coal", "brass": game.get("mining").place_vein(cell, direction, item)
+		"straight", "corner_right", "corner_left", "junction": game.get("conveyors").place(cell, direction, item)
+		"drill": game.get("drills").place(cell, direction)
+		"launcher":
+			game.get("launchers").place(cell)
+			cycle.use_free_launcher()
+			game.set("placing_free_launcher", false)
+		"compactor": game.get_node("Compactors").place(cell, game.get_node("Compactors").direction)
+	game.set("placement_paid", false)
+	game.get_node("Compactors").paid = false
+	if cycle.is_guided_tutorial_active() or not Input.is_key_pressed(KEY_SHIFT) or not economy.can_afford(item_price(item)):
+		cancel_active()
+	else:
+		shift_batch = true
+	game.redraw_world()
+	return true
+
 func cancel_active() -> bool:
 	if not placement_active() and not game.get("holding_object"): return false
 	game.cancel_placement()
@@ -257,6 +342,10 @@ func _input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if placement_active() and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		place_selected(world_cell(event.position))
+		get_viewport().set_input_as_handled()
+		return
 	if game.get("camera_controller").transitioning and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		get_viewport().set_input_as_handled()
 		return

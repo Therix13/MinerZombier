@@ -194,32 +194,10 @@ func buy_expansion() -> void:
 	shop.close_shop()
 
 func buy_brass_vein() -> void:
-	if not progression.is_item_unlocked("brass"):
-		return
-	if not cycle.allows_action("buy_brass"):
-		return
-	if cycle.is_night or cycle.defeated:
-		return
-	if placing_coal or placing_brass or placing_belt or placing_drill or placing_launcher or not economy.spend(economy.BRASS_VEIN_PRICE):
-		return
-	placement_paid = not economy.developer_mode
-	placing_brass = true
-	placement_direction = 1
-	shop.close_shop()
-	redraw_world()
+	get_node("WorldInteractions").select_item("brass")
 
 func buy_coal_vein() -> void:
-	if not cycle.allows_action("buy_coal"):
-		return
-	if cycle.is_night or cycle.defeated:
-		return
-	if placing_coal or placing_brass or placing_belt or placing_drill or placing_launcher or not economy.spend(economy.COAL_VEIN_PRICE):
-		return
-	placement_paid = not economy.developer_mode
-	placing_coal = true
-	placement_direction = 1
-	shop.close_shop()
-	redraw_world()
+	get_node("WorldInteractions").select_item("coal")
 
 func buy_conveyor() -> void:
 	buy_belt("straight")
@@ -234,35 +212,10 @@ func buy_junction_conveyor() -> void:
 	buy_belt("junction")
 
 func buy_belt(shape: String) -> void:
-	if not progression.is_item_unlocked(shape):
-		return
-	if not cycle.allows_action("buy_conveyor") or (cycle.is_tutorial_active() and shape != "straight"):
-		return
-	if cycle.is_night or cycle.defeated:
-		return
-	if placing_coal or placing_brass or placing_belt or placing_drill or placing_launcher or not economy.spend(economy.CONVEYOR_PRICE):
-		return
-	placement_paid = not economy.developer_mode
-	placing_belt = true
-	belt_shape = shape
-	placement_direction = 1
-	shop.close_shop()
-	redraw_world()
+	get_node("WorldInteractions").select_item(shape)
 
 func buy_drill() -> void:
-	if not progression.is_item_unlocked("drill"):
-		return
-	if not cycle.allows_action("buy_drill"):
-		return
-	if cycle.is_night or cycle.defeated:
-		return
-	if placing_coal or placing_brass or placing_belt or placing_drill or placing_launcher or not economy.spend(economy.DRILL_PRICE):
-		return
-	placement_paid = not economy.developer_mode
-	placing_drill = true
-	placement_direction = 1
-	shop.close_shop()
-	redraw_world()
+	get_node("WorldInteractions").select_item("drill")
 
 func buy_left_defense_tile() -> void:
 	buy_defense_tile("left")
@@ -290,19 +243,7 @@ func buy_defense_tile(_side: String) -> void:
 	shop.close_shop()
 
 func buy_launcher() -> void:
-	if not cycle.allows_action("buy_launcher"):
-		return
-	if cycle.is_night or cycle.defeated:
-		return
-	if placing_coal or placing_brass or placing_belt or placing_drill or placing_launcher:
-		return
-	placing_free_launcher = cycle.free_launcher_available
-	if not placing_free_launcher and not economy.spend(economy.LAUNCHER_PRICE):
-		return
-	placement_paid = not placing_free_launcher and not economy.developer_mode
-	placing_launcher = true
-	shop.close_shop()
-	redraw_world()
+	get_node("WorldInteractions").select_item("launcher")
 
 func cancel_placement() -> void:
 	if placing_launcher:
@@ -329,18 +270,6 @@ func cancel_placement() -> void:
 	else:
 		return
 	placement_paid = false
-	redraw_world()
-
-func complete_placement(price: int) -> void:
-	if not cycle.is_tutorial_active() and Input.is_key_pressed(KEY_SHIFT) and economy.spend(price):
-		placement_paid = not economy.developer_mode
-	else:
-		placing_coal = false
-		placing_brass = false
-		placing_belt = false
-		placing_drill = false
-		placing_launcher = false
-		placement_paid = false
 	redraw_world()
 
 func on_sale_completed(kind: String) -> void:
@@ -398,28 +327,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		var placing: String = "launcher" if placing_launcher else ("coal" if placing_coal else ("belt" if placing_belt else ("other" if placing_brass or placing_drill else "")))
 		if not cycle.allows_world_press(cell, placing):
 			return
-		if placing_launcher:
-			if launchers.place(cell):
-				if placing_free_launcher:
-					cycle.use_free_launcher()
-					placing_free_launcher = false
-				complete_placement(economy.LAUNCHER_PRICE)
-			return
-		if placing_brass:
-			if not launchers.launchers.has(cell) and not conveyors.belts.has(cell) and not drills.drills.has(cell) and mining.place_vein(cell, placement_direction, "brass"):
-				complete_placement(economy.BRASS_VEIN_PRICE)
-			return
-		if placing_coal:
-			if not launchers.launchers.has(cell) and not conveyors.belts.has(cell) and not drills.drills.has(cell) and mining.place_vein(cell, placement_direction):
-				complete_placement(economy.COAL_VEIN_PRICE)
-			return
-		if placing_drill:
-			if not launchers.launchers.has(cell) and drills.place(cell, placement_direction):
-				complete_placement(economy.DRILL_PRICE)
-			return
-		if placing_belt:
-			if conveyors.place(cell, placement_direction, belt_shape):
-				complete_placement(economy.CONVEYOR_PRICE)
+		if get_node("WorldInteractions").placement_active():
+			get_node("WorldInteractions").place_selected(cell)
 			return
 		if mining.nuggets_at(cell) > 0:
 			held_object_type = "nugget"

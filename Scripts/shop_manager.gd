@@ -904,8 +904,11 @@ func request_item(item: String, request: Signal) -> void:
 		return
 	if cycle != null and (cycle.is_night or cycle.defeated or not tutorial_allows_item(item)):
 		return
-	var compactors: Node = get_parent().get_parent().get_node_or_null("Compactors")
-	if compactors != null: compactors.cancel_placement()
+	var interactions: Node = get_parent().get_parent().get_node("WorldInteractions")
+	if interactions.item_price(item) >= 0:
+		interactions.select_item(item)
+		return
+	interactions.cancel_active()
 	request.emit()
 
 func refresh_item_buttons() -> void:
@@ -943,7 +946,7 @@ func open_shop() -> void:
 	shop_open = true
 	shop_animating = true
 	shop_button.hide()
-	money_box.hide()
+	money_box.show()
 	animate_shop(true)
 	if cycle != null:
 		update_cycle()
@@ -967,6 +970,9 @@ func animate_shop(opened: bool) -> void:
 	var right: float = 0.0 if opened else PANEL_WIDTH
 	tween.parallel().tween_property(shop_panel, "offset_left", left, ANIMATION_TIME)
 	tween.parallel().tween_property(shop_panel, "offset_right", right, ANIMATION_TIME)
+	var money_right: float = -PANEL_WIDTH - 12.0 if opened else -TOGGLE_SIZE - 27.0
+	tween.parallel().tween_property(money_box, "offset_right", money_right, ANIMATION_TIME)
+	tween.parallel().tween_property(money_box, "offset_left", money_right - MONEY_BOX_WIDTH, ANIMATION_TIME)
 	tween.finished.connect(finish_animation)
 
 func finish_animation() -> void:

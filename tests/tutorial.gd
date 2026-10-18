@@ -175,7 +175,7 @@ func run_checks() -> void:
 	shop._on_cycle_action()
 	check(not game.placing_coal and game.economy.coins == 500 and not shop.cycle_action.visible, "The tutorial card cannot purchase an item directly")
 	await purchase_route("BASE", "coal")
-	check(game.get("placing_coal") and game.get("economy").coins == 400, "The real store buys one coal vein")
+	check(game.get("placing_coal") and game.get("economy").coins == 500, "The real store selects a coal vein without charging")
 	if not game.get("placing_coal"):
 		quit(1)
 		return
