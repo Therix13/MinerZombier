@@ -8,6 +8,7 @@ const MAX_HEALTH: float = 3.0
 const MOVEMENT_SPEED: float = 35.0
 const ATTACK_INTERVAL: float = 2.0
 const ATTACK_DAMAGE: float = 1.0
+const DISMEMBERMENT_CHANCE: float = 0.25
 
 var health: float = MAX_HEALTH
 var max_health: float = MAX_HEALTH
@@ -16,12 +17,15 @@ var walking_time: float = 0.0
 var attacking: bool = false
 var attack_timer: float = ATTACK_INTERVAL
 var hit_flash: float = 0.0
+var limbs: Array[String] = ["left_arm", "right_arm", "left_leg", "right_leg"]
+var random := RandomNumberGenerator.new()
 
 func setup(start_position: Vector2, target_position: Vector2, starting_health: float = MAX_HEALTH) -> void:
 	position = start_position
 	destination = target_position
 	max_health = maxf(0.5, starting_health)
 	health = max_health
+	limbs.assign(["left_arm", "right_arm", "left_leg", "right_leg"])
 
 func _ready() -> void:
 	add_to_group("zombies")
@@ -51,9 +55,11 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func take_damage(amount: float) -> void:
-	if health <= 0.0:
+	if health <= 0.0 or amount <= 0.0:
 		return
+	var received: float = minf(health, amount)
 	health = maxf(0.0, health - amount)
+	show_hit(received)
 	if health <= 0.0:
 		remove_from_group("zombies")
 		set_process(false)
@@ -65,18 +71,71 @@ func take_damage(amount: float) -> void:
 func apply_damage(amount: float) -> void:
 	take_damage(amount)
 
+func show_hit(amount: float) -> void:
+	if not is_inside_tree(): return
+	var effect := HitEffect.new()
+	effect.amount = amount
+	if not limbs.is_empty() and random.randf() < DISMEMBERMENT_CHANCE:
+		effect.limb = limbs.pop_at(random.randi_range(0, limbs.size() - 1))
+		effect.limb_position = Vector2(-8 if effect.limb.begins_with("left") else 8, 12 if effect.limb.ends_with("arm") else 18)
+		effect.velocity = Vector2(random.randf_range(-45, 45), -65)
+		effect.spin = random.randf_range(-5, 5)
+	# The effect belongs to the battlefield so fatal hits remain visible.
+	get_parent().add_child(effect)
+	effect.global_transform = global_transform
+	effect.z_index = z_index + 1
+	queue_redraw()
+
 func _draw() -> void:
 	var bob: float = 0.0 if attacking else sin(walking_time) * 1.5
 	var body_center := Vector2(0.0, bob)
 	var arm_color := Color("#a9b86c") if hit_flash > 0.0 else Color("#849c66")
 	draw_circle(body_center + Vector2(1.0, 11.0), 13.0, Color(0.0, 0.0, 0.0, 0.21))
+	if "left_leg" in limbs: draw_rect(Rect2(Vector2(-7, 14 + bob), Vector2(5, 9)), Color("#556d43"))
+	if "right_leg" in limbs: draw_rect(Rect2(Vector2(2, 14 + bob), Vector2(5, 9)), Color("#556d43"))
 	draw_rect(Rect2(Vector2(-8.0, 1.0 + bob), Vector2(16.0, 16.0)), Color("#394b35"))
-	draw_rect(Rect2(Vector2(-11.0, 6.0 + bob), Vector2(6.0, 13.0)), arm_color)
-	draw_rect(Rect2(Vector2(5.0, 6.0 + bob), Vector2(6.0, 13.0)), arm_color)
+	if "left_arm" in limbs: draw_rect(Rect2(Vector2(-11.0, 6.0 + bob), Vector2(6.0, 13.0)), arm_color)
+	if "right_arm" in limbs: draw_rect(Rect2(Vector2(5.0, 6.0 + bob), Vector2(6.0, 13.0)), arm_color)
 	draw_circle(body_center + Vector2(0.0, -6.0), 11.0, Color("#202e24"))
 	draw_circle(body_center + Vector2(0.0, -7.0), 9.0, Color("#8aab6a"))
 	draw_rect(Rect2(Vector2(-6.0, -9.0 + bob), Vector2(4.0, 3.0)), Color("#ecde83"))
 	draw_rect(Rect2(Vector2(2.0, -9.0 + bob), Vector2(4.0, 3.0)), Color("#ecde83"))
 	draw_line(Vector2(-3.0, -1.0 + bob), Vector2(3.0, -1.0 + bob), Color("#384b36"), 2.0)
-	draw_rect(Rect2(Vector2(-15.0, -23.0), Vector2(30.0, 4.0)), Color("#351d1d"))
-	draw_rect(Rect2(Vector2(-15.0, -23.0), Vector2(30.0 * health / max_health, 4.0)), Color("#c45143"))
+
+class HitEffect extends Node2D:
+	var amount: float
+	var limb: String = ""
+	var age: float = 0.0
+	var velocity := Vector2.ZERO
+	var limb_position := Vector2.ZERO
+	var spin: float = 0.0
+	var angle: float = 0.0
+
+	func _process(delta: float) -> void:
+		age += delta
+		if age >= (1.0 if limb.is_empty() else 2.5):
+			queue_free()
+			return
+		if not limb.is_empty():
+			velocity.y += 180 * delta
+			limb_position += velocity * delta
+			angle += spin * delta
+			if limb_position.y > 18:
+				limb_position.y = 18
+				velocity = Vector2.ZERO
+				spin = 0.0
+		queue_redraw()
+
+	func _draw() -> void:
+		if age < 1.0:
+			var label: String = String.num(amount, 2).rstrip("0").rstrip(".")
+			var font: Font = ThemeDB.fallback_font
+			var at := Vector2(-font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x * 0.5, -27 - age * 30)
+			var opacity: float = clampf((1.0 - age) * 3, 0, 1)
+			draw_string_outline(font, at, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 4, Color(0.1, 0.08, 0.06, opacity))
+			draw_string(font, at, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(1.0, 0.85, 0.55, opacity))
+		if not limb.is_empty():
+			draw_set_transform(limb_position, angle)
+			var color := Color("#849c66") if limb.ends_with("arm") else Color("#556d43")
+			color.a = clampf((2.5 - age) * 2, 0, 1)
+			draw_rect(Rect2(Vector2(-3, -6), Vector2(6, 12)), color)
