@@ -7,7 +7,7 @@ func finish_wave() -> void:
 		manager.spawn_zombie()
 	for enemy in get_nodes_in_group("zombies"):
 		enemy.take_damage(100.0)
-	manager._process(0.01)
+	manager._process(3.0)
 	await settle()
 
 func run_checks() -> void:

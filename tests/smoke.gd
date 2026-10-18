@@ -81,7 +81,7 @@ func run_checks() -> void:
 	manager.call("spawn_zombie")
 	for zombie in get_nodes_in_group("zombies"):
 		zombie.call("take_damage", 100.0)
-	manager.call("_process", 0.01)
+	manager.call("_process", 3.0)
 	check(cycle.get("day") == 2 and not cycle.get("is_night"), "Cleared wave advances to day 2")
 	var popup: Control = game.get("night_victory_overlay")
 	check(popup != null, "Both scenes use the shared controller with victory popup")

@@ -12,6 +12,7 @@ const SPAWN_DISTANCE: float = 225.0
 const SPAWN_HEIGHT: float = -590.0
 const ATTACK_LINE_Y: float = -28.0
 const BASE_MAX_HEALTH: float = 100.0
+const WAVE_END_DELAY: float = 3.0
 
 var grid: RefCounted
 var spawn_timer: float = 0.0
@@ -21,6 +22,7 @@ var wave_total: int = 0
 var wave_day: int = 1
 var active_wave: bool = false
 var base_health: float = BASE_MAX_HEALTH
+var cleared_time: float = 0.0
 
 func setup(grid_manager: RefCounted) -> void:
 	grid = grid_manager
@@ -35,6 +37,7 @@ func start_wave(day: int) -> void:
 	spawn_count = 0
 	spawn_from_left = true
 	spawn_timer = SPAWN_INTERVAL
+	cleared_time = 0.0
 	active_wave = true
 	spawn_zombie()
 
@@ -47,8 +50,13 @@ func _process(delta: float) -> void:
 			spawn_timer = SPAWN_INTERVAL
 			spawn_zombie()
 	if spawn_count >= wave_total and get_tree().get_nodes_in_group("zombies").is_empty():
-		active_wave = false
-		wave_completed.emit()
+		cleared_time += delta
+		if cleared_time >= WAVE_END_DELAY:
+			active_wave = false
+			cleared_time = 0.0
+			wave_completed.emit()
+	else:
+		cleared_time = 0.0
 
 func spawn_zombie() -> void:
 	if not active_wave or spawn_count >= wave_total:

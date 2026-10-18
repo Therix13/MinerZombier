@@ -164,7 +164,7 @@ func run_checks() -> void:
 	await toggle_key()
 	await wait_for_view()
 	game.launchers.advance(4.0)
-	manager._process(0.01)
+	manager._process(3.0)
 	await settle()
 	check(game.cycle.day == 3 and not game.cycle.is_night and game.night_victory_overlay.visible, "The reloaded sixth shot completes the second night normally")
 	check(not guide.resupply_active(), "The last killing shot does not show an empty-ammo lesson after victory")

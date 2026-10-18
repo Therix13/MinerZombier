@@ -236,7 +236,7 @@ func run_checks() -> void:
 	manager.call("spawn_zombie")
 	for enemy in get_nodes_in_group("zombies"):
 		enemy.call("take_damage", 100.0)
-	manager.call("_process", 0.01)
+	manager.call("_process", 3.0)
 	await settle()
 	await click_control(game.get("night_victory_continue_button"))
 	await settle()

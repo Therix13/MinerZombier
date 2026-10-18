@@ -312,7 +312,7 @@ func announce_researches(research_ids: Array[String]) -> void:
 func update_notice_visibility() -> void:
 	if research_notice == null or notice_research_ids.is_empty(): return
 	var victory: Control = get_parent().get_parent().get("night_victory_overlay")
-	if victory != null and victory.visible:
+	if (cycle != null and (cycle.is_night or cycle.defeated)) or (victory != null and victory.visible):
 		research_notice.hide()
 		research_notice_backdrop.hide()
 		research_notice_timer.stop()
