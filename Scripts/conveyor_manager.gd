@@ -55,7 +55,7 @@ func place(cell: Vector2i, direction: int, shape: String = STRAIGHT) -> bool:
 	return true
 
 func move(source: Vector2i, destination: Vector2i, direction: int) -> bool:
-	if not belts.has(source):
+	if not belts.has(source) or mining.nuggets_at(source) > 0:
 		return false
 	if source != destination and not can_place(destination):
 		return false

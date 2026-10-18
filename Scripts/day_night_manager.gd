@@ -18,7 +18,7 @@ const TUTORIAL_ACTIONS := [
 ]
 const TUTORIAL_TITLES := [
 	"Tu primera veta", "Del carbón a las monedas", "Haz sitio para crecer",
-	"Prepara las defensas", "Tu primer lanzapapas",
+	"Prepara las defensas", "Tu primer Lanzapepitas",
 	"Carga la munición", "¡Todo listo!",
 ]
 const TUTORIAL_LAST_STEP: int = 6
@@ -160,12 +160,15 @@ func tutorial_text() -> String:
 		3:
 			return "Desbloquea las dos plataformas para defender la entrada."
 		4:
-			return "Obtén tu lanzapapas gratuito y colócalo en la plataforma dorada."
+			return "Obtén tu Lanzapepitas gratuito y colócalo en la plataforma dorada."
 		5:
 			if mining.nuggets_at(TUTORIAL_ORE_CELL) > 0:
-				return "Arrastra la pepita al lanzapapas marcado. Necesitas cargar 4 en total."
-			return "Extrae carbón de tu veta y arrástralo al lanzapapas: 4 pepitas preparan la primera noche."
+				return "Arrastra la pepita al Lanzapepitas marcado. Necesitas cargar 4 en total."
+			return "Extrae carbón de tu veta y arrástralo al Lanzapepitas: 4 pepitas preparan la primera noche."
 	return "¡Preparación lista! Inicia la primera noche."
+
+func needs_defense_warning() -> bool:
+	return day == 4 and not is_night and not defeated and launchers.launchers.size() < 2
 
 func can_start_night() -> bool:
 	return not is_night and not defeated and not launchers.launchers.is_empty() and has_ammo() and (day > 1 or tutorial_step >= TUTORIAL_LAST_STEP)

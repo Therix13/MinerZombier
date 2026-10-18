@@ -64,6 +64,8 @@ func toggle_night_view() -> void:
 func can_drop(kind: String, source: Vector2i, destination: Vector2i) -> bool:
 	if not phase_allows() or (not grid.owned_tiles.has(source) and not grid.defense_tiles.has(source)) or not has_kind(source, kind) or not game.get("cycle").allows_interaction(kind, source, destination, true):
 		return false
+	if kind == "belt" and loaded_belt(source):
+		return false
 	if game.get("cycle").is_night:
 		# Mine and reload during combat, while buildings remain in place.
 		return kind == "nugget" and (source == destination or game.get("launchers").can_receive(destination) or game.get("mining").can_move_nugget(destination))
@@ -72,14 +74,20 @@ func can_drop(kind: String, source: Vector2i, destination: Vector2i) -> bool:
 	if kind == "nugget":
 		if destination == grid.sale_cell or game.get("launchers").can_receive(destination):
 			return true
-		if cell_data(destination).is_empty():
-			return game.get("mining").can_move_nugget(destination)
+		if game.get("mining").can_move_nugget(destination):
+			return true
+	# Swapping another object must not move a loaded conveyor indirectly.
+	if loaded_belt(source) or loaded_belt(destination):
+		return false
 	return can_hold(destination, cell_data(source)) and can_hold(source, cell_data(destination))
+
+func loaded_belt(cell: Vector2i) -> bool:
+	return game.get("conveyors").belts.has(cell) and game.get("mining").nuggets_at(cell) > 0
 
 func swaps_contents(kind: String, source: Vector2i, destination: Vector2i) -> bool:
 	if game.get("cycle").is_night:
 		return false
-	return source != destination and not cell_data(destination).is_empty() and not (kind == "nugget" and (destination == grid.sale_cell or game.get("launchers").can_receive(destination))) and can_drop(kind, source, destination)
+	return source != destination and not cell_data(destination).is_empty() and not (kind == "nugget" and (destination == grid.sale_cell or game.get("launchers").can_receive(destination) or game.get("mining").can_move_nugget(destination))) and can_drop(kind, source, destination)
 
 func rotate_data(data: Dictionary, direction: int) -> void:
 	for kind in ["coal_vein", "brass_vein", "belt"]:
@@ -117,7 +125,7 @@ func drop(kind: String, source: Vector2i, destination: Vector2i, direction: int 
 				mining.changed.emit()
 				return true
 			return false
-		if cell_data(destination).is_empty() or game.get("cycle").is_night:
+		if mining.can_move_nugget(destination):
 			mining.move_nugget(source, destination)
 			return true
 	var origin: Dictionary = cell_data(source)
@@ -131,13 +139,10 @@ func drop(kind: String, source: Vector2i, destination: Vector2i, direction: int 
 func world_cell(point: Vector2) -> Vector2i:
 	return grid.world_to_cell(game.get_global_transform_with_canvas().affine_inverse() * point)
 
-func pick_kind(cell: Vector2i, point: Vector2) -> String:
+func pick_kind(cell: Vector2i, _point: Vector2) -> String:
 	var mining: RefCounted = game.get("mining")
-	var local: Vector2 = game.get_global_transform_with_canvas().affine_inverse() * point
 	if mining.nuggets_at(cell) > 0:
-		# The center picks up ore; the edge (or Shift) picks up its conveyor.
-		if not game.get("conveyors").belts.has(cell) or (local.distance_to(grid.get_cell_rect(cell).get_center()) <= 14.0 and not Input.is_key_pressed(KEY_SHIFT)):
-			return "nugget"
+		return "nugget"
 	if mining.vein_at(cell) != "": return "vein"
 	if game.get("drills").drills.has(cell): return "drill"
 	if game.get("launchers").launchers.has(cell): return "launcher"

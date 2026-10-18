@@ -93,10 +93,22 @@ func run_checks() -> void:
 			clear_items()
 			put(a, samples[first])
 			put(b, samples[second])
-			check(mover.can_drop(types[first], a, b) and mover.drop(types[first], a, b, 3) and mover.cell_data(a) == samples[second] and mover.cell_data(b) == samples[first], "Swap %d/%d preserves both complete items and their resources" % [first, second])
+			if first == 3 or second == 3:
+				check(not mover.can_drop(types[first], a, b) and not mover.drop(types[first], a, b, 3) and mover.cell_data(a) == samples[first] and mover.cell_data(b) == samples[second], "Swap %d/%d cannot displace a loaded belt in either cell" % [first, second])
+			else:
+				check(mover.can_drop(types[first], a, b) and mover.drop(types[first], a, b, 3) and mover.cell_data(a) == samples[second] and mover.cell_data(b) == samples[first], "Swap %d/%d preserves both complete items and their resources" % [first, second])
 	check(game.economy.coins == coins and game.progression.total_experience == 0, "Swapping never grants coins or EXP")
 	var before: Dictionary = mover.cell_data(a)
 	check(not mover.drop("nugget", a, Vector2i(0, 0)) and mover.cell_data(a) == before, "A rejected swap outside owned land preserves all contents")
+	for ore: String in ["coal", "brass"]:
+		clear_items()
+		put(a, {"belt": {"direction": 1, "shape": "junction"}, "entry": 2, ore: 2})
+		before = mover.cell_data(a)
+		check(not mover.drop("belt", a, b) and not game.conveyors.move(a, b, 3) and not game.conveyors.move(a, a, 3) and mover.cell_data(a) == before, "A belt carrying %s cannot move or rotate through either manager" % ore)
+		put(b, {"belt": {"direction": 0, "shape": "straight"}})
+		check(not mover.swaps_contents("nugget", a, b) and mover.drop("nugget", a, b) and game.mining.nuggets_at(a) == 1 and game.mining.nuggets_at(b) == 1 and game.conveyors.belt_shape(a) == "junction" and game.conveyors.belt_shape(b) == "straight", "Ore can be removed onto another belt without moving either conveyor")
+		game.mining.remove_one_nugget(a, ore)
+		check(game.conveyors.move(a, a, 2) and mover.drop("belt", a, Vector2i(15, 2)) and game.conveyors.belts.has(Vector2i(15, 2)), "A cleared belt becomes movable again")
 	clear_items()
 	game.grid.purchase_defense_platforms()
 	var left: Vector2i = game.grid.defense_cell("left")
@@ -122,6 +134,7 @@ func run_checks() -> void:
 	game.cycle.tutorial_step = 1
 	check(not mover.drop("nugget", a, b), "Tutorial restrictions also apply to swaps")
 	game.cycle.day = 2
+	check_defense_warning()
 	clear_items()
 	put(a, {"belt": {"direction": 1, "shape": "straight"}})
 	put(b, {"coal": 1})
@@ -134,7 +147,9 @@ func run_checks() -> void:
 	put(a, {"belt": {"direction": 1, "shape": "straight"}, "coal": 1})
 	put(b, {"brass_vein": {"direction": 2, "progress": 5}})
 	await drag(a, b, Vector2(18, 0))
-	check(game.conveyors.belts.has(b) and game.mining.nuggets_at(b) == 1 and game.mining.brass_veins[a]["progress"] == 5, "Dragging the edge moves a loaded belt and swaps the destination vein back intact")
+	check(game.conveyors.belts.has(a) and game.mining.nuggets_at(a) == 1 and game.mining.brass_veins[b]["progress"] == 5 and not game.holding_object, "Dragging the edge cannot move a loaded belt or swap its destination")
+	await drag(a, Vector2i(15, 2), Vector2(18, 0))
+	check(game.conveyors.belts.has(a) and game.mining.nuggets_at(a) == 0 and game.mining.nuggets_at(Vector2i(15, 2)) == 1, "Dragging a loaded cell removes only its ore and leaves the conveyor in place")
 	clear_items()
 	put(a, {"coal_vein": {"direction": 1, "progress": 0}})
 	await mouse_move(point(a))
@@ -161,3 +176,32 @@ func run_checks() -> void:
 	await settle()
 	print("RESULT: ", passed, " passed; ", failed, " failed; interactions=", scene)
 	quit(1 if failed else 0)
+
+func check_defense_warning() -> void:
+	clear_items()
+	game.cycle.day = 4
+	game.cycle.changed.emit()
+	check(game.cycle.needs_defense_warning() and "Alto riesgo" in game.shop.cycle_goal.text, "Night 4 warns when both purchased platforms are empty")
+	var left: Vector2i = game.grid.defense_cell("left")
+	var right: Vector2i = game.grid.defense_cell("right")
+	game.launchers.place(left)
+	game.launchers.receive(left, "coal")
+	check(game.cycle.needs_defense_warning() and "2 torretas" in game.shop.cycle_goal.text and not game.shop.cycle_action.disabled, "One placed turret warns about defeat while still allowing the player to start")
+	game.launchers.place(right)
+	check(not game.cycle.needs_defense_warning() and not "Alto riesgo" in game.shop.cycle_goal.text, "Placing the second turret immediately clears the warning")
+	game.launchers.launchers.erase(right)
+	game.launchers.changed.emit()
+	check(game.cycle.needs_defense_warning() and "Alto riesgo" in game.shop.cycle_goal.text, "Removing a turret immediately restores the risk warning")
+	game.cycle.is_night = true
+	game.cycle.changed.emit()
+	check(not game.cycle.needs_defense_warning() and game.shop.cycle_goal.text == "Resiste la oleada y protege la entrada.", "The preparation warning is cleared once combat starts")
+	game.cycle.is_night = false
+	game.cycle.defeated = true
+	game.cycle.changed.emit()
+	check(not game.cycle.needs_defense_warning() and game.shop.cycle_title.text == "Base destruida", "The defeat screen does not show the preparation warning")
+	game.cycle.defeated = false
+	game.cycle.day = 3
+	game.cycle.changed.emit()
+	check(not game.cycle.needs_defense_warning() and not "Alto riesgo" in game.shop.cycle_goal.text, "Earlier nights keep their normal preparation message")
+	game.cycle.day = 2
+	game.cycle.changed.emit()

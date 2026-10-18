@@ -116,6 +116,7 @@ func set_cycle(game_cycle: RefCounted) -> void:
 	cycle = game_cycle
 	build_cycle_panel()
 	cycle.changed.connect(update_cycle)
+	cycle.launchers.changed.connect(update_cycle)
 	update_cycle()
 	ensure_tutorial_guide.call_deferred()
 	ensure_intro.call_deferred()
@@ -428,6 +429,7 @@ func update_cycle() -> void:
 	cycle_heading.text = "PRIMEROS PASOS" if tutorial else "DEFENSA DE LA BASE"
 	cycle_badge.text = "%02d / %02d" % [mini(cycle.tutorial_step + 1, cycle.TUTORIAL_LAST_STEP), cycle.TUTORIAL_LAST_STEP] if tutorial else "DÍA %d" % cycle.day
 	cycle_steps.visible = tutorial
+	cycle_goal.add_theme_color_override("font_color", Color("#bacbb7"))
 	cycle_action.show()
 	for index in range(cycle_steps.get_child_count()):
 		cycle_steps.get_child(index).color = Color("#8db574") if index < cycle.tutorial_step else (Color("#e1b879") if index == cycle.tutorial_step else Color("#354b3a"))
@@ -455,7 +457,7 @@ func update_cycle() -> void:
 			4:
 				cycle_action.hide()
 				if game.get("placing_launcher"):
-					cycle_goal.text = "Coloca el lanzapapas en la plataforma dorada."
+					cycle_goal.text = "Coloca el Lanzapepitas en la plataforma dorada."
 				else:
 					cycle_goal.text = tutorial_navigation_text()
 			6:
@@ -476,6 +478,9 @@ func update_cycle() -> void:
 		cycle_goal.text = "Construye, fabrica munición y prepara la próxima noche."
 		cycle_action.text = "INICIAR NOCHE"
 		cycle_action.disabled = not cycle.can_start_night() or shop_open or shop_animating
+		if cycle.needs_defense_warning():
+			cycle_goal.text = "Alto riesgo de perder. Coloca al menos 2 torretas."
+			cycle_goal.add_theme_color_override("font_color", Color("#edbb76"))
 	shop_button.disabled = (tutorial and tutorial_purchase().is_empty()) or cycle.is_night or cycle.defeated
 	view_button.disabled = tutorial or cycle.defeated
 	var guide: Node = get_parent().get_parent().get_node_or_null("TutorialGuide")
@@ -497,7 +502,7 @@ func tutorial_purchase() -> Dictionary:
 			return {"category": "DEFENSA", "item": "defense_platforms", "instruction": "Desbloquea las plataformas."}
 		4:
 			if not game.get("placing_launcher"):
-				return {"category": "DEFENSA", "item": "launcher", "instruction": "Obtén tu lanzapapas gratuito."}
+				return {"category": "DEFENSA", "item": "launcher", "instruction": "Obtén tu Lanzapepitas gratuito."}
 	return {}
 
 func tutorial_navigation_text() -> String:
@@ -756,7 +761,7 @@ func open_category(category: String) -> void:
 			shop_content.add_child(platforms_button)
 			platforms_button.disabled = platforms_button.disabled or not tutorial_allows_item("defense_platforms")
 			purchase_buttons["defense_platforms"] = platforms_button
-			var launcher_button := create_button("LANZAPAPAS - GRATIS" if cycle != null and cycle.free_launcher_available else "LANZAPAPAS - 200")
+			var launcher_button := create_button("LANZAPEPITAS - GRATIS" if cycle != null and cycle.free_launcher_available else "LANZAPEPITAS - 200")
 			launcher_button.disabled = not (cycle != null and cycle.free_launcher_available) and not economy.can_afford(economy.LAUNCHER_PRICE)
 			launcher_button.disabled = launcher_button.disabled or not tutorial_allows_item("launcher")
 			launcher_button.pressed.connect(request_item.bind("launcher", launcher_requested))
