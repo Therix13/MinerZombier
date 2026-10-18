@@ -2,6 +2,7 @@ extends Node
 
 var game: Node2D
 var grid: RefCounted
+var shift_batch: bool = false
 
 func _ready() -> void:
 	game = get_parent() as Node2D
@@ -66,6 +67,7 @@ func toggle_night_view() -> void:
 func can_drop(kind: String, source: Vector2i, destination: Vector2i) -> bool:
 	if not phase_allows() or (not grid.owned_tiles.has(source) and not grid.defense_tiles.has(source)) or not has_kind(source, kind) or not game.get("cycle").allows_interaction(kind, source, destination, true):
 		return false
+	if destination == grid.sale_cell and kind != "nugget": return can_sell(kind, source)
 	if kind == "belt" and loaded_belt(source):
 		return false
 	if kind == "compactor" and loaded_compactor(source) and source != destination: return false
@@ -91,6 +93,41 @@ func loaded_belt(cell: Vector2i) -> bool:
 
 func loaded_compactor(cell: Vector2i) -> bool:
 	return game.get("mining").occupied_by_compactor(cell) and int(game.get_node("Compactors").machines[cell]["count"]) > 0
+
+func resale_value(kind: String, source: Vector2i) -> int:
+	var economy: RefCounted = game.get("economy")
+	var price: int = 0
+	match kind:
+		"vein": price = economy.BRASS_VEIN_PRICE if game.get("mining").vein_at(source) == "brass" else economy.COAL_VEIN_PRICE
+		"belt": price = economy.CONVEYOR_PRICE
+		"drill": price = economy.DRILL_PRICE
+		"launcher": price = economy.LAUNCHER_PRICE
+		"compactor": price = game.get_node("Compactors").PRICE
+	return floori(price * 0.5)
+
+func can_sell(kind: String, source: Vector2i) -> bool:
+	var cycle: RefCounted = game.get("cycle")
+	return kind in ["vein", "belt", "drill", "launcher", "compactor"] and phase_allows() and not cycle.is_night and not cycle.is_guided_tutorial_active() and (grid.owned_tiles.has(source) or grid.defense_tiles.has(source)) and has_kind(source, kind) and not (kind == "belt" and loaded_belt(source))
+
+func sell(kind: String, source: Vector2i) -> bool:
+	if not can_sell(kind, source): return false
+	var data: Dictionary = cell_data(source)
+	var refund: int = resale_value(kind, source)
+	if kind == "launcher":
+		for ore: String in data["launcher"]["ammo"]:
+			data[ore] = int(data.get(ore, 0)) + 1
+	elif kind == "compactor" and int(data["compactor"]["count"]) > 0:
+		var ore: String = data["compactor"]["kind"]
+		data[ore] = int(data.get(ore, 0)) + int(data["compactor"]["count"])
+	if kind == "vein":
+		data.erase("coal_vein")
+		data.erase("brass_vein")
+	else:
+		data.erase(kind)
+	if kind == "belt": data.erase("entry")
+	apply_cells({source: data})
+	game.get("economy").add(refund)
+	return true
 
 func swaps_contents(kind: String, source: Vector2i, destination: Vector2i) -> bool:
 	if kind == "nugget" and game.get("mining").occupied_by_compactor(destination): return false
@@ -122,6 +159,7 @@ func apply_cells(cells: Dictionary) -> void:
 func drop(kind: String, source: Vector2i, destination: Vector2i, direction: int = 1) -> bool:
 	if not can_drop(kind, source, destination):
 		return false
+	if destination == grid.sale_cell and kind != "nugget": return sell(kind, source)
 	var mining: RefCounted = game.get("mining")
 	var launchers: RefCounted = game.get("launchers")
 	if kind == "nugget" and source != destination:
@@ -171,8 +209,35 @@ func clear_drag() -> void:
 	game.set("dragging_object", false)
 	game.set("held_object_type", "")
 	game.redraw_world()
+	game.get_node("Compactors").queue_redraw()
+
+func placement_active() -> bool:
+	return game.get("placing_coal") or game.get("placing_brass") or game.get("placing_belt") or game.get("placing_drill") or game.get("placing_launcher") or game.get_node("Compactors").placing
+
+func cancel_active() -> bool:
+	if not placement_active() and not game.get("holding_object"): return false
+	game.cancel_placement()
+	game.get_node("Compactors").cancel_placement()
+	shift_batch = false
+	clear_drag()
+	return true
+
+func _process(_delta: float) -> void:
+	if not placement_active():
+		shift_batch = false
+		return
+	if game.get("cycle").is_guided_tutorial_active(): return
+	if Input.is_key_pressed(KEY_SHIFT): shift_batch = true
+	elif shift_batch: cancel_active()
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventKey and (event.keycode == KEY_SHIFT or event.physical_keycode == KEY_SHIFT) and placement_active() and not game.get("cycle").is_guided_tutorial_active():
+		if event.pressed:
+			shift_batch = true
+		else:
+			cancel_active()
+			get_viewport().set_input_as_handled()
+		return
 	if game.get("cycle").is_night and event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_P or event.physical_keycode == KEY_P):
 		toggle_night_view()
 		get_viewport().set_input_as_handled()

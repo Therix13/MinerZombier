@@ -276,8 +276,13 @@ func _process(_delta: float) -> void:
 	# Input state still updates when a Control or another _input callback
 	# consumes ESC. Keep the shortcut working in that case, even when paused.
 	if Input.is_action_just_pressed(PAUSE_ACTION) and not pause_event_received:
-		toggle_pause_menu()
+		if not cancel_pending_action(): toggle_pause_menu()
 	pause_event_received = false
+
+func cancel_pending_action() -> bool:
+	if menu_open or get_tree().paused: return false
+	var interactions: Node = get_parent().get_node_or_null("WorldInteractions")
+	return interactions != null and interactions.cancel_active()
 
 func handle_key_event(event: InputEvent) -> bool:
 	if not event is InputEventKey or not event.pressed:
@@ -285,12 +290,12 @@ func handle_key_event(event: InputEvent) -> bool:
 	if event.keycode == KEY_ESCAPE or event.physical_keycode == KEY_ESCAPE:
 		pause_event_received = true
 		if not event.echo:
-			toggle_pause_menu()
+			if not cancel_pending_action(): toggle_pause_menu()
 		return true
 	if event.echo:
 		return false
 	if event.keycode == KEY_BACKSPACE and not get_tree().paused and get_parent().has_method("cancel_placement"):
-		get_parent().cancel_placement()
+		cancel_pending_action()
 		return true
 	if event.keycode == KEY_F11 or (event.alt_pressed and event.keycode == KEY_ENTER):
 		if is_editor_embedded():

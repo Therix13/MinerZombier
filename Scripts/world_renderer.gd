@@ -47,6 +47,10 @@ func _draw() -> void:
 		draw_rect(connector_rect.grow(-1.0), Color("#d1ad66"), false, 2.0)
 		var connector_center: Vector2 = connector_rect.get_center()
 		draw_circle(connector_center, 3.0, Color("#d1ad66"))
+	for cell in grid.defense_tiles:
+		var platform_rect: Rect2 = grid.get_cell_rect(cell)
+		draw_defense_platform(platform_rect)
+		draw_rect(platform_rect.grow(-1.0), Color("#ffe095"), false, 3.0)
 	for cell in conveyors.belts:
 		if holding_object and dragging_object and (held_object_type == "belt" or swap_bundle) and cell == held_object_cell:
 			continue
@@ -72,10 +76,6 @@ func _draw() -> void:
 			continue
 		var vein: Dictionary = mining.coal_veins[cell]
 		draw_coal_vein(grid.get_cell_rect(cell).get_center(), int(vein["direction"]), int(vein["progress"]), false)
-	for cell in grid.defense_tiles:
-		var platform_rect: Rect2 = grid.get_cell_rect(cell)
-		draw_defense_platform(platform_rect)
-		draw_rect(platform_rect.grow(-1.0), Color("#ffe095"), false, 3.0)
 	for cell in launchers.launchers:
 		if holding_object and dragging_object and held_object_type == "launcher" and cell == held_object_cell:
 			continue
@@ -295,12 +295,14 @@ func draw_sale_cell() -> void:
 
 	var dragging_to_sale: bool = (
 		dragging_object
-		and held_object_type == "nugget"
 		and hovered_cell == grid.sale_cell
+		and (held_object_type == "nugget" or (is_instance_valid(interactions) and interactions.can_sell(held_object_type, held_object_cell)))
 	)
 
 	if dragging_to_sale:
 		draw_rect(rect, Color("#ffe18a"), false, 4.0)
+		if held_object_type != "nugget":
+			draw_string(ThemeDB.fallback_font, rect.end + Vector2(-38, 17), "+%d" % interactions.resale_value(held_object_type, held_object_cell), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#d5a351"))
 	elif sale_hovered:
 		draw_rect(rect, Color("#ffe6a2"), false, 2.0)
 

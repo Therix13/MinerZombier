@@ -128,11 +128,15 @@ func _input(event: InputEvent) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not placing or not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_LEFT or not event.pressed: return
+	if game.get("cycle").is_night or not game.get("cycle").allows_action("buy_compactor"): return
 	if not game.get_node("WorldInteractions").phase_allows(): return
 	var cell: Vector2i = grid.world_to_cell(game.get_local_mouse_position())
 	if place(cell, direction):
 		placing = false
 		paid = false
+		if Input.is_key_pressed(KEY_SHIFT) and not game.get("cycle").is_guided_tutorial_active() and game.get("economy").spend(PRICE):
+			placing = true
+			paid = not game.get("economy").developer_mode
 	get_viewport().set_input_as_handled()
 
 func _draw() -> void:
