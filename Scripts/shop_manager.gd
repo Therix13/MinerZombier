@@ -378,7 +378,7 @@ func build_research_card(technology_id: String, data: Dictionary) -> Button:
 	var view: Array = RESEARCH_VIEW[technology_id]
 	var button := Button.new()
 	button.name = "Research_" + technology_id
-	button.custom_minimum_size = Vector2(116, 116)
+	button.custom_minimum_size = Vector2(116, 86)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.clip_contents = true
 	button.pressed.connect(technology_requested.emit.bind(technology_id))
@@ -398,17 +398,19 @@ func build_research_card(technology_id: String, data: Dictionary) -> Button:
 	column.add_child(header)
 	var icon := ItemPreview.new()
 	icon.kind = {"straight_belt": "straight", "curved_belts": "corner_right", "junction_belt": "junction"}.get(technology_id, technology_id)
-	icon.custom_minimum_size = Vector2(64, 64)
-	icon.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	icon.custom_minimum_size = Vector2(28, 28)
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	header.add_child(icon)
 	var rank := compact_research_label("", 13)
 	rank.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rank.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	header.add_child(rank)
 	rank.hide()
-	var title := compact_research_label(view[1], 14)
-	column.add_child(title)
-	title.hide()
+	var title := create_label(view[1], 13)
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(title)
 	var effect := compact_research_label(view[2], 11)
 	column.add_child(effect)
 	effect.hide()
@@ -685,7 +687,7 @@ func create_button(value: String) -> Button:
 func catalog_grid() -> GridContainer:
 	if item_grid == null:
 		item_grid = GridContainer.new()
-		item_grid.columns = 2
+		item_grid.columns = 1
 		item_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		item_grid.add_theme_constant_override("h_separation", 8)
 		item_grid.add_theme_constant_override("v_separation", 8)
@@ -694,7 +696,7 @@ func catalog_grid() -> GridContainer:
 
 func create_art_button(kind: String, description: String, price: int = -1) -> Button:
 	var button := create_button("")
-	button.custom_minimum_size = Vector2(116, 108)
+	button.custom_minimum_size = Vector2(116, 56)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.tooltip_text = description
 	var margin := MarginContainer.new()
@@ -703,20 +705,34 @@ func create_art_button(kind: String, description: String, price: int = -1) -> Bu
 	for side in ["left", "top", "right", "bottom"]:
 		margin.add_theme_constant_override("margin_" + side, 8)
 	button.add_child(margin)
-	var column := VBoxContainer.new()
-	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	column.add_theme_constant_override("separation", 4)
-	margin.add_child(column)
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 8)
+	margin.add_child(row)
 	var art := ItemPreview.new()
 	art.kind = kind
-	art.custom_minimum_size = Vector2(64, 64)
-	art.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	column.add_child(art)
-	var cost := create_label("◆ %d" % price, 16, Color("#ffdf9c"))
-	cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	art.custom_minimum_size = Vector2(36, 36)
+	art.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(art)
+	var short_names := {
+		"expansion": "Ampliar base", "coal": "Carbón", "brass": "Latón",
+		"drill": "Taladro", "compactor": "Compactador", "straight": "Cinta recta",
+		"corner_right": "Cinta L derecha", "corner_left": "Cinta L izquierda",
+		"junction": "Cinta en T", "platform": "Plataformas", "launcher": "Lanzapepitas",
+		"ore:coal": "Carbón · Nv. 1", "ore:brass": "Latón · Nv. 1",
+		"ore:coal_2": "Carbón · Nv. 2", "ore:brass_2": "Latón · Nv. 2",
+	}
+	var label := create_label(short_names.get(kind, description.capitalize()) if price >= 0 or kind.begins_with("ore:") else description.capitalize(), 15)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(label)
+	var cost := create_label("◆ %d" % price, 15, Color("#ffdf9c"))
+	cost.autowrap_mode = TextServer.AUTOWRAP_OFF
+	cost.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	cost.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cost.visible = price >= 0
-	column.add_child(cost)
+	row.add_child(cost)
 	button.set_meta("price_label", cost)
 	button.set_meta("item_art", art)
 	return button
