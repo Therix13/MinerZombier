@@ -61,7 +61,7 @@ func run_checks() -> void:
 	var b := Vector2i(15, 1)
 	var d := Vector2i(16, 1)
 	var e := Vector2i(14, 2)
-	check(game.economy.sale_value("coal") == 5 and game.economy.sale_value("brass") == 7 and game.economy.sale_value("coal_2") == 15 and game.economy.sale_value("brass_2") == 21, "Sale prices include the new brass value and a 50 percent processing bonus")
+	check(game.economy.sale_value("coal") == 3 and game.economy.sale_value("brass") == 5 and game.economy.sale_value("coal_2") == 8 and game.economy.sale_value("brass_2") == 15, "Coal and brass sales use the configured prices for each tier")
 	var coins: int = game.economy.coins
 	compactors.buy()
 	check(not compactors.placing and game.economy.coins == coins, "An unresearched compactor cannot be bought")

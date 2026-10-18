@@ -1155,9 +1155,9 @@ func open_category(category: String) -> void:
 			purchase_buttons["expansion"] = button
 			catalog_grid().add_child(button)
 		"VETAS":
-			add_item_button("VETA DE CARBÓN · 100", economy.COAL_VEIN_PRICE, "coal", coal_vein_requested)
-			add_item_button("VETA DE LATÓN · 150", economy.BRASS_VEIN_PRICE, "brass", brass_vein_requested)
-			add_item_button("VETA DE HIERRO · 200", economy.IRON_VEIN_PRICE, "iron", coal_vein_requested)
+			add_item_button("VETA DE CARBÓN", economy.COAL_VEIN_PRICE, "coal", coal_vein_requested)
+			add_item_button("VETA DE LATÓN", economy.BRASS_VEIN_PRICE, "brass", brass_vein_requested)
+			add_item_button("VETA DE HIERRO", economy.IRON_VEIN_PRICE, "iron", coal_vein_requested)
 		"HERRAMIENTAS":
 			add_item_button("TALADRO AUTOMÁTICO · 200", economy.DRILL_PRICE, "drill", drill_requested)
 			add_item_button("COMPACTADOR · 300", CompactorScript.PRICE, "compactor", compactor_requested)

@@ -9,21 +9,34 @@ const CONVEYOR_PRICE := 50
 const DRILL_PRICE := 200
 const LAUNCHER_PRICE := 200
 const DEFENSE_TILE_PRICE := 100
-const COAL_SELL_PRICE := 5
-const BRASS_VEIN_PRICE := 150
-const BRASS_SELL_PRICE := 7
-const IRON_VEIN_PRICE := 200
-const IRON_SELL_PRICE := 9
+const COAL_SELL_PRICE := 3
+const BRASS_VEIN_PRICE := 500
+const BRASS_SELL_PRICE := 5
+const IRON_VEIN_PRICE := 5000
+const IRON_SELL_PRICE := 10
+const GOLD_VEIN_PRICE := 50000
+const GOLD_SELL_PRICE := 30
+
+const NUGGET_SELL_PRICES := {
+	"coal": [3, 8, 20, 50],
+	"brass": [5, 15, 40, 100],
+	"iron": [10, 30, 75, 175],
+	"gold": [30, 75, 200, 500],
+}
+# Keep ingot prices independent of changes to nugget values.
+const INGOT_BASE_SELL_PRICES := {"coal": 135, "brass": 189, "iron": 243}
 
 var coins: int = START_COINS
 var developer_mode: bool = false
 
 func sale_value(kind: String) -> int:
-	var base: int = IRON_SELL_PRICE if kind.begins_with("iron") else (BRASS_SELL_PRICE if kind.begins_with("brass") else COAL_SELL_PRICE)
-	# A level-one ingot preserves the value of its level-four ore input.
+	var material: String = kind.get_slice("_", 0)
 	var suffix: String = kind.get_slice("_", kind.get_slice_count("_") - 1)
 	var level: int = int(suffix) if suffix.is_valid_int() else 1
-	return base * (27 if "_ingot" in kind else 1) * int(pow(3, level - 1))
+	if "_ingot" in kind:
+		return int(INGOT_BASE_SELL_PRICES.get(material, 135)) * int(pow(3, level - 1))
+	var prices: Array = NUGGET_SELL_PRICES.get(material, NUGGET_SELL_PRICES["coal"])
+	return int(prices[clampi(level, 1, 4) - 1])
 
 func can_afford(price: int) -> bool:
 	return developer_mode or coins >= price

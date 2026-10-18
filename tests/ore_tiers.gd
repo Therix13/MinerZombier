@@ -60,8 +60,8 @@ func run_checks() -> void:
 				check(game.mining.nugget_type(c) == material + "_" + str(level + 1) and compactors.machines[b]["count"] == 0, "Four seconds output the correct next tier")
 				compactors.process_outputs(4.0)
 				check(game.mining.nuggets_at(c) == 1, "Idle compactors cannot duplicate their output")
-			var base: int = 7 if material == "brass" else 5
-			check(game.economy.sale_value(kind) == base * int(pow(3, level - 1)) and game.mining.material_units(kind) == int(pow(2, level - 1)), "Tier %d keeps input units and 50 percent fusion bonus" % level)
+			var prices: Array = [5,15,40,100] if material == "brass" else [3,8,20,50]
+			check(game.economy.sale_value(kind) == prices[level-1] and game.mining.material_units(kind) == int(pow(2, level - 1)), "Tier %d has its configured sale value and preserves input units" % level)
 			clear_items()
 			put(a, {kind: 1})
 			cash = game.economy.coins
@@ -91,7 +91,7 @@ func run_checks() -> void:
 	game.shop.open_shop()
 	await wait_shop()
 	game.shop.open_category("RECURSOS")
-	check(game.shop.resource_buttons.size() == 12, "DEV resources include both materials at all four levels")
+	check(game.shop.resource_buttons.size() == game.shop.RESOURCE_LABELS.size(), "DEV resources include all configured materials and tiers")
 	game.shop.close_shop()
 	await wait_shop()
 	print("RESULT: ", passed, " passed; ", failed, " failed; ore tiers")
