@@ -12,7 +12,7 @@ const POINTS_PER_NIGHT: int = 1
 const ZOMBIE_EXPERIENCE: int = 25
 const SALE_EXPERIENCE := {"coal": 1, "brass": 2, "coal_2": 2, "brass_2": 4, "coal_3": 4, "brass_3": 8, "coal_4": 8, "brass_4": 16, "brass_ingot": 16, "brass_ingot_2": 32, "brass_ingot_3": 64, "brass_ingot_4": 128}
 const RESEARCHES := {
-	"saw": {"name": "Sierra", "branch": "PROCESAMIENTO", "cost": 1, "level": 3, "requires": ["furnace"], "description": "Corta una pepita de Nv. 2–4 en dos del nivel anterior."},
+	"saw": {"name": "Sierra", "branch": "PROCESAMIENTO", "cost": 1, "level": 3, "requires": ["furnace"], "description": "Corta una pepita o lingote de Nv. 2–4 en dos del nivel anterior."},
 	"iron": {"name": "Hierro", "branch": "MINERÍA", "cost": 1, "level": 4, "requires": ["furnace"], "description": "Desbloquea vetas de hierro y sus lingotes."},
 	"drill": {
 		"name": "Taladro", "branch": "MINERÍA", "cost": 1, "level": 2,

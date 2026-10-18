@@ -38,7 +38,7 @@ func run_checks() -> void:
 	game.get_node("Construction").receive(c,"brass_ingot")
 	check(saw.machines.has(c) and saw.machines[c]["direction"] == 2 and game.economy.coins == cash - saw.PRICE,"A completed blueprint becomes a Sierra with its chosen outlet")
 	clear_items()
-	for material in ["coal","brass","iron"]:
+	for material in ["coal","brass","iron","brass_ingot","iron_ingot"]:
 		for tier in range(2,5):
 			clear_items()
 			saw.place(c,1)
@@ -63,8 +63,8 @@ func run_checks() -> void:
 			check(game.mining.nugget_type(out) == output and saw.stored_items(c).is_empty() and saw.can_receive(c,input),"Second product exits and unlocks the next cut")
 	clear_items()
 	saw.place(c,1)
-	for kind: String in ["coal","brass","iron","brass_ingot","iron_ingot_4","coal_5",""]:
-		check(not saw.receive(c,kind),"Sierra rejects level-one, ingot or invalid material: " + kind)
+	for kind: String in ["coal","brass","iron","brass_ingot","iron_ingot","coal_ingot_2","coal_5",""]:
+		check(not saw.receive(c,kind),"Sierra rejects level-one or invalid material: " + kind)
 	game.mining.items_for("coal")[a] = 1
 	check(not mover.drop("nugget",a,c) and game.mining.nuggets_at(a) == 1,"A rejected raw nugget stays in the player's source cell")
 	clear_items()

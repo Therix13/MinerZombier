@@ -33,10 +33,9 @@ func place(cell: Vector2i, direction: int = 1) -> bool:
 	return true
 
 static func lower_tier(kind: String) -> String:
-	# Ingots remain ingots; the Sierra only cuts nuggets.
-	if "_ingot" in kind: return ""
+	# Keep the material and form: ingots split into ingots, nuggets into nuggets.
 	for level in [2,3,4]:
-		for material in ["coal","brass","iron"]:
+		for material in ["coal","brass","iron","brass_ingot","iron_ingot"]:
 			if kind == material + "_" + str(level): return material if level == 2 else material + "_" + str(level - 1)
 	return ""
 
