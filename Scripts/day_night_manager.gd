@@ -13,7 +13,7 @@ const TUTORIAL_ACTIONS := [
 	["buy_coal", "place_coal"],
 	["mine_coal", "sell_coal"],
 	["mine_coal", "fuse", "sell_fused"],
-	["expand"],
+	["buy_coal", "place_coal", "fuse_veins"],
 	["unlock_defense"],
 	["buy_launcher", "place_launcher"],
 	["mine_coal", "load_ammo"],
@@ -21,11 +21,11 @@ const TUTORIAL_ACTIONS := [
 ]
 const TUTORIAL_TITLES := [
 	"Tu primera veta", "Del carbón a las monedas", "Fusiona y vende",
-	"Haz sitio para crecer", "Prepara las defensas", "Tu primer Lanzapepitas",
+	"Fusiona tus vetas", "Prepara las defensas", "Tu primer Lanzapepitas",
 	"Carga la munición", "¡Todo listo!",
 ]
 const TUTORIAL_LAST_STEP: int = 7
-const TUTORIAL_DISPLAY_STEPS: int = 8
+const TUTORIAL_DISPLAY_STEPS: int = 7
 
 var day: int = 1
 var is_night: bool = false
@@ -91,7 +91,7 @@ func dispose() -> void:
 	economy = null
 
 func vein_lesson_active() -> bool:
-	return is_tutorial_active() and tutorial_step == 3 and grid.cave_width >= 7 and not vein_fusion_taught
+	return is_tutorial_active() and tutorial_step == 3 and not vein_fusion_taught
 
 func _on_vein_fused(cell: Vector2i) -> void:
 	if vein_lesson_active() and cell == TUTORIAL_COAL_CELL and mining.vein_level(cell) >= 2:
@@ -139,7 +139,7 @@ func _on_research_unlocked(_research_id: String) -> void:
 func tutorial_purchase_price() -> int:
 	if vein_lesson_active(): return 0 if mining.coal_veins.has(TUTORIAL_NEW_VEIN_CELL) else economy.COAL_VEIN_PRICE
 	match tutorial_step:
-		3: return economy.EXPANSION_PRICE
+		3: return economy.COAL_VEIN_PRICE
 		4: return economy.DEFENSE_TILE_PRICE
 		5: return economy.LAUNCHER_PRICE
 	return 0
@@ -184,7 +184,7 @@ func allows_action(action: String) -> bool:
 	return action in TUTORIAL_ACTIONS[clampi(tutorial_step, 0, TUTORIAL_LAST_STEP)]
 
 func tutorial_display_step() -> int:
-	return mini(TUTORIAL_DISPLAY_STEPS,tutorial_step + 1 + (1 if tutorial_step > 3 or vein_lesson_active() else 0))
+	return mini(TUTORIAL_DISPLAY_STEPS,tutorial_step + 1)
 
 func tutorial_title() -> String:
 	if vein_lesson_active(): return "Fusiona tus vetas"
@@ -228,7 +228,7 @@ func allows_interaction(kind: String, source: Vector2i, destination: Vector2i, d
 		return allows_action("sell_fused") and mining.nugget_type(source) == "coal_2" and destination == grid.sale_cell
 	if kind == "nugget" and source == TUTORIAL_ORE_CELL and dragged:
 		if tutorial_step == 6 and mining.nugget_type(source) in ["coal_2", "coal_3", "coal_4"]:
-			return grid.is_valid_cell(destination) and mining.can_move_nugget(destination)
+			return destination == grid.sale_cell or (grid.is_valid_cell(destination) and mining.can_move_nugget(destination))
 		return (allows_action("fuse") and destination == TUTORIAL_FUSION_CELL) or (allows_action("sell_coal") and destination == grid.sale_cell) or (allows_action("load_ammo") and destination == grid.defense_cell("left"))
 	return false
 
@@ -258,7 +258,7 @@ func refresh_tutorial() -> void:
 			1:
 				completed = coal_sold >= TUTORIAL_SALES_TARGET
 			2: completed = fusion_sold
-			3: completed = grid.cave_width >= 7 and grid.cave_height >= 5 and vein_fusion_taught
+			3: completed = vein_fusion_taught
 			4: completed = level3_sold and grid.defense_tiles.size() >= 2
 			5: completed = level4_sold and not launchers.launchers.is_empty()
 			6: completed = ammo_damage() >= 2.0
@@ -294,11 +294,11 @@ func tutorial_text() -> String:
 			if mining.nuggets_at(TUTORIAL_ORE_CELL) > 0:
 				return "Arrástrala a la casilla dorada." if mining.nuggets_at(TUTORIAL_FUSION_CELL) == 0 else "Arrástrala sobre la otra: 2 de Nv. 1 crean 1 de Nv. 2."
 			return "Extrae 2 pepitas y combínalas. La de Nv. 2 se vende más cara."
-		3: return "Amplía la base a 7 × 5."
+		3: return "Compra una segunda veta de carbón y fusiónala con la primera."
 		4: return "Compra las dos plataformas de defensa."
 		5: return "Compra el Lanzapepitas y colócalo en la plataforma dorada."
 		6:
-			if mining.nugget_type(TUTORIAL_ORE_CELL) in ["coal_2", "coal_3", "coal_4"]: return "Aparta la pepita de nivel alto: el Lanzapepitas solo acepta Nv. 1."
+			if mining.nugget_type(TUTORIAL_ORE_CELL) in ["coal_2", "coal_3", "coal_4"]: return "Vende la pepita de nivel alto en el cofre: el Lanzapepitas solo acepta Nv. 1."
 			return "Extrae y carga 4 pepitas de Nv. 1 en el Lanzapepitas."
 	return "¡Preparación lista! Inicia la primera noche."
 

@@ -20,7 +20,7 @@ func run_checks() -> void:
 	intro.set_process(false)
 	check(paused and not game.get_node("CanvasLayer").visible,"Opening cinematic pauses simulation and hides the HUD")
 	check(Engine.has_meta(IntroScript.SESSION_KEY),"Opening is marked seen for this session")
-	check(game.economy.coins == 500 and game.progression.total_experience == 0 and game.grid.owned_tiles.size() == 9,"Opening grants no money, resources or buildings")
+	check(game.economy.coins == 100 and game.progression.total_experience == 0 and game.grid.owned_tiles.size() == 9,"Opening grants no money, resources or buildings")
 	check(intro.film.renderer.get_script() == preload("res://Scripts/world_renderer.gd") and intro.film.renderer.grid == game.grid,"Film renders the real current mine with the gameplay artwork")
 	intro.elapsed = 4
 	intro.present_frame()
@@ -88,7 +88,7 @@ func run_checks() -> void:
 	await settle()
 	await key(KEY_F10)
 	check(game.economy.developer_mode and game.cycle.tutorial_skipped and game.cycle.barrier_broken and not paused,"F10 during the opening skips the film and the full tutorial")
-	check(not game.has_node("BarrierBreach") and not game.cycle.is_night and game.economy.coins == 500,"DEV skip triggers neither the collapse nor a premature night or rewards")
+	check(not game.has_node("BarrierBreach") and not game.cycle.is_night and game.economy.coins == 100,"DEV skip triggers neither the collapse nor a premature night or rewards")
 	game.free()
 	await settle()
 	print("RESULT: ",passed," passed; ",failed," failed; fence story; ",scene)

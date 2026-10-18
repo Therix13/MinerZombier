@@ -2,7 +2,7 @@ extends RefCounted
 
 signal money_changed(amount: int)
 
-const START_COINS := 500
+const START_COINS := 100
 const EXPANSION_PRICE := 500
 const COAL_VEIN_PRICE := 100
 const CONVEYOR_PRICE := 50

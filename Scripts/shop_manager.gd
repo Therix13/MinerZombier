@@ -696,10 +696,7 @@ func tutorial_purchase() -> Dictionary:
 			if not game.get("placing_coal"):
 				return {"category": "VETAS", "item": "coal", "instruction": "Compra la veta de carbón."}
 		3:
-			if cycle.vein_lesson_active():
-				if not game.get("placing_coal") and not cycle.mining.coal_veins.has(cycle.TUTORIAL_NEW_VEIN_CELL): return {"category": "VETAS", "item": "coal", "instruction": "Compra otra veta de carbón para fusionarlas."}
-				return {}
-			return {"category": "EXPANSION", "item": "expansion", "instruction": "Compra la ampliación a 7 × 5."}
+			if not game.get("placing_coal") and not cycle.mining.coal_veins.has(cycle.TUTORIAL_NEW_VEIN_CELL): return {"category": "VETAS", "item": "coal", "instruction": "Compra otra veta de carbón para fusionarlas."}
 		4:
 			return {"category": "DEFENSA", "item": "defense_platforms", "instruction": "Compra las plataformas."}
 		5:

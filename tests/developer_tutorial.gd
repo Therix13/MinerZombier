@@ -23,7 +23,7 @@ func run_checks() -> void:
 	check(game.cycle.day == 1 and game.cycle.tutorial_step == 0 and game.cycle.is_tutorial_active(), "A normal new game still begins with its tutorial")
 	await key(KEY_F10)
 	check(game.economy.developer_mode and game.cycle.tutorial_skipped and not game.cycle.is_guided_tutorial_active(), "F10 from the first step immediately activates DEV and skips the tutorial")
-	check(game.economy.coins == 500 and game.progression.total_experience == 0 and game.grid.owned_tiles.size() == 9 and game.cycle.day == 1, "Skipping grants no tutorial rewards, automatic buildings, or extra days")
+	check(game.economy.coins == 100 and game.progression.total_experience == 0 and game.grid.owned_tiles.size() == 9 and game.cycle.day == 1, "Skipping grants no tutorial rewards, automatic buildings, or extra days")
 	await buy_from_shop()
 	var at := Vector2i(16, 2)
 	await mouse_move(point(at))
@@ -39,7 +39,7 @@ func run_checks() -> void:
 	await mouse_button(point(platform), true)
 	await mouse_button(point(platform), false)
 	game.launchers.receive(platform, "coal")
-	check(game.cycle.can_start_night() and game.economy.coins == 500 and not game.cycle.expansion_bonus_granted, "DEV can prepare the first wave freely without the tutorial sales bonus")
+	check(game.cycle.can_start_night() and game.economy.coins == 100 and not game.cycle.expansion_bonus_granted, "DEV can prepare the first wave freely without the tutorial sales bonus")
 	game.start_night()
 	var manager: Node = game.zombie_manager
 	manager.set_process(false)

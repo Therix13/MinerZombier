@@ -207,9 +207,9 @@ func run_checks() -> void:
 	await key(KEY_ESCAPE, false)
 	check(not paused, "ESC resumes the guided game")
 	shop._on_cycle_action()
-	check(not game.placing_coal and game.economy.coins == 500 and not shop.cycle_action.visible, "The tutorial card cannot purchase an item directly")
+	check(not game.placing_coal and game.economy.coins == 100 and not shop.cycle_action.visible, "The tutorial card cannot purchase an item directly")
 	await purchase_route("VETAS", "coal")
-	check(game.get("placing_coal") and game.get("economy").coins == 500, "The real store selects a coal vein without charging")
+	check(game.get("placing_coal") and game.get("economy").coins == 100, "The real store selects a coal vein without charging")
 	if not game.get("placing_coal"):
 		quit(1)
 		return
@@ -222,7 +222,7 @@ func run_checks() -> void:
 	await click_cell(cycle.TUTORIAL_COAL_CELL)
 	await key(KEY_SHIFT, false)
 	check(cycle.tutorial_step == 1 and game.get("mining").coal_veins.size() == 1, "Marked cell completes the coal placement step")
-	check(not game.get("placing_coal") and game.get("economy").coins == 400, "Shift cannot purchase extra objects during the tutorial")
+	check(not game.get("placing_coal") and game.get("economy").coins == 0, "Shift cannot purchase extra objects during the tutorial")
 	await drag_cell(cycle.TUTORIAL_COAL_CELL, Vector2i(16, 1))
 	check(game.get("mining").coal_veins.has(cycle.TUTORIAL_COAL_CELL) and game.get("mining").coal_veins.size() == 1, "Dragging the vein cannot move it out of the guided route")
 	await extract_one()
@@ -230,13 +230,13 @@ func run_checks() -> void:
 	await drag_cell(cycle.TUTORIAL_ORE_CELL, Vector2i(16, 1))
 	check(game.get("mining").nuggets_at(cycle.TUTORIAL_ORE_CELL) == 1, "Dropping ore on an unrelated tile preserves it at the source")
 	await drag_cell(cycle.TUTORIAL_ORE_CELL, grid.sale_cell)
-	check(cycle.tutorial_step == 1 and game.get("economy").coins == 405 and not cycle.expansion_bonus_granted, "One sale does not advance or grant the five-sale bonus")
+	check(cycle.tutorial_step == 1 and game.get("economy").coins == 5 and not cycle.expansion_bonus_granted, "One sale does not advance or grant the five-sale bonus")
 	for index in range(4):
 		await extract_one()
 		await drag_cell(cycle.TUTORIAL_ORE_CELL, grid.sale_cell)
 		if index < 3:
 			check(cycle.tutorial_step == 1 and not cycle.expansion_bonus_granted, "Sale %d still waits for all five nuggets" % (index + 2))
-	check(cycle.tutorial_step == 2 and game.economy.coins == 425 and not cycle.expansion_bonus_granted, "Five sales lead directly to fusion without free coins")
+	check(cycle.tutorial_step == 2 and game.economy.coins == 25 and not cycle.expansion_bonus_granted, "Five sales lead directly to fusion without free coins")
 	await extract_one()
 	await drag_cell(cycle.TUTORIAL_ORE_CELL, cycle.TUTORIAL_FUSION_CELL)
 	check(cycle.tutorial_step == 2 and game.mining.nugget_type(cycle.TUTORIAL_FUSION_CELL) == "coal", "The first nugget waits on the marked fusion tile")
@@ -245,14 +245,12 @@ func run_checks() -> void:
 	check(cycle.fusion_taught and cycle.tutorial_step == 2 and game.mining.nugget_type(cycle.TUTORIAL_FUSION_CELL) == "coal_2", "Fusion stays in its lesson until the more valuable nugget is sold")
 	check("15" in cycle.tutorial_text() and "5" in cycle.tutorial_text(), "The lesson compares refined and raw sale prices")
 	await drag_cell(cycle.TUTORIAL_FUSION_CELL, grid.sale_cell)
-	check(cycle.fusion_sold and cycle.tutorial_step == 3 and game.economy.coins == 440 and cycle.needs_tutorial_income(), "Selling the fused nugget pays only its sale price and opens the income task")
+	check(cycle.fusion_sold and cycle.tutorial_step == 3 and game.economy.coins == 40 and cycle.needs_tutorial_income(), "Selling the fused nugget pays only its sale price and opens the income task")
 	await earn_purchase_money()
-	await purchase_route("EXPANSION", "expansion")
-	check(cycle.tutorial_step == 3 and cycle.vein_lesson_active() and grid.cave_width == 7 and game.economy.coins == 0, "Expansion opens the vein-fusion lesson without granting coins")
-	await earn_purchase_money()
+	check(cycle.tutorial_step == 3 and cycle.vein_lesson_active() and grid.cave_width == 3 and game.economy.coins == 100 and not cycle.allows_action("expand"), "The fourth lesson funds the second vein instead of buying an expansion")
 	await purchase_route("VETAS","coal")
 	await click_cell(cycle.TUTORIAL_NEW_VEIN_CELL)
-	check(game.mining.coal_veins.size() == 2 and game.economy.coins == 0 and cycle.tutorial_display_step() == 5,"The second vein is paid for and marked as the fifth lesson")
+	check(game.mining.coal_veins.size() == 2 and game.economy.coins == 0 and cycle.tutorial_display_step() == 4,"The second vein is paid for and marked as the fourth lesson")
 	await drag_cell(cycle.TUTORIAL_NEW_VEIN_CELL,cycle.TUTORIAL_COAL_CELL)
 	check(cycle.vein_fusion_taught and cycle.tutorial_step == 4 and game.mining.vein_level(cycle.TUTORIAL_COAL_CELL) == 2 and game.mining.coal_veins.size() == 1,"A real drag fuses the two veins before defense preparation")
 	await earn_purchase_money()
@@ -268,8 +266,9 @@ func run_checks() -> void:
 	await check_locked_actions()
 	game.mining.items_for("coal_3")[cycle.TUTORIAL_ORE_CELL] = 1
 	var parking: Array[Vector2i] = game.get_node("TutorialGuide").targets()
+	var before_sale: int = game.economy.coins
 	await drag_cell(parking[0], parking[1])
-	check(game.mining.nugget_type(parking[1]) == "coal_3" and game.mining.nuggets_at(cycle.TUTORIAL_ORE_CELL) == 0, "Leftover high-tier ore can be parked before loading raw ammunition")
+	check(parking[1] == grid.sale_cell and game.economy.coins == before_sale + game.economy.sale_value("coal_3") and game.mining.nuggets_at(cycle.TUTORIAL_ORE_CELL) == 0, "Surplus high-tier ore is sold during ammunition training to keep the unexpanded mine free")
 	var sold: int = cycle.coal_sold
 	for index in range(4):
 		await extract_one()
@@ -290,7 +289,7 @@ func run_checks() -> void:
 	check(breach.film.barrier.destruction == 1.0,"The fence is visibly destroyed at the end of the second scene")
 	breach.finish()
 	await settle()
-	check(cycle.is_night and cycle.barrier_broken and not paused and not cycle.is_tutorial_active(),"The collapse ends directly in the first active wave")
+	check(cycle.is_night and cycle.barrier_broken and not paused and not cycle.is_tutorial_active() and grid.cave_width == 3 and grid.cave_height == 3,"The collapse ends directly in the first active wave")
 	var night_cash: int = game.economy.coins
 	var manager: Node = game.get("zombie_manager")
 	manager.set_process(false)
