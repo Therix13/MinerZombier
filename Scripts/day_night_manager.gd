@@ -96,6 +96,9 @@ func vein_lesson_active() -> bool:
 func advanced_vein_lesson() -> bool:
 	return is_tutorial_active() and tutorial_step == 4
 
+func target_vein_level() -> int:
+	return mini(4, mining.vein_level(TUTORIAL_COAL_CELL) + 1)
+
 func vein_fusion_targets() -> Array[Vector2i]:
 	for tier in range(3,0,-1):
 		var cells: Array[Vector2i] = []
@@ -180,18 +183,18 @@ func needs_tutorial_income() -> bool:
 	return is_tutorial_active() and tutorial_step in [3, 4, 5, 6] and (not economy.can_afford(tutorial_purchase_price()) or (tutorial_step == 5 and not level4_sold))
 
 func income_level() -> int:
-	return 4 if tutorial_step in [4,5,6] else 2
+	return 4 if tutorial_step in [5,6] else 2
 
 func advanced_income() -> bool:
-	return needs_tutorial_income() and tutorial_step in [4, 5, 6]
+	return needs_tutorial_income() and tutorial_step in [3, 4, 5, 6]
 
 func income_targets() -> Array[Vector2i]:
 	if tutorial_step in [4,6]:
-		for tier in range(4,0,-1):
+		for tier in range(4, 1 if tutorial_step == 4 else 0, -1):
 			var kind: String = "coal" if tier == 1 else "coal_" + str(tier)
 			for cell: Vector2i in mining.items_for(kind):
 				return [cell,grid.sale_cell]
-		return [TUTORIAL_COAL_CELL]
+		if tutorial_step == 6: return [TUTORIAL_COAL_CELL]
 	# Prefer selling the requested tier, then fusing the highest available pair.
 	var level: int = income_level()
 	for tier in range(level, 0, -1):
@@ -228,6 +231,7 @@ func tutorial_display_step() -> int:
 	return mini(TUTORIAL_DISPLAY_STEPS,tutorial_step + 1)
 
 func tutorial_title() -> String:
+	if advanced_vein_lesson(): return "Fusiona hasta nivel %d" % target_vein_level()
 	if vein_lesson_active(): return "Fusiona tus vetas"
 	return TUTORIAL_TITLES[clampi(tutorial_step, 0, TUTORIAL_LAST_STEP)]
 
@@ -252,7 +256,7 @@ func allows_world_press(cell: Vector2i, placing: String = "") -> bool:
 		return cell in [TUTORIAL_COAL_CELL,TUTORIAL_NEW_VEIN_CELL]
 	if advanced_income():
 		var kind: String = mining.nugget_type(cell)
-		return (cell == TUTORIAL_COAL_CELL and mining.nuggets_at(TUTORIAL_ORE_CELL) == 0) or (grid.is_valid_cell(cell) and grid.owned_tiles.has(cell) and kind in ["coal", "coal_2", "coal_3", "coal_4"] and mining.ore_level(kind) <= income_level())
+		return (cell == TUTORIAL_COAL_CELL and mining.nuggets_at(TUTORIAL_ORE_CELL) == 0) or (grid.is_valid_cell(cell) and grid.owned_tiles.has(cell) and kind in ["coal", "coal_2", "coal_3", "coal_4"] and mining.ore_level(kind) <= (4 if tutorial_step in [4,6] else income_level()))
 	return (allows_action("mine_coal") and cell == TUTORIAL_COAL_CELL and mining.nuggets_at(TUTORIAL_ORE_CELL) == 0) or ((allows_action("sell_coal") or allows_action("load_ammo") or allows_action("fuse")) and cell == TUTORIAL_ORE_CELL) or (allows_action("sell_fused") and cell == TUTORIAL_FUSION_CELL and mining.nugget_type(cell) == "coal_2")
 
 func allows_interaction(kind: String, source: Vector2i, destination: Vector2i, dragged: bool) -> bool:
@@ -262,8 +266,11 @@ func allows_interaction(kind: String, source: Vector2i, destination: Vector2i, d
 		return true
 	if advanced_income() and kind == "nugget" and dragged:
 		var material: String = mining.nugget_type(source)
-		if material not in ["coal", "coal_2", "coal_3", "coal_4"] or mining.ore_level(material) > income_level(): return false
-		if destination == grid.sale_cell: return tutorial_step in [4,6] or material == "coal_" + str(income_level())
+		if material not in ["coal", "coal_2", "coal_3", "coal_4"] or mining.ore_level(material) > (4 if tutorial_step in [4,6] else income_level()): return false
+		if destination == grid.sale_cell:
+			if tutorial_step == 6: return true
+			if tutorial_step == 4: return mining.ore_level(material) >= 2
+			return material == "coal_" + str(income_level())
 		return grid.is_valid_cell(destination) and grid.owned_tiles.has(destination) and (mining.can_move_nugget(destination) or (mining.ore_level(material) < income_level() and mining.can_fuse(source, destination)))
 	if kind == "vein":
 		if advanced_vein_lesson() and not needs_tutorial_income():
@@ -321,27 +328,19 @@ func refresh_tutorial() -> void:
 
 func tutorial_text() -> String:
 	if advanced_vein_lesson():
-		if needs_tutorial_income(): return "Extrae y vende pepitas para comprar otra veta de carbón: cuesta 100 monedas."
+		var goal: int = target_vein_level()
+		if needs_tutorial_income(): return "Objetivo: veta Nv. %d. %s" % [goal, income_instruction()]
 		var pair: Array[Vector2i] = vein_fusion_targets()
-		if not pair.is_empty(): return "Fusiona las vetas marcadas: 2 de Nv. %d → 1 de Nv. %d. Objetivo: veta de Nv. 4." % [mining.vein_level(pair[0]),mining.vein_level(pair[0])+1]
-		return "Compra otra veta de carbón y colócala en la casilla dorada. Fusiona pares del mismo nivel hasta Nv. 4."
+		if not pair.is_empty():
+			var tier: int = mining.vein_level(pair[0])
+			var next_goal: String = "Así crearás la veta Nv. %d." % goal if tier+1 == goal else "Prepara otro par hasta tener 2 vetas Nv. %d para crear la de Nv. %d." % [goal-1,goal]
+			return "Arrastra la veta marcada sobre la otra: 2 vetas Nv. %d → 1 Nv. %d. %s" % [tier,tier+1,next_goal]
+		return "Para crear una veta Nv. %d necesitas 2 vetas Nv. %d. Compra vetas Nv. 1 y fusiona pares iguales; coloca la siguiente en la casilla dorada." % [goal,goal-1]
 	if needs_ammo_vein(): return "Compra una veta de Nv. 1 para producir munición básica." if not needs_tutorial_income() else "Vende pepitas para comprar una veta de Nv. 1: el arma solo acepta munición de Nv. 1."
 	if vein_lesson_active() and not needs_tutorial_income():
 		if mining.coal_veins.has(TUTORIAL_NEW_VEIN_CELL): return "Arrastra la segunda veta sobre la primera: 2 vetas del mismo material y nivel crean una superior. Puedes llegar hasta Nv. 4."
 		return "Compra otra veta de carbón y colócala en la casilla dorada para fusionar las minas."
-	if needs_tutorial_income():
-		var missing: int = tutorial_purchase_price() - economy.coins
-		if advanced_income():
-			var level: int = income_level()
-			var targets: Array[Vector2i] = income_targets()
-			if targets.size() == 2:
-				if targets[1] == grid.sale_cell: return "Vende la pepita de Nv. %d en el cofre: vale %d monedas." % [level, economy.sale_value("coal_" + str(level))]
-				if mining.can_fuse(targets[0], targets[1]):
-					var from_level: int = mining.ore_level(mining.nugget_type(targets[0]))
-					return "2 de Nv. %d → 1 de Nv. %d. Combínalas hasta Nv. %d y véndela." % [from_level, from_level + 1, level]
-				return "Mueve la pepita a la casilla dorada para seguir fusionando hasta Nv. %d." % level
-			return "Extrae carbón y fusiona pepitas iguales hasta Nv. %d. Véndelas para comprar %s." % [level, "las defensas" if tutorial_step == 4 else "el Lanzapepitas"]
-		return "Vende pepitas para reunir %d monedas más. Las de Nv. 2 valen %d." % [missing, economy.sale_value("coal_2")]
+	if needs_tutorial_income(): return income_instruction()
 	match tutorial_step:
 		0: return "Compra una veta de carbón y colócala en la casilla dorada."
 		1: return "Arrastra la pepita al cofre." if mining.nuggets_at(TUTORIAL_ORE_CELL) > 0 else "Extrae y vende 5 pepitas de carbón."
@@ -358,6 +357,18 @@ func tutorial_text() -> String:
 			if mining.nugget_type(tutorial_output_cell()) in ["coal_2", "coal_3", "coal_4"]: return "Vende la pepita de nivel alto en el cofre: el Lanzapepitas solo acepta Nv. 1."
 			return "Extrae y carga 4 pepitas de Nv. 1 en el Lanzapepitas."
 	return "¡Preparación lista! Inicia la primera noche."
+
+func income_instruction() -> String:
+	var level: int = income_level()
+	var targets: Array[Vector2i] = income_targets()
+	var purchase: String = "otra veta (100 monedas)" if tutorial_step in [3,4,6] else ("las plataformas" if not platforms_ready() else "el Lanzapepitas")
+	if targets.size() == 2:
+		var kind: String = mining.nugget_type(targets[0])
+		var from_level: int = mining.ore_level(kind)
+		if targets[1] == grid.sale_cell: return "Vende la pepita Nv. %d en el cofre: vale %d monedas. Ahorra para %s." % [from_level,economy.sale_value(kind),purchase]
+		if mining.can_fuse(targets[0],targets[1]): return "Fusiona las pepitas marcadas: 2 de Nv. %d → 1 de Nv. %d. Vende desde Nv. %d para comprar %s." % [from_level,from_level+1,level,purchase]
+		return "Mueve la pepita a la casilla dorada. Fusiona hasta Nv. %d y vende para comprar %s." % [level,purchase]
+	return "Extrae carbón. Fusiona y vende pepitas desde Nv. %d para comprar %s." % [level,purchase]
 
 func needs_defense_warning() -> bool:
 	return day == 4 and not is_night and not defeated and launchers.launchers.size() < 2

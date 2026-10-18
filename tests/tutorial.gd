@@ -155,40 +155,44 @@ func earn_purchase_money() -> void:
 		check(not mover.drop("nugget", cycle.TUTORIAL_ORE_CELL, grid.sale_cell), "A lower-tier sale cannot bypass the level-%d lesson" % requested)
 		game.mining.coal_nuggets.erase(cycle.TUTORIAL_ORE_CELL)
 	while cycle.needs_tutorial_income() and count < 300:
-		if requested == 2:
-			for click in range(5): game.mining.mine(cycle.TUTORIAL_COAL_CELL)
-			check(mover.drop("nugget", cycle.TUTORIAL_ORE_CELL, grid.sale_cell), "A mined nugget funds the expansion")
-			earned += game.economy.sale_value("coal")
+		var targets: Array[Vector2i] = cycle.income_targets()
+		if targets.size() == 1:
+			for strike in range(5): await click_cell(targets[0])
 		else:
-			var targets: Array[Vector2i] = cycle.income_targets()
-			if targets.size() == 1:
-				for click in range(5): game.mining.mine(targets[0])
-			else:
-				if targets[1] == grid.sale_cell:
-					check(game.mining.nugget_type(targets[0]) == "coal_" + str(requested), "The guide requests the correct tier for sale")
-					earned += game.economy.sale_value("coal_" + str(requested))
-				check(mover.drop("nugget", targets[0], targets[1]), "The highlighted level-%d fusion route is playable" % requested)
+			if targets[1] == grid.sale_cell:
+				check(game.mining.nugget_type(targets[0]) == "coal_" + str(requested), "The guide requests the correct tier for sale")
+				earned += game.economy.sale_value("coal_" + str(requested))
+			await drag_cell(targets[0], targets[1])
 		count += 1
 	await settle()
 	check(count < 300 and not cycle.needs_tutorial_income() and game.economy.coins == balance + earned and not cycle.allows_action("mine_coal"), "Only actual tier sales fund the next purchase; its menu then unlocks")
 
 func fund_current_vein() -> void:
 	var count := 0
-	var mover: Node = game.get_node("WorldInteractions")
 	while cycle.needs_tutorial_income() and count < 100:
 		var targets: Array[Vector2i] = cycle.income_targets()
 		if targets.size() == 1:
-			for strike in range(5): game.mining.mine(targets[0])
+			for strike in range(5): await click_cell(targets[0])
 		else:
-			check(mover.drop("nugget",targets[0],targets[1]),"Actual nugget sales fund the next vein without gifts")
+			var selling: bool = targets[1] == grid.sale_cell
+			var kind: String = game.mining.nugget_type(targets[0])
+			var coins: int = game.economy.coins
+			if cycle.tutorial_step == 4 and selling: check(game.mining.ore_level(kind) >= 2,"Vein funding never asks to sell raw nuggets after teaching fusion")
+			await drag_cell(targets[0],targets[1])
+			if selling: check(game.economy.coins == coins + game.economy.sale_value(kind),"Real guided sales fund the next vein without gifts")
 		count += 1
 	await settle()
 	check(count < 100 and not cycle.needs_tutorial_income(),"The marked mining route can pay for the next vein")
 
 func learn_advanced_veins() -> void:
+	if DisplayServer.get_name() != "headless":
+		await settle()
+		root.get_texture().get_image().save_png("/workspace/.onboarding/display-test/vein-level-three-goal.png")
 	var purchases := 0
 	var merges := 0
+	var reached_three := false
 	while cycle.advanced_vein_lesson() and purchases < 8:
+		check("nivel %d" % (4 if reached_three else 3) in cycle.tutorial_title(),"The lesson explicitly targets level three before level four")
 		if cycle.needs_tutorial_income(): await fund_current_vein()
 		var pair: Array[Vector2i] = cycle.vein_fusion_targets()
 		if pair.size() == 2:
@@ -196,6 +200,9 @@ func learn_advanced_veins() -> void:
 			check(game.mining.vein_level(pair[1]) == tier,"The guide only pairs veins of the same tier")
 			await drag_cell(pair[0],pair[1])
 			check(game.mining.vein_level(pair[1]) == tier + 1,"A real drag creates the next vein tier")
+			if pair[1] == cycle.TUTORIAL_COAL_CELL and tier == 2:
+				reached_three = true
+				check(cycle.tutorial_step == 4 and "nivel 4" in cycle.tutorial_title(),"Reaching vein level three keeps the lesson active and advances its objective to four")
 			merges += 1
 			if DisplayServer.get_name() != "headless" and pair[1] == cycle.TUTORIAL_COAL_CELL and tier == 2:
 				await settle()
@@ -207,7 +214,7 @@ func learn_advanced_veins() -> void:
 			check(game.mining.vein_at(at) == "coal","A paid new vein occupies its marked staging cell")
 			purchases += 1
 	await settle()
-	check(purchases == 6 and merges == 6 and cycle.tutorial_step == 5 and game.mining.vein_level(cycle.TUTORIAL_COAL_CELL) == 4,"Six purchased veins and six real merges complete the lesson through levels three and four")
+	check(reached_three and purchases == 6 and merges == 6 and cycle.tutorial_step == 5 and game.mining.vein_level(cycle.TUTORIAL_COAL_CELL) == 4,"Six purchased veins and six real merges complete the lesson through levels three and four")
 	check(grid.cave_width == 3 and grid.cave_height == 3 and grid.defense_tiles.is_empty(),"The level-four vein lesson needs neither expansion nor defense purchases")
 
 func run_checks() -> void:
@@ -284,6 +291,11 @@ func run_checks() -> void:
 	check("15" in cycle.tutorial_text() and "5" in cycle.tutorial_text(), "The lesson compares refined and raw sale prices")
 	await drag_cell(cycle.TUTORIAL_FUSION_CELL, grid.sale_cell)
 	check(cycle.fusion_sold and cycle.tutorial_step == 3 and game.economy.coins == 40 and cycle.needs_tutorial_income(), "Selling the fused nugget pays only its sale price and opens the income task")
+	await extract_one()
+	var balance_after_fusion: int = game.economy.coins
+	await drag_cell(cycle.TUTORIAL_ORE_CELL,grid.sale_cell)
+	check(game.economy.coins == balance_after_fusion and game.mining.nugget_type(cycle.TUTORIAL_ORE_CELL) == "coal","After learning level-two nuggets, the next lesson blocks raw nugget sales")
+	check("Nv. 2" in cycle.tutorial_text(),"Funding the first vein fusion explicitly requests level-two nuggets")
 	await earn_purchase_money()
 	check(cycle.tutorial_step == 3 and cycle.vein_lesson_active() and grid.cave_width == 3 and game.economy.coins == 100 and not cycle.allows_action("expand"), "The fourth lesson funds the second vein instead of buying an expansion")
 	await purchase_route("VETAS","coal")
@@ -309,13 +321,18 @@ func run_checks() -> void:
 	await click_cell(cycle.TUTORIAL_NEW_VEIN_CELL)
 	check(game.mining.vein_level(cycle.TUTORIAL_NEW_VEIN_CELL) == 1 and not cycle.needs_ammo_vein(),"A separate paid level-one vein supplies basic ammunition after the main vein reaches level four")
 	await check_locked_actions()
+	var loaded_from_funding := 0
+	if game.mining.nugget_type(cycle.tutorial_output_cell()) == "coal":
+		await drag_cell(cycle.tutorial_output_cell(),grid.defense_cell("left"))
+		loaded_from_funding = 1
+		check(is_equal_approx(cycle.ammo_damage(),0.5),"Raw ore left from funding is correctly marked as ammunition")
 	game.mining.items_for("coal_3")[cycle.tutorial_output_cell()] = 1
 	var parking: Array[Vector2i] = game.get_node("TutorialGuide").targets()
 	var before_sale: int = game.economy.coins
 	await drag_cell(parking[0], parking[1])
 	check(parking[1] == grid.sale_cell and game.economy.coins == before_sale + game.economy.sale_value("coal_3") and game.mining.nuggets_at(cycle.tutorial_output_cell()) == 0, "Surplus high-tier ore is sold during ammunition training to keep the unexpanded mine free")
 	var sold: int = cycle.coal_sold
-	for index in range(4):
+	for index in range(4 - loaded_from_funding):
 		await extract_one()
 		if index == 0:
 			await drag_cell(cycle.tutorial_output_cell(), grid.sale_cell)
