@@ -177,6 +177,8 @@ func is_over_control(control: Control, position: Vector2) -> bool:
 	return Rect2(Vector2.ZERO, control.size).has_point(local)
 
 func _input(event: InputEvent) -> void:
+	# Let menu dismissal consume the click before tutorial world-input locks.
+	if game.get("shop").handle_outside_click(event): return
 	if not cycle.is_guided_tutorial_active():
 		return
 	# Victory must be dismissible before the day-two lesson takes input.

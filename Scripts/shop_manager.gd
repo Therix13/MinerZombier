@@ -58,6 +58,7 @@ var money_box: PanelContainer
 var money_label: Label
 var shop_button: Button
 var view_button: Button
+var outside_click_pending: bool = false
 var shop_panel: PanelContainer
 var shop_content: VBoxContainer
 var shop_title: Label
@@ -1098,6 +1099,23 @@ func unlock_defense_platforms() -> void:
 	defense_platforms_unlocked.emit()
 	open_category("DEFENSA")
 
+func _input(event: InputEvent) -> void:
+	handle_outside_click(event)
+
+func handle_outside_click(event: InputEvent) -> bool:
+	if not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_LEFT: return false
+	if not event.pressed and outside_click_pending:
+		outside_click_pending = false
+		get_viewport().set_input_as_handled()
+		return true
+	if not event.pressed or not shop_open: return false
+	var local: Vector2 = shop_panel.get_global_transform_with_canvas().affine_inverse() * event.position
+	if Rect2(Vector2.ZERO, shop_panel.size).has_point(local): return false
+	outside_click_pending = true
+	close_shop()
+	get_viewport().set_input_as_handled()
+	return true
+
 func open_shop() -> void:
 	if cycle != null and cycle.is_tutorial_active() and tutorial_purchase().is_empty():
 		return
@@ -1113,7 +1131,7 @@ func open_shop() -> void:
 		update_cycle()
 
 func close_shop() -> void:
-	if not shop_open or shop_animating:
+	if not shop_open:
 		return
 	shop_open = false
 	shop_animating = true
