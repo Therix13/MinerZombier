@@ -1,0 +1,57 @@
+extends "res://tests/compactor.gd"
+
+func run_checks() -> void:
+	root.show()
+	var args := OS.get_cmdline_user_args()
+	game = load("res://main.tscn").instantiate()
+	if "--legacy" in args: game.set_script(load(OS.get_environment("GODOT_LEGACY_MAIN")))
+	root.add_child(game)
+	current_scene = game
+	await settle()
+	game.set_process(false)
+	var display: CanvasLayer
+	for child in game.get_children():
+		if child.has_method("toggle_pause_menu"): display = child
+	display.resolution = Vector2i(1280, 720)
+	display.window_mode = 0
+	display.apply_display(false)
+	await settle()
+	mover = game.get_node("WorldInteractions")
+	compactors = game.get_node("Compactors")
+	compactors.set_process(false)
+	shop = game.shop
+	check(game.cycle.day == 1 and game.cycle.tutorial_step == 0 and game.cycle.is_tutorial_active(), "A normal new game still begins with its tutorial")
+	await key(KEY_F10)
+	check(game.economy.developer_mode and game.cycle.tutorial_skipped and not game.cycle.is_guided_tutorial_active(), "F10 from the first step immediately activates DEV and skips the tutorial")
+	check(game.economy.coins == 500 and game.progression.total_experience == 0 and game.grid.owned_tiles.size() == 9 and game.cycle.day == 1, "Skipping grants no tutorial rewards, automatic buildings, or extra days")
+	await buy_from_shop()
+	var at := Vector2i(16, 2)
+	await mouse_move(point(at))
+	await mouse_button(point(at), true)
+	await mouse_button(point(at), false)
+	check(compactors.machines.has(at) and not mover.placement_active(), "An advanced machine can be selected and placed outside the marked tutorial cell from day one")
+	game.buy_expansion()
+	await wait_shop()
+	shop.unlock_defense_platforms()
+	var platform: Vector2i = game.grid.defense_cell("right")
+	mover.select_item("launcher")
+	await mouse_move(point(platform))
+	await mouse_button(point(platform), true)
+	await mouse_button(point(platform), false)
+	game.launchers.receive(platform, "coal")
+	check(game.cycle.can_start_night() and game.economy.coins == 500 and not game.cycle.expansion_bonus_granted, "DEV can prepare the first wave freely without the tutorial sales bonus")
+	game.start_night()
+	var manager: Node = game.zombie_manager
+	manager.set_process(false)
+	while manager.spawn_count < manager.wave_total: manager.spawn_zombie()
+	for enemy in get_nodes_in_group("zombies"): enemy.take_damage(100)
+	manager._process(3.0)
+	await settle()
+	check(game.cycle.day == 2 and not game.cycle.research_tutorial_pending and not game.cycle.is_research_tutorial_active(), "Skipping also prevents the mandatory research lesson on day two")
+	game.dismiss_night_victory_popup()
+	await key(KEY_F10)
+	check(not game.economy.developer_mode and not game.cycle.is_guided_tutorial_active() and not game.progression.is_item_unlocked("compactor"), "Leaving DEV keeps the tutorial skipped while restoring normal research locks")
+	game.free()
+	await settle()
+	print("RESULT: ", passed, " passed; ", failed, " failed; developer tutorial")
+	quit(1 if failed else 0)

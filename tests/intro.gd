@@ -121,7 +121,6 @@ func run_checks() -> void:
 		check(picture.get_pixel(10, 600).get_luminance() > 0.05 and picture.get_pixel(1270, 600).get_luminance() > 0.05 and picture.get_pixel(10, 650).get_luminance() < 0.01, "Mine tiles cover wide-shot edges while letterbox bars remain black")
 	await send_key(KEY_P)
 	await send_key(KEY_R)
-	await send_key(KEY_F10)
 	check(pristine() and not game.shop.shop_open and not game.camera_controller.defense_view, "Game hotkeys cannot mutate the paused tutorial during the film")
 	await send_key(KEY_ESCAPE)
 	check(game.display_settings.menu_open and paused, "Escape opens the real pause menu during the film")
@@ -173,6 +172,13 @@ func run_checks() -> void:
 	await click_skip()
 	check(old_intro.get_ref() == null and not paused and game.ui_layer.visible, "The real skip button immediately releases the film and its pause")
 	check(pristine() and game.cycle.is_tutorial_active(), "Skipping starts the same untouched tutorial")
+	# F10 should also reach DEV directly from the opening cinematic.
+	game.free()
+	Engine.remove_meta(IntroScript.SESSION_KEY)
+	await load_game()
+	intro.set_process(false)
+	await send_key(KEY_F10)
+	check(game.economy.developer_mode and game.cycle.tutorial_skipped and not paused and not game.has_node("IntroCinematic") and game.ui_layer.visible, "F10 skips the opening cinematic and tutorial directly into DEV")
 	# Scene removal from external code must release an introduction-owned pause.
 	game.free()
 	Engine.remove_meta(IntroScript.SESSION_KEY)

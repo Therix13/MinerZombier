@@ -182,7 +182,7 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventKey:
 		# Pause, display settings, and keyboard navigation remain accessible.
-		if event.keycode in [KEY_P, KEY_R, KEY_F10] or event.physical_keycode in [KEY_P, KEY_R, KEY_F10]:
+		if event.keycode in [KEY_P, KEY_R] or event.physical_keycode in [KEY_P, KEY_R]:
 			get_viewport().set_input_as_handled()
 		return
 	if not event is InputEventMouseButton:

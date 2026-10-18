@@ -118,6 +118,13 @@ func _process(delta: float) -> void:
 	if elapsed >= DURATION:
 		finish()
 
+func _input(event: InputEvent) -> void:
+	if ended or (is_instance_valid(display) and display.menu_open): return
+	if event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_F10 or event.physical_keycode == KEY_F10):
+		get_viewport().set_input_as_handled()
+		if not game.get("economy").developer_mode: game.get("economy").toggle_developer_mode()
+		finish()
+
 func present_frame() -> void:
 	film.time = elapsed
 	film.present()

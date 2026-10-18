@@ -31,6 +31,7 @@ var coal_sold: int = 0
 var expansion_bonus_granted: bool = false
 var free_launcher_available: bool = true
 var research_tutorial_pending: bool = false
+var tutorial_skipped: bool = false
 var progression: RefCounted
 var grid: RefCounted
 var mining: RefCounted
@@ -83,10 +84,17 @@ func _on_sale(kind: String) -> void:
 		changed.emit()
 
 func is_tutorial_active() -> bool:
-	return day == 1 and not is_night and not defeated
+	return not tutorial_skipped and day == 1 and not is_night and not defeated
 
 func is_research_tutorial_active() -> bool:
-	return research_tutorial_pending and day == 2 and not is_night and not defeated
+	return not tutorial_skipped and research_tutorial_pending and day == 2 and not is_night and not defeated
+
+func skip_tutorial() -> void:
+	if tutorial_skipped: return
+	tutorial_skipped = true
+	tutorial_step = TUTORIAL_LAST_STEP
+	research_tutorial_pending = false
+	changed.emit()
 
 func is_guided_tutorial_active() -> bool:
 	return is_tutorial_active() or is_research_tutorial_active()
@@ -97,6 +105,7 @@ func _on_research_unlocked(_research_id: String) -> void:
 		changed.emit()
 
 func allows_action(action: String) -> bool:
+	if action == "developer": return true
 	if is_research_tutorial_active():
 		return action == "research"
 	if not is_tutorial_active():
@@ -147,7 +156,7 @@ func has_ammo() -> bool:
 	return false
 
 func refresh_tutorial() -> void:
-	if day != 1 or is_night or defeated:
+	if tutorial_skipped or day != 1 or is_night or defeated:
 		return
 	var previous: int = tutorial_step
 	while tutorial_step < TUTORIAL_LAST_STEP:
@@ -214,7 +223,7 @@ func complete_night() -> void:
 	is_night = false
 	day += 1
 	if day == 2:
-		research_tutorial_pending = true
+		research_tutorial_pending = not tutorial_skipped
 	if progression != null:
 		progression.award_night()
 	economy.add(NIGHT_REWARD)

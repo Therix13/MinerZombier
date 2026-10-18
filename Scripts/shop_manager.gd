@@ -806,6 +806,10 @@ func set_view_mode(defense_enabled: bool) -> void:
 
 func update_money(amount: int) -> void:
 	money_label.text = "∞ DEV" if economy.developer_mode else str(amount)
+	if economy.developer_mode and cycle != null and not cycle.tutorial_skipped:
+		var interactions: Node = get_parent().get_parent().get_node_or_null("WorldInteractions")
+		if interactions != null: interactions.cancel_active()
+		cycle.skip_tutorial()
 	if progression != null:
 		progression.developer_mode = economy.developer_mode
 		var interactions: Node = get_parent().get_parent().get_node_or_null("WorldInteractions")
