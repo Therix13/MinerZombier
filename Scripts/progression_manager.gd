@@ -82,6 +82,13 @@ func has_research(research_id: String) -> bool:
 func is_item_unlocked(item_id: String) -> bool:
 	return item_id in BASE_ITEMS or (ITEM_RESEARCH.has(item_id) and has_research(ITEM_RESEARCH[item_id]))
 
+func visible_researches(at_level: int = -1) -> Array[String]:
+	var result: Array[String] = []
+	var visible_level: int = level if at_level < 0 else at_level
+	for research_id: String in RESEARCHES:
+		if int(RESEARCHES[research_id]["level"]) <= visible_level: result.append(research_id)
+	return result
+
 func research_block_reason(technology_id: String) -> String:
 	if not RESEARCHES.has(technology_id):
 		return "Investigación desconocida."

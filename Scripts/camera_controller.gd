@@ -7,10 +7,14 @@ const DEFENSE_HALF_WIDTH: float = 330.0
 const DEFENSE_FOOTER: float = 64.0
 const DEFENSE_LEFT_MARGIN: float = 340.0
 const VIEW_CHANGE_DURATION: float = 0.65
+const MINE_COMBAT_TOP: float = -144.0
 
 var defense_view: bool = false
 var mine_position: Vector2 = Vector2.ZERO
 var mine_zoom: float = 1.0
+var combat_mine_active: bool = false
+var combat_mine_position: Vector2
+var combat_mine_zoom: float = 1.0
 
 var camera: Camera2D
 var viewport: Viewport
@@ -58,6 +62,33 @@ func get_active_min_zoom() -> float:
 	if not defense_view:
 		return min_zoom
 	return defense_zoom()
+
+func bind_cycle(cycle: RefCounted) -> void:
+	cycle.changed.connect(motion.on_cycle_changed)
+
+func horde_active() -> bool:
+	var cycle: RefCounted = camera.get_parent().get("cycle")
+	return cycle != null and cycle.is_night and not cycle.defeated
+
+func fit_combat_mine() -> void:
+	var size: Vector2 = viewport.get_visible_rect().size
+	var factor: float = camera.get_parent().get_node("CanvasLayer").scale.x
+	var frame := Rect2(Vector2(DEFENSE_LEFT_MARGIN * factor, 100.0 * factor), Vector2(maxf(1, size.x - 2 * DEFENSE_LEFT_MARGIN * factor), maxf(1, size.y - 164.0 * factor)))
+	var bottom: float = grid.GRID_OFFSET_Y + grid.cave_height * grid.TILE_SIZE
+	var center_x: float = grid.get_cell_rect(grid.sale_cell).get_center().x
+	var bounds := Rect2(center_x - grid.cave_width * grid.TILE_SIZE * 0.5, MINE_COMBAT_TOP, grid.cave_width * grid.TILE_SIZE, bottom - MINE_COMBAT_TOP)
+	var zoom: float = clampf(minf(frame.size.x / bounds.size.x, frame.size.y / bounds.size.y), min_zoom, max_zoom)
+	camera.zoom = Vector2.ONE * zoom
+	camera.position = bounds.get_center() - (frame.get_center() - size * 0.5) / zoom
+
+func on_cycle_changed() -> void:
+	if horde_active() or not combat_mine_active: return
+	combat_mine_active = false
+	if not defense_view:
+		stop_transition()
+		camera.position = mine_position
+		camera.zoom = Vector2.ONE * clampf(mine_zoom, min_zoom, max_zoom)
+		clamp_position()
 
 func defense_bounds() -> Rect2:
 	# Fit the combat lanes, platforms, and entrance, rather than empty map edges.
@@ -110,6 +141,7 @@ func update_zoom_limits(initial: bool = false) -> void:
 		var ratio: float = viewport_size.x / previous_viewport_size.x
 		camera.zoom *= ratio
 		mine_zoom *= ratio
+		combat_mine_zoom *= ratio
 	previous_viewport_size = viewport_size
 	var map_size: Vector2 = grid.get_map_size()
 	max_zoom = viewport_size.x / (VISIBLE_COLUMNS * grid.TILE_SIZE)
@@ -120,8 +152,9 @@ func update_zoom_limits(initial: bool = false) -> void:
 	var value: float = maximum if initial else clampf(camera.zoom.x, minimum, maximum)
 	camera.zoom = Vector2.ONE * value
 	if was_transitioning and not defense_view:
-		camera.zoom = Vector2.ONE * clampf(mine_zoom, min_zoom, max_zoom)
-		camera.position = mine_position
+		camera.zoom = Vector2.ONE * clampf(combat_mine_zoom if combat_mine_active else mine_zoom, min_zoom, max_zoom)
+		camera.position = combat_mine_position if combat_mine_active else mine_position
+	if combat_mine_active and not defense_view and horde_active(): fit_combat_mine()
 	clamp_position()
 
 func clamp_position() -> void:
@@ -135,7 +168,7 @@ func clamp_position() -> void:
 	var size: Vector2 = grid.get_map_size()
 	var half: Vector2 = viewport.get_visible_rect().size / (camera.zoom * 2.0)
 	camera.position.x = size.x * 0.5 if half.x * 2.0 >= size.x else clampf(camera.position.x, half.x, size.x - half.x)
-	var top: float = 0.0
+	var top: float = MINE_COMBAT_TOP - 160.0 if horde_active() else 0.0
 	var bottom: float = size.y
 	if half.y * 2.0 >= bottom - top:
 		camera.position.y = (top + bottom) * 0.5
@@ -182,16 +215,30 @@ func set_defense_view(enabled: bool) -> void:
 		return
 	dragging = false
 	if enabled and not transitioning:
-		mine_position = camera.position
-		mine_zoom = camera.zoom.x
+		if combat_mine_active:
+			combat_mine_position = camera.position
+			combat_mine_zoom = camera.zoom.x
+		else:
+			mine_position = camera.position
+			mine_zoom = camera.zoom.x
 	var start_position: Vector2 = camera.position
 	var start_zoom: float = camera.zoom.x
 	var start_cover: float = defense_mask.modulate.a if defense_mask.visible else 0.0
 	stop_transition()
 	defense_view = enabled
 	if not defense_view:
-		camera.zoom = Vector2.ONE * clampf(mine_zoom, min_zoom, max_zoom)
-		camera.position = mine_position
+		if horde_active():
+			if not combat_mine_active:
+				fit_combat_mine()
+				combat_mine_active = true
+			else:
+				camera.zoom = Vector2.ONE * clampf(combat_mine_zoom, min_zoom, max_zoom)
+				camera.position = combat_mine_position
+			combat_mine_position = camera.position
+			combat_mine_zoom = camera.zoom.x
+		else:
+			camera.zoom = Vector2.ONE * clampf(mine_zoom, min_zoom, max_zoom)
+			camera.position = mine_position
 	clamp_position()
 	to_position = camera.position
 	to_zoom = camera.zoom.x
@@ -229,6 +276,9 @@ func advance_transition(delta: float) -> void:
 
 class ViewMotion extends Node:
 	var controller: RefCounted
+
+	func on_cycle_changed() -> void:
+		controller.on_cycle_changed()
 
 	func _process(delta: float) -> void:
 		controller.advance_transition(delta)

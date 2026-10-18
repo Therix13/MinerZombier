@@ -71,6 +71,11 @@ var item_buttons: Dictionary = {}
 var category_buttons: Dictionary = {}
 var purchase_buttons: Dictionary = {}
 var fallback_display: CanvasLayer
+var known_research_level: int = 1
+var research_notice: PanelContainer
+var research_notice_label: Label
+var research_notice_timer: Timer
+var notice_research_ids: Array[String] = []
 
 func setup(economy_manager: RefCounted, grid_manager: RefCounted) -> void:
 	economy = economy_manager
@@ -122,6 +127,7 @@ func update_pause_layout() -> void:
 
 func set_cycle(game_cycle: RefCounted) -> void:
 	cycle = game_cycle
+	get_parent().get_parent().get("camera_controller").bind_cycle(cycle)
 	build_cycle_panel()
 	cycle.changed.connect(update_cycle)
 	cycle.launchers.changed.connect(update_cycle)
@@ -148,6 +154,7 @@ func ensure_tutorial_guide() -> void:
 
 func set_progression(player_progression: RefCounted) -> void:
 	progression = player_progression
+	known_research_level = progression.level
 	cycle.set_progression(progression)
 	# Legacy scene scripts must also treat research solely as item unlocks.
 	var game: Node = get_parent().get_parent()
@@ -156,12 +163,14 @@ func set_progression(player_progression: RefCounted) -> void:
 		if callback.get_object() == game and callback.get_method() == &"apply_technologies":
 			progression.technology_unlocked.disconnect(callback)
 	build_progression_panel()
+	build_research_notice()
 	progression.changed.connect(update_progression)
 	update_progression()
 
 func _process(_delta: float) -> void:
 	if progression == null:
 		return
+	update_notice_visibility()
 	# Preserve research locks even with older scenes that handle purchases themselves.
 	var game: Node = get_parent().get_parent()
 	var item: String = ""
@@ -216,8 +225,80 @@ func update_progression() -> void:
 	experience_bar.value = progression.experience
 	experience_bar.tooltip_text = "EXP %d / %d\nZombi +%d · venta de carbón +%d · venta de latón +%d." % [progression.experience, progression.experience_to_next_level(), progression.ZOMBIE_EXPERIENCE, progression.SALE_EXPERIENCE["coal"], progression.SALE_EXPERIENCE["brass"]]
 	progression_panel.visible = not shop_open and not shop_animating
+	if progression.level > known_research_level:
+		var old_ids: Array[String] = progression.visible_researches(known_research_level)
+		var new_ids: Array[String] = []
+		for research_id: String in progression.visible_researches():
+			if research_id not in old_ids and not progression.has_research(research_id): new_ids.append(research_id)
+		known_research_level = progression.level
+		announce_researches(new_ids)
+	if shop_open and shop_title.text == "INVESTIGACIÓN" and research_buttons.keys() != progression.visible_researches():
+		rebuild_catalog()
+	elif shop_open and shop_title.text == "BASE" and item_buttons.keys() != visible_shop_items():
+		rebuild_catalog()
 	refresh_research_buttons()
 	refresh_item_buttons()
+
+func visible_shop_items() -> Array[String]:
+	var result: Array[String] = []
+	for item: String in ["coal", "brass", "straight", "corner_right", "corner_left", "junction", "drill", "compactor"]:
+		if progression == null or progression.is_item_unlocked(item): result.append(item)
+	return result
+
+func rebuild_catalog() -> void:
+	var scroll: int = shop_scroll.scroll_vertical
+	open_category(shop_title.text)
+	shop_scroll.set_deferred("scroll_vertical", scroll)
+
+func build_research_notice() -> void:
+	research_notice = PanelContainer.new()
+	research_notice.name = "NewResearchNotice"
+	research_notice.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	research_notice.offset_left = -210
+	research_notice.offset_right = 210
+	research_notice.offset_top = 18
+	research_notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	research_notice.z_index = 120
+	var style := create_style("#192920", "#d5b078", 1, 9)
+	style.content_margin_left = 14
+	style.content_margin_right = 14
+	style.content_margin_top = 10
+	style.content_margin_bottom = 10
+	research_notice.add_theme_stylebox_override("panel", style)
+	add_child(research_notice)
+	research_notice_label = create_label("", 15, Color("#efd5a2"))
+	research_notice_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	research_notice_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	research_notice.add_child(research_notice_label)
+	research_notice.hide()
+	research_notice_timer = Timer.new()
+	research_notice_timer.one_shot = true
+	research_notice_timer.wait_time = 5.0
+	research_notice_timer.timeout.connect(func() -> void:
+		research_notice.hide()
+		notice_research_ids.clear())
+	add_child(research_notice_timer)
+
+func announce_researches(research_ids: Array[String]) -> void:
+	if research_ids.is_empty(): return
+	for research_id: String in research_ids:
+		if research_id not in notice_research_ids: notice_research_ids.append(research_id)
+	var names: PackedStringArray = []
+	for research_id: String in notice_research_ids: names.append(RESEARCH_VIEW[research_id][1])
+	research_notice_label.text = "Nuevas investigaciones\n" + " · ".join(names)
+	research_notice_timer.stop()
+	research_notice.hide()
+	update_notice_visibility()
+
+func update_notice_visibility() -> void:
+	if research_notice == null or notice_research_ids.is_empty(): return
+	var victory: Control = get_parent().get_parent().get("night_victory_overlay")
+	if victory != null and victory.visible:
+		research_notice.hide()
+		research_notice_timer.stop()
+	elif not research_notice.visible:
+		research_notice.show()
+		research_notice_timer.start()
 
 func open_research() -> void:
 	if cycle != null and (cycle.is_night or cycle.defeated):
@@ -237,7 +318,7 @@ func build_research_content() -> void:
 	var row: HBoxContainer
 	var section: VBoxContainer
 	var branch_count: int = 0
-	for technology_id in progression.RESEARCHES:
+	for technology_id in progression.visible_researches():
 		var data: Dictionary = progression.RESEARCHES[technology_id]
 		var branch: String = data["branch"]
 		if branch != previous_branch:
@@ -766,7 +847,8 @@ func open_category(category: String) -> void:
 			shop_content.add_child(create_label("MINERIA", 19, Color("#f3ca85")))
 			add_item_button("VETA DE CARBÓN · 100", economy.COAL_VEIN_PRICE, "coal", coal_vein_requested)
 			add_item_button("VETA DE LATÓN · 150", economy.BRASS_VEIN_PRICE, "brass", brass_vein_requested)
-			shop_content.add_child(create_label("AUTOMATIZACION", 19, Color("#f3ca85")))
+			if visible_shop_items().size() > (2 if progression != null and progression.is_item_unlocked("brass") else 1):
+				shop_content.add_child(create_label("AUTOMATIZACION", 19, Color("#f3ca85")))
 			add_item_button("CINTA RECTA · 50", economy.CONVEYOR_PRICE, "straight", conveyor_requested)
 			add_item_button("CINTA EN L DERECHA · 50", economy.CONVEYOR_PRICE, "corner_right", corner_conveyor_requested)
 			add_item_button("CINTA EN L IZQUIERDA · 50", economy.CONVEYOR_PRICE, "corner_left", left_corner_conveyor_requested)
@@ -795,16 +877,11 @@ func open_category(category: String) -> void:
 	if cycle != null: update_cycle()
 
 func add_item_button(text: String, price: int, item: String, request: Signal) -> void:
+	if progression != null and not progression.is_item_unlocked(item): return
 	var button := create_button(text)
 	button.pressed.connect(request_item.bind(item, request))
 	item_buttons[item] = {"button": button, "price": price}
 	purchase_buttons[item] = button
-	var icon := ResearchIcon.new()
-	icon.name = "ResearchLock"
-	icon.kind = "lock"
-	icon.position = Vector2(9, 17)
-	icon.size = Vector2(15, 15)
-	button.add_child(icon)
 	shop_content.add_child(button)
 	refresh_item_buttons()
 
@@ -822,7 +899,6 @@ func refresh_item_buttons() -> void:
 		var button: Button = item_buttons[item]["button"]
 		var unlocked: bool = progression == null or progression.is_item_unlocked(item)
 		button.disabled = not unlocked or not economy.can_afford(item_buttons[item]["price"]) or not tutorial_allows_item(item) or (cycle != null and (cycle.is_night or cycle.defeated))
-		button.get_node("ResearchLock").visible = not unlocked
 		button.tooltip_text = ""
 		if not unlocked:
 			button.tooltip_text = "Investigar: %s" % progression.RESEARCHES[progression.ITEM_RESEARCH[item]]["name"]
