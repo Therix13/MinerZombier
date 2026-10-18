@@ -120,14 +120,14 @@ func run_checks() -> void:
 	await settle()
 	check(game.launchers.launchers[platform]["ammo"].is_empty() and get_nodes_in_group("zombies").size() == 1, "Five shots leave the second wave active with one wounded enemy")
 	var guide: Node = game.get_node("TutorialGuide")
-	check(guide.resupply_step == 0 and shop.cycle_title.text == "Sin munición" and not shop.cycle_action.disabled, "The first shortage starts a short lesson with a mine shortcut")
+	check(guide.resupply_step == 0 and shop.cycle_title.text == "Sin munición" and not shop.cycle_action.visible and guide.pointer.target == shop.view_button, "The first shortage points to the real mine button without a shortcut")
 	var button: Button = shop.view_button
 	var defense_position: Vector2 = game.camera.position
-	await click(control_point(shop.cycle_action))
-	check(controller.transitioning and not controller.defense_view and game.camera.position.y > defense_position.y and game.camera.position.y < mine_position.y, "The lesson's mine shortcut moves the camera downward smoothly")
+	await click(control_point(button))
+	check(controller.transitioning and not controller.defense_view and game.camera.position.y > defense_position.y and game.camera.position.y < mine_position.y, "The marked mine button moves the camera downward smoothly")
 	await wait_for_view()
 	check(not controller.defense_view and button.text == "DEFENSIVA", "The mine opens during combat")
-	check(guide.resupply_step == 1 and guide.resupply_targets() == [vein] and shop.cycle_action.disabled, "The lesson highlights extraction before reloading")
+	check(guide.resupply_step == 1 and guide.resupply_targets() == [vein] and not shop.cycle_action.visible, "The lesson highlights extraction before reloading")
 	check(game.cycle.is_night and manager.active_wave and not paused, "Changing views does not pause or complete the wave")
 	var survivor: Node2D = get_nodes_in_group("zombies")[0]
 	var health: float = manager.base_health
@@ -148,8 +148,8 @@ func run_checks() -> void:
 	await mouse_button(cell_point(platform), false)
 	check(game.launchers.launchers[platform]["ammo"].size() == 1 and game.mining.nuggets_at(ammo_connection) == 0, "A real drag reloads the empty weapon with the extracted nugget")
 	check(game.conveyors.belts.has(ammo_connection) and shop.shop_button.disabled, "Reloading preserves the belt and the nighttime shop lock")
-	check(guide.resupply_step == 2 and shop.cycle_action.text == "VOLVER A DEFENSA", "Reloading advances the lesson to returning to defense")
-	await click(control_point(shop.cycle_action))
+	check(guide.resupply_step == 2 and guide.pointer.target == button and not shop.cycle_action.visible, "Reloading points to the real defense button")
+	await click(control_point(button))
 	await wait_for_view()
 	check(controller.defense_view and button.text == "MINA" and not guide.resupply_active(), "Returning to defense completes the lesson")
 	await click(control_point(button))

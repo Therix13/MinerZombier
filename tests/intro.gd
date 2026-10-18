@@ -145,7 +145,7 @@ func run_checks() -> void:
 	await settle()
 	check(not paused and game.ui_layer.visible and not game.has_node("IntroCinematic"), "Natural completion removes the film and resumes the tutorial")
 	check(game.cycle.is_tutorial_active() and game.cycle.tutorial_step == 0, "The first guided tutorial step is ready after the arrival")
-	check(not game.shop.cycle_action.disabled and not game.shop.cycle_action.text.is_empty(), "The tutorial purchase button becomes available")
+	check(not game.shop.shop_button.disabled and not game.shop.cycle_action.visible and game.get_node("TutorialGuide").pointer.target == game.shop.shop_button, "The tutorial points to the real shop menu after the introduction")
 	game.restart_game()
 	await scene_changed
 	await settle()

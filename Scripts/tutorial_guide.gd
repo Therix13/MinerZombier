@@ -8,12 +8,17 @@ var pulse: float = 0.0
 var resupply_step: int = -1
 var resupply_taught: bool = false
 var last_transitioning: bool = false
+var pointer: GuidePointer
 
 func _ready() -> void:
 	game = get_parent() as Node2D
 	cycle = game.get("cycle")
 	game.get("renderer").tutorial = cycle
 	z_index = 1000
+	pointer = GuidePointer.new()
+	pointer.name = "TutorialPointer"
+	game.get("shop").add_child(pointer)
+	pointer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	cycle.changed.connect(on_step_changed)
 	get_viewport().size_changed.connect(focus_objective)
 	on_step_changed()
@@ -49,13 +54,24 @@ func _process(delta: float) -> void:
 	pulse += delta
 	if not cycle.is_tutorial_active():
 		update_resupply()
+		update_ui_pointer()
 		return
 	var vein: Dictionary = cycle.mining.coal_veins.get(cycle.TUTORIAL_COAL_CELL, {})
-	var state: Array = [cycle.tutorial_step, game.get("placing_coal"), game.get("placing_belt"), game.get("placing_launcher"), cycle.mining.nuggets_at(cycle.TUTORIAL_ORE_CELL), vein.get("progress", 0), cycle.ammo_damage(), cycle.economy.coins]
+	var shop: Control = game.get("shop")
+	var state: Array = [cycle.tutorial_step, game.get("placing_coal"), game.get("placing_belt"), game.get("placing_launcher"), cycle.mining.nuggets_at(cycle.TUTORIAL_ORE_CELL), vein.get("progress", 0), cycle.ammo_damage(), cycle.economy.coins, shop.shop_open, shop.shop_animating, shop.shop_title.text]
 	if state != last_state:
 		last_state = state
 		game.get("shop").update_cycle()
+	update_ui_pointer()
 	queue_redraw()
+
+func update_ui_pointer() -> void:
+	var shop: Control = game.get("shop")
+	pointer.target = shop.tutorial_ui_target()
+	if resupply_active() and resupply_step != 1 and not game.get("camera_controller").transitioning:
+		pointer.target = shop.view_button
+	pointer.pulse = pulse
+	pointer.queue_redraw()
 
 func resupply_active() -> bool:
 	return resupply_step >= 0 and cycle.is_night and not cycle.defeated
@@ -83,11 +99,7 @@ func update_resupply() -> void:
 		queue_redraw()
 	last_transitioning = controller.transitioning
 	if resupply_active():
-		var button: Button = game.get("shop").view_button
-		button.modulate = Color.WHITE.lerp(Color("#f0c777"), 0.35 + 0.2 * sin(pulse * 4.0)) if resupply_step != 1 else Color.WHITE
 		queue_redraw()
-	elif previous >= 0:
-		game.get("shop").view_button.modulate = Color.WHITE
 
 func apply_resupply_card(shop: Control) -> void:
 	shop.cycle_heading.text = "APRENDE A RECARGAR"
@@ -96,21 +108,14 @@ func apply_resupply_card(shop: Control) -> void:
 	match resupply_step:
 		0:
 			shop.cycle_title.text = "Sin munición"
-			shop.cycle_goal.text = "Cambia a la mina para recargar."
-			shop.cycle_action.text = "IR A LA MINA"
+			shop.cycle_goal.text = "Pulsa MINA para recargar."
 		1:
 			shop.cycle_title.text = "Recarga el arma"
 			shop.cycle_goal.text = "Extrae una pepita y arrástrala al arma."
-			shop.cycle_action.text = "ARRASTRA LA PEPITA"
 		2:
 			shop.cycle_title.text = "¡Arma recargada!"
-			shop.cycle_goal.text = "Regresa a la defensa."
-			shop.cycle_action.text = "VOLVER A DEFENSA"
-	shop.cycle_action.disabled = resupply_step == 1 or game.get("camera_controller").transitioning
-
-func resupply_action() -> void:
-	if resupply_active() and resupply_step != 1:
-		game.get("shop").request_view_toggle()
+			shop.cycle_goal.text = "Pulsa DEFENSIVA para regresar."
+	shop.cycle_action.hide()
 
 func resupply_targets() -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
@@ -148,9 +153,12 @@ func clear_interaction() -> void:
 	game.redraw_world()
 
 func is_over_card(position: Vector2) -> bool:
-	var panel: Control = game.get("shop").get_node("CyclePanel")
-	var local: Vector2 = panel.get_global_transform_with_canvas().affine_inverse() * position
-	return Rect2(Vector2.ZERO, panel.size).has_point(local)
+	return is_over_control(game.get("shop").get_node("CyclePanel"), position)
+
+func is_over_control(control: Control, position: Vector2) -> bool:
+	if not control.is_visible_in_tree(): return false
+	var local: Vector2 = control.get_global_transform_with_canvas().affine_inverse() * position
+	return Rect2(Vector2.ZERO, control.size).has_point(local)
 
 func _input(event: InputEvent) -> void:
 	if not cycle.is_tutorial_active():
@@ -161,6 +169,11 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		return
 	if not event is InputEventMouseButton:
+		return
+	var shop: Control = game.get("shop")
+	if (shop.shop_open or shop.shop_animating) and is_over_control(shop.shop_panel, event.position):
+		return
+	if not shop.tutorial_purchase().is_empty() and is_over_control(shop.shop_button, event.position):
 		return
 	if event.button_index != MOUSE_BUTTON_LEFT:
 		get_viewport().set_input_as_handled()
@@ -181,17 +194,17 @@ func _input(event: InputEvent) -> void:
 func targets() -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
 	match cycle.tutorial_step:
-		0: result.append(cycle.TUTORIAL_COAL_CELL)
+		0:
+			if game.get("placing_coal"): result.append(cycle.TUTORIAL_COAL_CELL)
 		1, 5:
 			if cycle.mining.nuggets_at(cycle.TUTORIAL_ORE_CELL) > 0:
 				result.append(cycle.TUTORIAL_ORE_CELL)
 				result.append(cycle.grid.sale_cell if cycle.tutorial_step == 1 else cycle.grid.defense_cell("left"))
 			else:
 				result.append(cycle.TUTORIAL_COAL_CELL)
-		3:
-			result.append(cycle.grid.defense_cell("left"))
-			result.append(cycle.grid.defense_cell("right"))
-		4, 6: result.append(cycle.grid.defense_cell("left"))
+		4:
+			if game.get("placing_launcher"): result.append(cycle.grid.defense_cell("left"))
+		6: result.append(cycle.grid.defense_cell("left"))
 	return result
 
 func _draw() -> void:
@@ -216,3 +229,27 @@ func _draw() -> void:
 		draw_line(source + direction * 15.0, end, color, 1.5, true)
 		draw_line(end, end - direction.rotated(0.55) * 8.0, color, 1.5, true)
 		draw_line(end, end - direction.rotated(-0.55) * 8.0, color, 1.5, true)
+
+class GuidePointer extends Control:
+	var target: Control
+	var pulse: float = 0.0
+	var outline := StyleBoxFlat.new()
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		z_index = 100
+		outline.bg_color = Color.TRANSPARENT
+		outline.set_border_width_all(2)
+		outline.set_corner_radius_all(9)
+
+	func _draw() -> void:
+		if not is_instance_valid(target) or not target.is_visible_in_tree(): return
+		var transform: Transform2D = get_global_transform_with_canvas().affine_inverse() * target.get_global_transform_with_canvas()
+		var rect: Rect2 = (transform * Rect2(Vector2.ZERO, target.size)).grow(4.0)
+		var color := Color(0.95, 0.78, 0.47, 0.75 + 0.25 * sin(pulse * 4.0))
+		outline.border_color = color
+		draw_style_box(outline, rect)
+		var tip := Vector2(rect.position.x - 7.0, rect.get_center().y)
+		var tail: Vector2 = tip - Vector2(20.0 + 3.0 * sin(pulse * 4.0), 0)
+		draw_line(tail, tip - Vector2(4, 0), color, 2.0, true)
+		draw_colored_polygon(PackedVector2Array([tip, tip - Vector2(9, 6), tip - Vector2(9, -6)]), color)

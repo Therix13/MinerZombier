@@ -34,7 +34,7 @@ func mouse_event(point: Vector2, pressed: bool) -> void:
 
 func move_mouse(point: Vector2) -> void:
 	if DisplayServer.get_name() != "headless":
-		Input.warp_mouse(root.get_screen_transform().affine_inverse() * point)
+		Input.warp_mouse(point)
 	var event := InputEventMouseMotion.new()
 	event.position = point
 	event.global_position = point
@@ -74,6 +74,48 @@ func action_button() -> void:
 	await mouse_event(point, false)
 	await settle()
 
+func click_control(control: Control) -> void:
+	var point: Vector2 = root.get_screen_transform() * (control.get_global_transform_with_canvas() * (control.size * 0.5))
+	await move_mouse(point)
+	await mouse_event(point, true)
+	await mouse_event(point, false)
+	await settle()
+
+func wait_shop() -> void:
+	var deadline: int = Time.get_ticks_msec() + 2000
+	while shop.shop_animating and Time.get_ticks_msec() < deadline:
+		await process_frame
+	await settle()
+
+func purchase_route(category: String, item: String) -> void:
+	var guide: Node = game.get_node("TutorialGuide")
+	if not shop.shop_open:
+		check(guide.pointer.target == shop.shop_button and not shop.shop_button.disabled, "The guide marks the real menu before buying " + item)
+		await click_control(shop.shop_button)
+		await wait_shop()
+		check(shop.shop_open, "The marked menu opens for " + item)
+	if shop.shop_title.text != category:
+		check(guide.pointer.target == shop.category_buttons[category], "The guide points to the matching category for " + item)
+		for other: String in shop.category_buttons:
+			if other != category: check(shop.category_buttons[other].disabled, "Unrelated category stays locked: " + other)
+		shop.open_category("INVESTIGACIÓN")
+		check(shop.shop_title.text == "TIENDA", "Calling an unrelated category cannot bypass the guide")
+		await click_control(shop.category_buttons[category])
+	await settle()
+	check(shop.shop_title.text == category and guide.pointer.target == shop.purchase_buttons[item], "The guide marks the real purchase button for " + item)
+	if item == "coal":
+		await click_control(shop.fixed_back_button)
+		check(shop.shop_title.text == "TIENDA" and guide.pointer.target == shop.category_buttons[category], "Returning to categories restores the matching guide marker")
+		await click_control(shop.category_buttons[category])
+	for other: String in shop.purchase_buttons:
+		if other != item: check(shop.purchase_buttons[other].disabled, "Unrelated store purchase stays locked: " + other)
+	if item == "defense_platforms":
+		var coins: int = game.economy.coins
+		shop.request_item("launcher", shop.launcher_requested)
+		check(not game.placing_launcher and game.economy.coins == coins, "A synthetic weapon request cannot skip buying the platforms")
+	await click_control(shop.purchase_buttons[item])
+	await wait_shop()
+
 func check_locked_actions() -> void:
 	var coins: int = game.get("economy").coins
 	game.call("buy_brass_vein")
@@ -81,10 +123,13 @@ func check_locked_actions() -> void:
 	game.call("buy_junction_conveyor")
 	game.call("buy_conveyor")
 	game.call("research_technology", "drill")
-	game.call("toggle_view")
-	shop.call("open_shop")
+	# Older built-in controllers have their research locks enforced by the shop.
+	await settle()
 	check(game.get("economy").coins == coins and not game.get("placing_brass") and not game.get("placing_drill") and not game.get("placing_belt"), "Unrelated purchases spend nothing and do not enter placement")
-	check(not shop.get("shop_open") and shop.get("view_button").disabled and shop.get("shop_button").disabled, "Shop and view controls stay locked during the tutorial")
+	check(shop.view_button.disabled and shop.shop_button.disabled == shop.tutorial_purchase().is_empty(), "Only the menu required by the current step is unlocked")
+	if shop.tutorial_purchase().is_empty():
+		shop.open_shop()
+		check(not shop.shop_open, "The store stays locked while mining or loading ammunition")
 	check(not game.get("progression").has_research("drill"), "Research cannot bypass the tutorial")
 
 func extract_one() -> void:
@@ -97,11 +142,14 @@ func run_checks() -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args()
 	var scene_name: String = args[0] if not args.is_empty() else "main.tscn"
 	game = load("res://" + scene_name).instantiate()
+	if "--legacy" in args: game.set_script(load(OS.get_environment("GODOT_LEGACY_MAIN")))
 	root.add_child(game)
 	current_scene = game
 	await settle()
 	await settle()
-	var display: CanvasLayer = game.get("display_settings")
+	var display: CanvasLayer
+	for child in game.get_children():
+		if child.has_method("toggle_pause_menu"): display = child
 	display.resolution = Vector2i(1280, 720)
 	display.window_mode = 0
 	display.apply_display(false)
@@ -112,7 +160,7 @@ func run_checks() -> void:
 	grid = game.get("grid")
 	check(cycle.tutorial_step == 0 and cycle.is_tutorial_active(), "Fresh game starts in guided mode")
 	check(game.has_node("TutorialGuide"), "Tutorial input guard is installed")
-	check_locked_actions()
+	await check_locked_actions()
 	await key(KEY_F10)
 	await key(KEY_F10, false)
 	await key(KEY_P)
@@ -120,12 +168,14 @@ func run_checks() -> void:
 	check(not game.get("economy").developer_mode and not game.get("camera_controller").defense_view, "F10 and P cannot bypass tutorial locks")
 	await key(KEY_ESCAPE)
 	await key(KEY_ESCAPE, false)
-	check(paused and game.get("display_settings").menu_open, "ESC remains available during the tutorial")
+	check(paused and display.menu_open, "ESC remains available during the tutorial")
 	await key(KEY_ESCAPE)
 	await key(KEY_ESCAPE, false)
 	check(not paused, "ESC resumes the guided game")
-	await action_button()
-	check(game.get("placing_coal") and game.get("economy").coins == 400, "Tutorial card buys one coal vein")
+	shop._on_cycle_action()
+	check(not game.placing_coal and game.economy.coins == 500 and not shop.cycle_action.visible, "The tutorial card cannot purchase an item directly")
+	await purchase_route("BASE", "coal")
+	check(game.get("placing_coal") and game.get("economy").coins == 400, "The real store buys one coal vein")
 	if not game.get("placing_coal"):
 		quit(1)
 		return
@@ -155,19 +205,20 @@ func run_checks() -> void:
 	check(cycle.tutorial_step == 2 and game.get("economy").coins == 925 and cycle.coal_sold == 5, "The fifth sale grants the expansion bonus exactly once")
 	await click_cell(cycle.TUTORIAL_COAL_CELL)
 	check(game.get("mining").coal_veins[cycle.TUTORIAL_COAL_CELL]["progress"] == 0, "Mining is blocked during the expansion step")
-	await action_button()
+	await purchase_route("EXPANSION", "expansion")
 	check(cycle.tutorial_step == 3 and grid.cave_width == 7 and game.get("economy").coins == 425, "Expansion advances directly to defenses without a conveyor step")
 	game.call("buy_conveyor")
+	await settle()
 	check(not game.get("placing_belt") and game.get("conveyors").belts.is_empty(), "Conveyors remain locked throughout the tutorial")
-	await action_button()
-	check(cycle.tutorial_step == 4 and grid.defense_tiles.size() == 2 and game.get("economy").coins == 325, "Card unlocks both defense platforms once")
-	await action_button()
+	await purchase_route("DEFENSA", "defense_platforms")
+	check(cycle.tutorial_step == 4 and grid.defense_tiles.size() == 2 and game.get("economy").coins == 325, "The store unlocks both defense platforms once")
+	await purchase_route("DEFENSA", "launcher")
 	check(game.get("placing_launcher") and game.get("economy").coins == 325, "First launcher is free")
 	await click_cell(grid.defense_cell("right"))
 	check(game.get("launchers").launchers.is_empty() and game.get("placing_launcher"), "Unmarked launcher platform is blocked")
 	await click_cell(grid.defense_cell("left"))
 	check(cycle.tutorial_step == 5 and not cycle.free_launcher_available, "Marked launcher placement consumes the free launcher and advances")
-	check_locked_actions()
+	await check_locked_actions()
 	for index in range(4):
 		await extract_one()
 		if index == 0:
@@ -191,6 +242,7 @@ func run_checks() -> void:
 	check(cycle.day == 2 and not cycle.is_night and not shop.get("shop_button").disabled, "Completing the first night unlocks normal play")
 	check(game.get("progression").level == 2 and game.get("progression").research_points == 1, "Five tutorial sales and the first wave grant a research point")
 	game.call("buy_conveyor")
+	await settle()
 	check(not game.get("placing_belt"), "The straight conveyor still requires research after the tutorial")
 	game.call("research_technology", "straight_belt")
 	game.call("buy_conveyor")
@@ -200,6 +252,7 @@ func run_checks() -> void:
 	check(game.get("placing_coal"), "Basic purchases unlock immediately after the tutorial")
 	game.call("cancel_placement")
 	game.call("buy_brass_vein")
+	await settle()
 	check(not game.get("placing_brass"), "Advanced purchases still require their item research after the tutorial")
 	game.get("progression").add_experience(100)
 	game.call("research_technology", "drill")

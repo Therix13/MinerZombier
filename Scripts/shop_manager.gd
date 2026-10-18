@@ -65,6 +65,8 @@ var research_buttons: Dictionary = {}
 var research_status: Dictionary = {}
 var research_details: Dictionary = {}
 var item_buttons: Dictionary = {}
+var category_buttons: Dictionary = {}
+var purchase_buttons: Dictionary = {}
 var fallback_display: CanvasLayer
 
 func setup(economy_manager: RefCounted, grid_manager: RefCounted) -> void:
@@ -405,21 +407,16 @@ func build_cycle_panel() -> void:
 	column.add_child(cycle_action)
 
 func _on_cycle_action() -> void:
-	if cycle_action.disabled:
+	if cycle_action.disabled or not cycle_action.visible:
 		return
 	var guide: Node = get_parent().get_parent().get_node_or_null("TutorialGuide")
 	if guide != null and guide.resupply_active():
-		guide.resupply_action()
 		return
 	if cycle.defeated:
 		restart_requested.emit()
 	elif cycle.is_tutorial_active():
-		match cycle.tutorial_step:
-			0: coal_vein_requested.emit()
-			2: expansion_requested.emit()
-			3: unlock_defense_platforms()
-			4: launcher_requested.emit()
-			6: night_requested.emit()
+		if cycle.tutorial_step == cycle.TUTORIAL_LAST_STEP:
+			night_requested.emit()
 		update_cycle()
 	elif cycle.can_start_night() and not shop_open and not shop_animating:
 		night_requested.emit()
@@ -431,6 +428,7 @@ func update_cycle() -> void:
 	cycle_heading.text = "PRIMEROS PASOS" if tutorial else "DEFENSA DE LA BASE"
 	cycle_badge.text = "%02d / %02d" % [mini(cycle.tutorial_step + 1, cycle.TUTORIAL_LAST_STEP), cycle.TUTORIAL_LAST_STEP] if tutorial else "DÍA %d" % cycle.day
 	cycle_steps.visible = tutorial
+	cycle_action.show()
 	for index in range(cycle_steps.get_child_count()):
 		cycle_steps.get_child(index).color = Color("#8db574") if index < cycle.tutorial_step else (Color("#e1b879") if index == cycle.tutorial_step else Color("#354b3a"))
 	if tutorial:
@@ -440,27 +438,26 @@ func update_cycle() -> void:
 		var game: Node = get_parent().get_parent()
 		match cycle.tutorial_step:
 			0:
-				cycle_action.text = "COLOCA LA VETA MARCADA" if game.get("placing_coal") else "COMPRAR VETA · 100"
-				cycle_action.disabled = game.get("placing_coal") or not economy.can_afford(economy.COAL_VEIN_PRICE)
+				cycle_action.hide()
 				if game.get("placing_coal"):
-					cycle_goal.text = "Coloca la veta en la casilla dorada. Su salida quedará orientada hacia la derecha."
+					cycle_goal.text = "Coloca la veta en la casilla dorada."
+				else:
+					cycle_goal.text = tutorial_navigation_text()
 			1, 5:
 				if cycle.tutorial_step == 5:
 					cycle_action.text = "MUNICIÓN · %d / 4" % roundi(cycle.ammo_damage() / 0.5)
 				else:
 					cycle_action.text = "CARBÓN VENDIDO · %d / %d" % [mini(cycle.coal_sold, cycle.TUTORIAL_SALES_TARGET), cycle.TUTORIAL_SALES_TARGET]
 				cycle_action.disabled = true
-			2:
-				cycle_action.text = "AMPLIAR A 7 × 5 · 500"
-				cycle_action.disabled = not economy.can_afford(economy.EXPANSION_PRICE)
-			3:
-				cycle_action.text = "DESBLOQUEAR DEFENSAS · 100"
-				cycle_action.disabled = not economy.can_afford(economy.DEFENSE_TILE_PRICE)
+			2, 3:
+				cycle_action.hide()
+				cycle_goal.text = tutorial_navigation_text()
 			4:
-				cycle_action.text = "COLOCA EL LANZAPAPAS" if game.get("placing_launcher") else "OBTENER LANZAPAPAS · GRATIS"
-				cycle_action.disabled = game.get("placing_launcher")
+				cycle_action.hide()
 				if game.get("placing_launcher"):
-					cycle_goal.text = "Coloca el lanzapapas en la plataforma izquierda resaltada en dorado."
+					cycle_goal.text = "Coloca el lanzapapas en la plataforma dorada."
+				else:
+					cycle_goal.text = tutorial_navigation_text()
 			6:
 				cycle_action.text = "INICIAR PRIMERA NOCHE"
 				cycle_action.disabled = not cycle.can_start_night()
@@ -479,12 +476,50 @@ func update_cycle() -> void:
 		cycle_goal.text = "Construye, fabrica munición y prepara la próxima noche."
 		cycle_action.text = "INICIAR NOCHE"
 		cycle_action.disabled = not cycle.can_start_night() or shop_open or shop_animating
-	shop_button.disabled = tutorial or cycle.is_night or cycle.defeated
+	shop_button.disabled = (tutorial and tutorial_purchase().is_empty()) or cycle.is_night or cycle.defeated
 	view_button.disabled = tutorial or cycle.defeated
 	var guide: Node = get_parent().get_parent().get_node_or_null("TutorialGuide")
 	if guide != null and guide.resupply_active():
 		guide.apply_resupply_card(self)
 	update_progression()
+
+func tutorial_purchase() -> Dictionary:
+	if cycle == null or not cycle.is_tutorial_active():
+		return {}
+	var game: Node = get_parent().get_parent()
+	match cycle.tutorial_step:
+		0:
+			if not game.get("placing_coal"):
+				return {"category": "BASE", "item": "coal", "instruction": "Compra la veta de carbón."}
+		2:
+			return {"category": "EXPANSION", "item": "expansion", "instruction": "Compra la ampliación a 7 × 5."}
+		3:
+			return {"category": "DEFENSA", "item": "defense_platforms", "instruction": "Desbloquea las plataformas."}
+		4:
+			if not game.get("placing_launcher"):
+				return {"category": "DEFENSA", "item": "launcher", "instruction": "Obtén tu lanzapapas gratuito."}
+	return {}
+
+func tutorial_navigation_text() -> String:
+	var purchase: Dictionary = tutorial_purchase()
+	if purchase.is_empty(): return ""
+	if not shop_open: return "Abre el menú ☰."
+	if shop_title.text != purchase["category"]:
+		return "Entra en %s." % ("EXPANSIÓN" if purchase["category"] == "EXPANSION" else purchase["category"])
+	return purchase["instruction"]
+
+func tutorial_ui_target() -> Control:
+	var purchase: Dictionary = tutorial_purchase()
+	if purchase.is_empty() or shop_animating: return null
+	if not shop_open: return shop_button
+	if shop_title.text != purchase["category"]:
+		return category_buttons.get(purchase["category"])
+	return purchase_buttons.get(purchase["item"])
+
+func tutorial_allows_item(item: String) -> bool:
+	if cycle == null or not cycle.is_tutorial_active(): return true
+	var purchase: Dictionary = tutorial_purchase()
+	return shop_open and not shop_animating and not purchase.is_empty() and purchase["item"] == item and shop_title.text == purchase["category"]
 
 func create_style(background: String, border: String, border_size: int, radius: int) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -651,6 +686,8 @@ func update_money(amount: int) -> void:
 
 func clear_content() -> void:
 	item_buttons.clear()
+	category_buttons.clear()
+	purchase_buttons.clear()
 	research_buttons.clear()
 	research_status.clear()
 	research_details.clear()
@@ -660,8 +697,6 @@ func clear_content() -> void:
 		child.queue_free()
 
 func show_categories() -> void:
-	if cycle != null and cycle.is_tutorial_active():
-		return
 	shop_title.text = "TIENDA"
 	fixed_back_button.hide()
 	shop_scroll.scroll_vertical = 0
@@ -669,11 +704,14 @@ func show_categories() -> void:
 	shop_content.add_child(create_label("CATEGORIAS", 20, Color("#f3ca85")))
 	for category in CATEGORIES:
 		var button := create_button(category + "  >")
+		button.disabled = cycle != null and cycle.is_tutorial_active() and tutorial_purchase().get("category", "") != category
 		button.pressed.connect(open_category.bind(category))
+		category_buttons[category] = button
 		shop_content.add_child(button)
+	if cycle != null: update_cycle()
 
 func open_category(category: String) -> void:
-	if cycle != null and cycle.is_tutorial_active():
+	if shop_animating or (cycle != null and cycle.is_tutorial_active() and tutorial_purchase().get("category", "") != category):
 		return
 	shop_title.text = category
 	fixed_back_button.show()
@@ -692,7 +730,8 @@ func open_category(category: String) -> void:
 			else:
 				button.text = "AMPLIAR A 7x5 - 500"
 				button.disabled = not economy.can_afford(economy.EXPANSION_PRICE)
-				button.pressed.connect(expansion_requested.emit)
+				button.pressed.connect(request_item.bind("expansion", expansion_requested))
+			purchase_buttons["expansion"] = button
 			shop_content.add_child(button)
 		"BASE":
 			shop_content.add_child(create_label("MINERIA", 19, Color("#f3ca85")))
@@ -715,15 +754,21 @@ func open_category(category: String) -> void:
 				platforms_button.disabled = not economy.can_afford(economy.DEFENSE_TILE_PRICE)
 				platforms_button.pressed.connect(unlock_defense_platforms)
 			shop_content.add_child(platforms_button)
+			platforms_button.disabled = platforms_button.disabled or not tutorial_allows_item("defense_platforms")
+			purchase_buttons["defense_platforms"] = platforms_button
 			var launcher_button := create_button("LANZAPAPAS - GRATIS" if cycle != null and cycle.free_launcher_available else "LANZAPAPAS - 200")
 			launcher_button.disabled = not (cycle != null and cycle.free_launcher_available) and not economy.can_afford(economy.LAUNCHER_PRICE)
-			launcher_button.pressed.connect(launcher_requested.emit)
+			launcher_button.disabled = launcher_button.disabled or not tutorial_allows_item("launcher")
+			launcher_button.pressed.connect(request_item.bind("launcher", launcher_requested))
+			purchase_buttons["launcher"] = launcher_button
 			shop_content.add_child(launcher_button)
+	if cycle != null: update_cycle()
 
 func add_item_button(text: String, price: int, item: String, request: Signal) -> void:
 	var button := create_button(text)
 	button.pressed.connect(request_item.bind(item, request))
 	item_buttons[item] = {"button": button, "price": price}
+	purchase_buttons[item] = button
 	var icon := ResearchIcon.new()
 	icon.name = "ResearchLock"
 	icon.kind = "lock"
@@ -734,9 +779,9 @@ func add_item_button(text: String, price: int, item: String, request: Signal) ->
 	refresh_item_buttons()
 
 func request_item(item: String, request: Signal) -> void:
-	if progression != null and not progression.is_item_unlocked(item):
+	if progression != null and item != "expansion" and not progression.is_item_unlocked(item):
 		return
-	if cycle != null and (cycle.is_night or cycle.defeated or cycle.is_tutorial_active()):
+	if cycle != null and (cycle.is_night or cycle.defeated or not tutorial_allows_item(item)):
 		return
 	request.emit()
 
@@ -744,14 +789,14 @@ func refresh_item_buttons() -> void:
 	for item in item_buttons:
 		var button: Button = item_buttons[item]["button"]
 		var unlocked: bool = progression == null or progression.is_item_unlocked(item)
-		button.disabled = not unlocked or not economy.can_afford(item_buttons[item]["price"]) or (cycle != null and (cycle.is_night or cycle.defeated or cycle.is_tutorial_active()))
+		button.disabled = not unlocked or not economy.can_afford(item_buttons[item]["price"]) or not tutorial_allows_item(item) or (cycle != null and (cycle.is_night or cycle.defeated))
 		button.get_node("ResearchLock").visible = not unlocked
 		button.tooltip_text = ""
 		if not unlocked:
 			button.tooltip_text = "Investigar: %s" % progression.RESEARCHES[progression.ITEM_RESEARCH[item]]["name"]
 
 func unlock_defense_platforms() -> void:
-	if cycle != null and not cycle.allows_action("unlock_defense"):
+	if not tutorial_allows_item("defense_platforms") or (cycle != null and not cycle.allows_action("unlock_defense")):
 		return
 	var left_cell: Vector2i = grid.defense_cell("left")
 	var right_cell: Vector2i = grid.defense_cell("right")
@@ -768,7 +813,7 @@ func unlock_defense_platforms() -> void:
 	open_category("DEFENSA")
 
 func open_shop() -> void:
-	if cycle != null and cycle.is_tutorial_active():
+	if cycle != null and cycle.is_tutorial_active() and tutorial_purchase().is_empty():
 		return
 	if shop_open or shop_animating or (cycle != null and (cycle.is_night or cycle.defeated)):
 		return
