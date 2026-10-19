@@ -42,6 +42,7 @@ func run_checks() -> void:
 	check(mover.select_item("launcher"),"Select the second rusty launcher")
 	await create_timer(0.4).timeout
 	check(mover.place_selected(b) and weapons.level_at(b) == 1 and game.economy.coins == 0,"Second launcher also costs exactly 500")
+	game.shop.accept_unlock_notice()
 	check(weapons.receive(a,"copper") and weapons.receive(b,"coal"),"Both basic launchers accept level-one ammunition")
 	check(weapons.receive(a,"copper_2") and weapons.launchers[a]["ammo"].size() == 3,"Higher-tier nuggets now add multiple rounds to a basic launcher")
 	check(mover.can_drop("launcher",a,b) and not mover.swaps_contents("launcher",a,b),"Dragging two basic launchers offers fusion rather than swapping")

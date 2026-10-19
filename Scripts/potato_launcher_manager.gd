@@ -47,6 +47,7 @@ func place(cell: Vector2i, level: int = 1) -> bool:
 	if not can_place(cell):
 		return false
 	launchers[cell] = {"ammo": [], "cooldown": 0.0, "angle": -PI * 0.5, "level": clampi(level,1,2)}
+	world.get("progression").record_launchers(launchers)
 	changed.emit()
 	return true
 
@@ -60,6 +61,7 @@ func interval_at(cell: Vector2i) -> float:
 	return UPGRADED_FIRE_INTERVAL if level_at(cell) == 2 else fire_interval
 
 func can_fuse(source: Vector2i, destination: Vector2i) -> bool:
+	if not world.get("progression").is_item_unlocked("launcher_2"): return false
 	if source == destination or not launchers.has(source) or not launchers.has(destination): return false
 	if level_at(source) != 1 or level_at(destination) != 1: return false
 	if world.get("cycle").is_night: return false

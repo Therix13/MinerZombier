@@ -33,6 +33,30 @@ func dispose() -> void:
 func is_item_unlocked(item: String) -> bool:
 	return item in BASE_ITEMS or unlocked.has(item) or (developer_mode and (item == "expansion" or item in NEXT_VEIN.values() or ConstructionScript.RECIPES.has(item)))
 
+func has_launcher_pair(weapons: Dictionary) -> bool:
+	var count: int = 0
+	for weapon: Dictionary in weapons.values():
+		if int(weapon.get("level",1)) == 1: count += 1
+	return count >= 2
+
+func record_launchers(weapons: Dictionary) -> void:
+	if has_launcher_pair(weapons):
+		var items: Array[String] = ["launcher_2"]
+		unlock_items(items)
+
+func record_night_completed(night: int) -> void:
+	if night >= 2:
+		var items: Array[String] = ["launcher_2"]
+		unlock_items(items)
+
+func restore_launcher_milestones(day: int, weapons: Dictionary, plans: Dictionary) -> void:
+	# Recognize conditions already met in saves created before this unlock existed.
+	if day >= 3 or has_launcher_pair(weapons): unlocked["launcher_2"] = true
+	for weapon: Dictionary in weapons.values():
+		if int(weapon.get("level",1)) == 2: unlocked["launcher_2"] = true
+	for plan: Dictionary in plans.values():
+		if plan.get("item") == "launcher_2": unlocked["launcher_2"] = true
+
 func record_placed_vein(cell: Vector2i) -> void:
 	if mining.vein_at(cell) == "copper":
 		var items: Array[String] = ["expansion"]

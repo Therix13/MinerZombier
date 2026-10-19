@@ -394,6 +394,7 @@ func restore_snapshot(data: Dictionary) -> bool:
 	}
 	for key: String in CYCLE_FIELDS:
 		game.cycle.set(key,data["cycle"].get(key,tutorial_defaults.get(key,game.cycle.get(key))))
+	game.progression.restore_launcher_milestones(game.cycle.day,game.launchers.launchers,game.get_node("Construction").plans)
 	# Revision 2 inserts expansion between ingot fusion and the defense lessons.
 	if int(data.get("tutorial_revision",1)) < 2 and game.cycle.tutorial_step >= 11:
 		if game.cycle.day == 1 and not game.cycle.is_night and not game.cycle.tutorial_skipped and game.cycle.tutorial_step < 15 and game.grid.cave_width < 7:

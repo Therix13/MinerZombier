@@ -508,6 +508,7 @@ func on_wave_completed() -> void:
 	if not cycle.is_night:
 		return
 	var completed_night: int = cycle.day
+	progression.record_night_completed(completed_night)
 	cycle.complete_night()
 	var guide: Node = get_node_or_null("TutorialGuide")
 	if guide != null: guide.retire()
