@@ -7,6 +7,8 @@ var live_game: Node
 var time := 0.0
 var destruction := 0.0
 var actors: Array[Node2D] = []
+var last_destruction := -1.0
+var last_center := INF
 
 func _ready() -> void:
 	for index in range(HORDE_SIZE):
@@ -24,14 +26,19 @@ func _process(delta: float) -> void:
 
 func present() -> void:
 	var center: float = grid.get_cell_rect(grid.sale_cell).get_center().x
+	var geometry_changed: bool = destruction != last_destruction or center != last_center
+	if not geometry_changed and destruction < 0.7: return
 	for index in range(actors.size()):
 		var row: int = index / 8
 		var advance: float = smoothstep(0.5,1.0,destruction) * (190 - row * 25)
-		actors[index].position = Vector2(center + (index % 8 - 3.5) * 48, FENCE_Y - 20 - row * 42 + advance)
+		if geometry_changed: actors[index].position = Vector2(center + (index % 8 - 3.5) * 48, FENCE_Y - 20 - row * 42 + advance)
 		actors[index].walking_time = time * 5 + index
 		actors[index].attacking = destruction < 0.7
-		actors[index].queue_redraw()
-	queue_redraw()
+		actors[index].update_visual()
+	if geometry_changed:
+		last_destruction = destruction
+		last_center = center
+		queue_redraw()
 
 func _draw() -> void:
 	if grid == null: return
@@ -51,3 +58,5 @@ func _draw() -> void:
 class WaitingZombie extends "res://Scripts/zombie.gd":
 	func _ready() -> void:
 		set_process(false)
+		create_body_sprite()
+		update_visual()

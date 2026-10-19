@@ -2,6 +2,8 @@ extends CanvasLayer
 
 signal finished
 
+static var sound_cache: Dictionary = {}
+
 const SESSION_KEY: StringName = &"mine_defense_intro_seen"
 const DURATION := 9.0
 const BREACH_DURATION := 7.0
@@ -190,6 +192,8 @@ func build_audio() -> void:
 	ambience.play()
 
 func synthesize_sound(seconds: float, kind: int) -> AudioStreamWAV:
+	var key := Vector2(seconds,float(kind))
+	if sound_cache.has(key): return sound_cache[key]
 	const RATE := 22050
 	var count: int = int(seconds * RATE)
 	var data := PackedByteArray()
@@ -216,6 +220,7 @@ func synthesize_sound(seconds: float, kind: int) -> AudioStreamWAV:
 	stream.format = AudioStreamWAV.FORMAT_16_BITS
 	stream.mix_rate = RATE
 	stream.data = data
+	sound_cache[key] = stream
 	return stream
 
 func update_audio() -> void:
@@ -276,7 +281,7 @@ class BarrierCanvas extends Node2D:
 		barrier.time = time
 		barrier.destruction = destruction
 		barrier.present()
-		renderer.queue_redraw()
+		# The paused factory stays retained while only its parent camera transform moves.
 
 class FilmBars extends Node2D:
 	func _init() -> void:

@@ -19,6 +19,8 @@ var attack_timer: float = ATTACK_INTERVAL
 var hit_flash: float = 0.0
 var limbs: Array[String] = ["left_arm", "right_arm", "left_leg", "right_leg"]
 var random := RandomNumberGenerator.new()
+var body_sprite: Sprite2D
+var last_body_state := -1
 
 func setup(start_position: Vector2, target_position: Vector2, starting_health: float = MAX_HEALTH) -> void:
 	position = start_position
@@ -29,7 +31,8 @@ func setup(start_position: Vector2, target_position: Vector2, starting_health: f
 
 func _ready() -> void:
 	add_to_group("zombies")
-	queue_redraw()
+	create_body_sprite()
+	update_visual()
 
 func _process(delta: float) -> void:
 	if attacking:
@@ -40,7 +43,7 @@ func _process(delta: float) -> void:
 			base_attacked.emit(ATTACK_DAMAGE)
 		if hit_flash > 0.0:
 			hit_flash = maxf(0.0, hit_flash - delta)
-			queue_redraw()
+			update_visual()
 		return
 	var remaining: Vector2 = destination - position
 	var step: float = MOVEMENT_SPEED * delta
@@ -52,7 +55,7 @@ func _process(delta: float) -> void:
 	else:
 		position += remaining.normalized() * step
 		walking_time += delta * 8.0
-	queue_redraw()
+	update_visual()
 
 func take_damage(amount: float) -> void:
 	if health <= 0.0 or amount <= 0.0:
@@ -66,7 +69,7 @@ func take_damage(amount: float) -> void:
 		defeated.emit()
 		queue_free()
 	else:
-		queue_redraw()
+		update_visual()
 
 func apply_damage(amount: float) -> void:
 	take_damage(amount)
@@ -84,7 +87,7 @@ func show_hit(amount: float) -> void:
 	get_parent().add_child(effect)
 	effect.global_transform = global_transform
 	effect.z_index = z_index + 1
-	queue_redraw()
+	update_visual()
 
 # All enemies share one small atlas, including every dismemberment/flash state.
 # Bobbing changes the sprite transform, rather than tessellating circles each frame.
@@ -125,7 +128,27 @@ static func get_body_atlas() -> ImageTexture:
 func body_state() -> int:
 	return (1 if "left_arm" in limbs else 0) | (2 if "right_arm" in limbs else 0) | (4 if "left_leg" in limbs else 0) | (8 if "right_leg" in limbs else 0) | (16 if hit_flash > 0 else 0)
 
+func create_body_sprite() -> void:
+	if body_sprite != null: return
+	body_sprite = Sprite2D.new()
+	body_sprite.name = "BodySprite"
+	body_sprite.texture = get_body_atlas()
+	body_sprite.region_enabled = true
+	body_sprite.scale = Vector2.ONE * 0.5
+	add_child(body_sprite)
+
+func update_visual() -> void:
+	if body_sprite == null:
+		queue_redraw()
+		return
+	var state: int = body_state()
+	if state != last_body_state:
+		body_sprite.region_rect = Rect2(Vector2(Vector2i(state % 8, state / 8) * BODY_SIZE),Vector2(BODY_SIZE))
+		last_body_state = state
+	body_sprite.position = Vector2(0,4 + (0.0 if attacking else sin(walking_time) * 1.5))
+
 func _draw() -> void:
+	if body_sprite != null: return
 	var state: int = body_state()
 	var bob: float = 0.0 if attacking else sin(walking_time) * 1.5
 	var source := Rect2(Vector2(Vector2i(state % 8, state / 8) * BODY_SIZE), Vector2(BODY_SIZE))

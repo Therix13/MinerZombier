@@ -41,6 +41,7 @@ func run() -> void:
 			node.resolution = Vector2i(1920,1080)
 			node.window_mode = 0
 			node.apply_display(false)
+	Engine.max_fps = 0
 	game.cycle.skip_tutorial()
 	await measure("idle")
 	game.grid.expand()

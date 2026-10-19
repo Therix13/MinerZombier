@@ -5,6 +5,8 @@ var cycle: RefCounted
 var last_step: int = -1
 var last_state: Array = []
 var pulse: float = 0.0
+var targets_dirty := true
+var cached_targets: Array[Vector2i] = []
 var resupply_step: int = -1
 var resupply_taught: bool = false
 var last_transitioning: bool = false
@@ -41,6 +43,7 @@ func _ready() -> void:
 	on_step_changed()
 
 func on_step_changed() -> void:
+	targets_dirty = true
 	if not cycle.is_tutorial_active():
 		queue_redraw()
 		return
@@ -80,6 +83,7 @@ func _process(delta: float) -> void:
 	var shop: Control = game.get("shop")
 	var state: Array = [cycle.tutorial_step, game.get("placing_coal"), game.get("placing_belt"), game.get("placing_launcher"), cycle.mining.nuggets_at(cycle.coal_output()), vein.get("progress", 0), cycle.ammo_damage(), cycle.economy.coins, shop.shop_open, shop.shop_animating, shop.shop_title.text]
 	if state != last_state:
+		targets_dirty = true
 		last_state = state
 		game.get("shop").update_cycle()
 	update_ui_pointer()
@@ -90,8 +94,10 @@ func update_ui_pointer() -> void:
 	pointer.target = shop.tutorial_ui_target()
 	if resupply_active() and resupply_step != 1 and not game.get("camera_controller").transitioning:
 		pointer.target = shop.view_button
-	pointer.pulse = pulse
-	pointer.queue_redraw()
+	pointer.visible = is_instance_valid(pointer.target) and pointer.target.is_visible_in_tree()
+	if pointer.visible:
+		pointer.pulse = pulse
+		pointer.queue_redraw()
 
 func resupply_active() -> bool:
 	return resupply_step >= 0 and cycle.is_night and not cycle.defeated
@@ -165,6 +171,12 @@ func _input(event: InputEvent) -> void:
 	game.get("shop").handle_outside_click(event)
 
 func targets() -> Array[Vector2i]:
+	if targets_dirty:
+		cached_targets = compute_targets()
+		targets_dirty = false
+	return cached_targets
+
+func compute_targets() -> Array[Vector2i]:
 	if not cycle.is_tutorial_active(): return []
 	if cycle.tutorial_step >= 6: return cycle.workshop_targets()
 	if cycle.tutorial_step == 0:

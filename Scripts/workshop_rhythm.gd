@@ -1,6 +1,8 @@
 extends Node2D
 
 # Original procedural score: one clock for percussion, bass and tuned machinery.
+static var audio_cache: Dictionary = {}
+
 const BPM := 100.0
 const BEAT := 60.0 / BPM
 const RATE := 22050
@@ -16,6 +18,9 @@ var voices: Array[AudioStreamPlayer] = []
 var sounds: Dictionary = {}
 var cooldowns: Dictionary = {}
 var impacts: Array[Dictionary] = []
+var transfer_tracks: Dictionary = {}
+var transfer_tracks_dirty := true
+var visual_activity := false
 var pending: Dictionary = {}
 var machine_beat := -1
 var night_mix := 0.0
@@ -88,6 +93,8 @@ func note(samples: PackedFloat32Array, start: float, duration: float, frequency:
 		samples[index % samples.size()] += tone * envelope * gain
 
 func make_score(dark: bool) -> AudioStreamWAV:
+	var key: String = "night_score" if dark else "day_score"
+	if audio_cache.has(key): return audio_cache[key]
 	var samples := PackedFloat32Array()
 	samples.resize(int(LOOP_BEATS * BEAT * RATE))
 	var rng := RandomNumberGenerator.new()
@@ -109,9 +116,13 @@ func make_score(dark: bool) -> AudioStreamWAV:
 				note(samples, at + half * BEAT * 0.5, 0.07, 3000, 0.025, 3, rng)
 				var pitch: float = root_note * 2 * pow(2, float(melody[(beat * 2 + half) % 8]) / 12.0)
 				note(samples, at + half * BEAT * 0.5, 0.32, pitch, 0.085 if half == 0 else 0.055, 0, rng)
-	return wav(samples, true)
+	var stream: AudioStreamWAV = wav(samples, true)
+	audio_cache[key] = stream
+	return stream
 
 func make_effect(kind: String) -> AudioStreamWAV:
+	var key: String = "effect:" + kind
+	if audio_cache.has(key): return audio_cache[key]
 	var samples := PackedFloat32Array()
 	samples.resize(int(RATE * 0.36))
 	var rng := RandomNumberGenerator.new()
@@ -131,7 +142,9 @@ func make_effect(kind: String) -> AudioStreamWAV:
 		"finish", "sale":
 			note(samples, 0, 0.22, 660, 0.32, 0, rng)
 			note(samples, 0.09, 0.25, 880, 0.24, 0, rng)
-	return wav(samples)
+	var stream: AudioStreamWAV = wav(samples)
+	audio_cache[key] = stream
+	return stream
 
 func request_sound(kind: String) -> void:
 	# Coalesce simultaneous factory actions; twelve drills never become twelve loud hits.
@@ -149,6 +162,7 @@ func on_transport(source: Vector2i, destination: Vector2i, kind: String) -> void
 	# A short moving glint follows the actual successful transfer.
 	if impacts.size() >= 64: impacts.pop_front()
 	impacts.append({"cell": source, "to": destination, "age": 0.0, "kind": "transfer", "material": kind})
+	transfer_tracks_dirty = true
 
 func _process(delta: float) -> void:
 	if game.get("cycle").defeated:
@@ -161,11 +175,14 @@ func _process(delta: float) -> void:
 	music.volume_db = linear_to_db(maxf(music_volume, 0.0001)) - 8.0
 	tension.volume_db = linear_to_db(maxf(music_volume * night_mix, 0.0001)) - 10.0
 	for kind: String in cooldowns: cooldowns[kind] = maxf(0, float(cooldowns[kind]) - delta)
+	var had_impacts: bool = not impacts.is_empty()
+	var moving_ore := false
 	for i in range(impacts.size() - 1, -1, -1):
 		impacts[i]["age"] += delta
+		if impacts[i]["kind"] == "transfer": moving_ore = true
 		if impacts[i]["age"] >= 0.35:
 			impacts.remove_at(i)
-			game.get("renderer").queue_redraw()
+			transfer_tracks_dirty = true
 	var beat := int(clock / BEAT)
 	if beat != machine_beat:
 		machine_beat = beat
@@ -183,16 +200,32 @@ func _process(delta: float) -> void:
 			cooldowns[kind] = 0.08 if kind in ["mine", "shot"] else 0.15
 			break
 	pending.clear()
-	queue_redraw()
-	if not impacts.is_empty(): game.get("renderer").queue_redraw()
+	var animated_machinery: bool = not game.get("conveyors").belts.is_empty() or not game.get("drills").drills.is_empty()
+	if not animated_machinery:
+		for machine: Dictionary in game.get_node("Compactors").machines.values():
+			if int(machine["count"]) == 2 and float(machine["elapsed"]) < 4: animated_machinery = true; break
+	if not animated_machinery:
+		for machine: Dictionary in game.get_node("Furnaces").machines.values():
+			if machine.get("burning",false): animated_machinery = true; break
+	if had_impacts or animated_machinery or visual_activity: queue_redraw()
+	visual_activity = had_impacts or animated_machinery
+	if moving_ore: game.get("renderer").queue_redraw()
 
 func nugget_position(cell: Vector2i, kind: String, target: Vector2) -> Vector2:
-	for impact: Dictionary in impacts:
-		if impact.get("to") != cell or impact.get("material") != kind: continue
-		var from: Vector2 = game.get("grid").get_cell_rect(impact["cell"]).get_center()
-		var progress: float = clampf(float(impact["age"]) / 0.3, 0, 1)
-		return from.lerp(target, progress * progress * (3 - 2 * progress))
-	return target
+	# Build once per transfer change, rather than scanning every effect for every ore.
+	if transfer_tracks_dirty:
+		transfer_tracks.clear()
+		for impact: Dictionary in impacts:
+			if impact["kind"] != "transfer": continue
+			var destination: Vector2i = impact["to"]
+			if not transfer_tracks.has(destination): transfer_tracks[destination] = {}
+			if not transfer_tracks[destination].has(impact["material"]): transfer_tracks[destination][impact["material"]] = impact
+		transfer_tracks_dirty = false
+	var track: Dictionary = transfer_tracks.get(cell,{}).get(kind,{})
+	if track.is_empty(): return target
+	var from: Vector2 = game.get("grid").get_cell_rect(track["cell"]).get_center()
+	var progress: float = clampf(float(track["age"]) / 0.3, 0, 1)
+	return from.lerp(target, progress * progress * (3 - 2 * progress))
 
 func _draw() -> void:
 	if game == null: return

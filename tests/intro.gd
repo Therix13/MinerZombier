@@ -81,7 +81,7 @@ func run_checks() -> void:
 	await settle()
 	check(not paused and game.cycle.is_night and game.cycle.barrier_broken and game.zombie_manager.active_wave,"Ending the collapse starts the first actual horde exactly once")
 	check(game.zombie_manager.spawn_count == 1 and game.cycle.day == 1,"The cinematic itself never spawned or consumed real enemies")
-	check(game.shop.get_node("CyclePanel").visible and game.get_node("CanvasLayer").visible,"Combat restores both HUD and defense card")
+	check(not game.shop.get_node("CyclePanel").visible and game.get_node("CanvasLayer").visible,"Combat restores the HUD while the completed tutorial stays hidden")
 	game.free()
 	await settle()
 	Engine.remove_meta(IntroScript.SESSION_KEY)

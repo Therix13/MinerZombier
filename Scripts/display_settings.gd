@@ -4,6 +4,7 @@ signal changed
 
 enum WindowMode { WINDOWED, BORDERLESS, FULLSCREEN }
 
+const TARGET_FPS := 120
 const SETTINGS_PATH := "user://display_settings.cfg"
 const PAUSE_ACTION: StringName = &"mine_defense_pause"
 const INTERFACE_WIDTH: float = 1280.0
@@ -11,6 +12,8 @@ const RESOLUTIONS := [Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1
 
 var resolution := Vector2i(1920, 1080)
 var window_mode: int = WindowMode.FULLSCREEN
+var vsync_enabled := false
+var vsync_checkbox: CheckBox
 var menu_open: bool = false
 var previously_paused: bool = false
 var previous_focus: WeakRef
@@ -38,6 +41,7 @@ var auto_click_answer: Callable
 var prompt_previously_paused: bool = false
 
 func _ready() -> void:
+	Engine.max_fps = TARGET_FPS
 	layer = 200
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	if not InputMap.has_action(PAUSE_ACTION):
@@ -81,6 +85,8 @@ func load_settings() -> void:
 	var saved_mode: Variant = config.get_value("display", "mode", window_mode)
 	if saved_mode is int and saved_mode in WindowMode.values():
 		window_mode = saved_mode
+	var saved_vsync: Variant = config.get_value("display", "vsync", false)
+	vsync_enabled = saved_vsync if saved_vsync is bool else false
 
 func load_gameplay_settings() -> void:
 	var config := ConfigFile.new()
@@ -116,11 +122,15 @@ func save_settings() -> Error:
 	config.set_value("display", "height", resolution.y)
 	config.set_value("display", "mode", window_mode)
 	config.set_value("display", "fullscreen", window_mode == WindowMode.FULLSCREEN)
+	config.set_value("display", "vsync", vsync_enabled)
 	config.set_value("gameplay", "auto_click", auto_click_enabled)
 	return config.save(SETTINGS_PATH)
 
 func apply_display(persist: bool = true) -> void:
+	Engine.max_fps = TARGET_FPS
 	var window: Window = get_window()
+	if DisplayServer.get_name() != "headless":
+		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if vsync_enabled else DisplayServer.VSYNC_DISABLED, window.get_window_id())
 	# Render at the selected resolution, keeping the image's aspect ratio.
 	window.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
 	window.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
@@ -234,6 +244,14 @@ func build_interface() -> void:
 		resolution_selector.add_item("%d × %d" % [candidate.x, candidate.y])
 	resolution_selector.custom_minimum_size.y = 42
 	settings_page.add_child(resolution_selector)
+	vsync_checkbox = CheckBox.new()
+	vsync_checkbox.text = "Sincronización vertical"
+	vsync_checkbox.tooltip_text = "Evita cortes de imagen; los FPS se limitan a la frecuencia de tu pantalla."
+	vsync_checkbox.button_pressed = vsync_enabled
+	vsync_checkbox.custom_minimum_size.y = 32
+	vsync_checkbox.add_theme_font_size_override("font_size", 17)
+	vsync_checkbox.add_theme_color_override("font_color", Color("#f3dfb8"))
+	settings_page.add_child(vsync_checkbox)
 	auto_click_checkbox = CheckBox.new()
 	auto_click_checkbox.text = "Clic automático sobre vetas"
 	auto_click_checkbox.button_pressed = auto_click_enabled
@@ -339,6 +357,7 @@ func show_pause_page() -> void:
 func open_settings() -> void:
 	if not menu_open:
 		open_menu()
+	vsync_checkbox.button_pressed = vsync_enabled
 	mode_selector.select(window_mode)
 	resolution_selector.select(RESOLUTIONS.find(resolution))
 	pause_page.hide()
@@ -357,6 +376,7 @@ func close_menu() -> void:
 	previous_focus = null
 
 func apply_selection() -> void:
+	vsync_enabled = vsync_checkbox.button_pressed
 	window_mode = mode_selector.get_selected_id()
 	resolution = RESOLUTIONS[resolution_selector.selected]
 	apply_display()
