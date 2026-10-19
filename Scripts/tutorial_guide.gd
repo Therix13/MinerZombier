@@ -236,8 +236,9 @@ class GuidePointer extends Control:
 		z_index = 100
 		outline.bg_color = Color.TRANSPARENT
 		outline.set_border_width_all(3)
-		outline.shadow_color = Color("#302417bb")
-		outline.shadow_size = 4
+		outline.draw_center = false
+		outline.shadow_color = Color.TRANSPARENT
+		outline.shadow_size = 0
 		outline.set_corner_radius_all(9)
 
 	func _draw() -> void:
@@ -251,7 +252,7 @@ class GuidePointer extends Control:
 		var tip := Vector2(rect.position.x - 9.0,rect.get_center().y)
 		var tail: Vector2 = tip - Vector2(travel,0)
 		# Header buttons get an upward arrow below them, clear of the money counter.
-		if rect.position.y < 95 and rect.size.y < 90:
+		if rect.position.y < 60 and rect.size.y < 90:
 			tip = Vector2(rect.get_center().x,rect.end.y + 9)
 			tail = tip + Vector2(0,travel)
 		draw_arrow(self,tail,tip,color,7.0,18.0)
