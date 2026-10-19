@@ -29,6 +29,13 @@ var back_button: Button
 var mode_selector: OptionButton
 var resolution_selector: OptionButton
 var pause_event_received: bool = false
+var auto_click_enabled: bool = false
+var auto_click_checkbox: CheckBox
+var auto_click_prompt: Control
+var auto_click_accept: Button
+var auto_click_decline: Button
+var auto_click_answer: Callable
+var prompt_previously_paused: bool = false
 
 func _ready() -> void:
 	layer = 200
@@ -41,6 +48,7 @@ func _ready() -> void:
 	if DisplayServer.get_name() != "headless":
 		load_settings()
 		apply_display(false)
+	load_gameplay_settings()
 	build_interface()
 	update_layout()
 	get_viewport().size_changed.connect(update_layout)
@@ -74,12 +82,41 @@ func load_settings() -> void:
 	if saved_mode is int and saved_mode in WindowMode.values():
 		window_mode = saved_mode
 
+func load_gameplay_settings() -> void:
+	var config := ConfigFile.new()
+	if config.load(SETTINGS_PATH) != OK: return
+	var enabled: Variant = config.get_value("gameplay", "auto_click", false)
+	auto_click_enabled = enabled if enabled is bool else false
+
+func set_auto_click(enabled: bool) -> void:
+	auto_click_enabled = enabled
+	auto_click_checkbox.set_pressed_no_signal(enabled)
+	if save_settings() != OK:
+		push_warning("No se pudo guardar la opción de clic automático.")
+
+func ask_auto_click(answer: Callable) -> void:
+	auto_click_answer = answer
+	prompt_previously_paused = get_tree().paused
+	get_tree().paused = true
+	auto_click_prompt.show()
+	auto_click_accept.grab_focus()
+
+func answer_auto_click(enabled: bool) -> void:
+	if not auto_click_prompt.visible: return
+	set_auto_click(enabled)
+	auto_click_prompt.hide()
+	get_tree().paused = prompt_previously_paused
+	var answer: Callable = auto_click_answer
+	auto_click_answer = Callable()
+	if answer.is_valid(): answer.call()
+
 func save_settings() -> Error:
 	var config := ConfigFile.new()
 	config.set_value("display", "width", resolution.x)
 	config.set_value("display", "height", resolution.y)
 	config.set_value("display", "mode", window_mode)
 	config.set_value("display", "fullscreen", window_mode == WindowMode.FULLSCREEN)
+	config.set_value("gameplay", "auto_click", auto_click_enabled)
 	return config.save(SETTINGS_PATH)
 
 func apply_display(persist: bool = true) -> void:
@@ -183,7 +220,7 @@ func build_interface() -> void:
 	settings_page = VBoxContainer.new()
 	settings_page.add_theme_constant_override("separation", 14)
 	pages.add_child(settings_page)
-	add_label(settings_page, "AJUSTES DE PANTALLA", 27)
+	add_label(settings_page, "AJUSTES", 27)
 	add_label(settings_page, "Modo de ventana", 17)
 	mode_selector = OptionButton.new()
 	mode_selector.add_item("Ventana", WindowMode.WINDOWED)
@@ -197,6 +234,15 @@ func build_interface() -> void:
 		resolution_selector.add_item("%d × %d" % [candidate.x, candidate.y])
 	resolution_selector.custom_minimum_size.y = 42
 	settings_page.add_child(resolution_selector)
+	auto_click_checkbox = CheckBox.new()
+	auto_click_checkbox.text = "Clic automático sobre vetas"
+	auto_click_checkbox.button_pressed = auto_click_enabled
+	auto_click_checkbox.custom_minimum_size.y = 42
+	auto_click_checkbox.add_theme_font_size_override("font_size", 19)
+	auto_click_checkbox.add_theme_color_override("font_color", Color("#f3dfb8"))
+	auto_click_checkbox.toggled.connect(set_auto_click)
+	settings_page.add_child(auto_click_checkbox)
+	add_label(settings_page, "Mina al dejar el ratón encima de una veta.", 16)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	settings_page.add_child(row)
@@ -210,6 +256,40 @@ func build_interface() -> void:
 	row.add_child(back_button)
 	settings_page.hide()
 	overlay.hide()
+	build_auto_click_prompt()
+
+func build_auto_click_prompt() -> void:
+	auto_click_prompt = Control.new()
+	auto_click_prompt.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	menu_root.add_child(auto_click_prompt)
+	var shade := ColorRect.new()
+	shade.color = Color(0.03, 0.04, 0.03, 0.85)
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	auto_click_prompt.add_child(shade)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	auto_click_prompt.add_child(center)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size.x = 520
+	panel.add_theme_stylebox_override("panel", make_style("#352516", "#a87843"))
+	center.add_child(panel)
+	var margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 24)
+	panel.add_child(margin)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 16)
+	margin.add_child(column)
+	add_label(column, "JUEGA A TU RITMO", 27)
+	var description: Label = add_label(column, "Este juego requiere muchos clics.\n¿Quieres activar el clic automático?\n\nSolo mina vetas al dejar el ratón encima.\nPuedes cambiarlo en Ajustes.", 19)
+	description.custom_minimum_size.x = 460
+	auto_click_accept = make_button("ACTIVAR CLIC AUTOMÁTICO")
+	auto_click_accept.pressed.connect(answer_auto_click.bind(true))
+	column.add_child(auto_click_accept)
+	auto_click_decline = make_button("CONTINUAR CON CLIC MANUAL")
+	auto_click_decline.pressed.connect(answer_auto_click.bind(false))
+	column.add_child(auto_click_decline)
+	auto_click_prompt.hide()
 
 func add_label(parent: Node, text: String, font_size: int) -> Label:
 	var label := Label.new()
@@ -241,7 +321,7 @@ func make_button(text: String) -> Button:
 	return button
 
 func open_menu() -> void:
-	if menu_open:
+	if menu_open or auto_click_prompt.visible:
 		return
 	var focused: Control = get_viewport().gui_get_focus_owner()
 	previous_focus = weakref(focused) if focused != null else null
@@ -295,6 +375,7 @@ func toggle_pause_menu() -> void:
 		close_menu()
 
 func _process(_delta: float) -> void:
+	if auto_click_prompt.visible: return
 	if start_screen_open(): return
 	# Input state still updates when a Control or another _input callback
 	# consumes ESC. Keep the shortcut working in that case, even when paused.
@@ -312,6 +393,8 @@ func start_screen_open() -> bool:
 	return saves != null and not saves.playing
 
 func handle_key_event(event: InputEvent) -> bool:
+	if auto_click_prompt.visible:
+		return event is InputEventKey and (event.keycode == KEY_ESCAPE or event.physical_keycode == KEY_ESCAPE)
 	if start_screen_open(): return false
 	if not event is InputEventKey or not event.pressed:
 		return false

@@ -2,6 +2,9 @@ extends Node
 
 var game: Node2D
 var grid: RefCounted
+const AUTO_CLICK_INTERVAL := 0.15
+var auto_click_elapsed: float = 0.0
+var auto_click_cell := Vector2i(-9999, -9999)
 var shift_batch: bool = false
 var placing_resource: String = ""
 var placing_furnace: bool = false
@@ -426,7 +429,30 @@ func cancel_active() -> bool:
 	clear_drag()
 	return true
 
+func advance_auto_click(delta: float) -> void:
+	var settings: CanvasLayer = game.get("display_settings")
+	var pointer: Vector2 = get_viewport().get_mouse_position()
+	var blocked: bool = not settings.auto_click_enabled or not phase_allows() or placement_active() or game.get("holding_object") or not get_window().has_focus() or not get_viewport().get_visible_rect().has_point(pointer) or get_viewport().gui_get_hovered_control() != null
+	if blocked:
+		auto_click_elapsed = 0.0
+		auto_click_cell = Vector2i(-9999, -9999)
+		return
+	var cell: Vector2i = world_cell(pointer)
+	if game.get("mining").vein_at(cell).is_empty() or not grid.owned_tiles.has(cell) or (game.get("camera_controller").defense_view and game.get("cycle").is_night):
+		auto_click_elapsed = 0.0
+		auto_click_cell = Vector2i(-9999, -9999)
+		return
+	if cell != auto_click_cell:
+		auto_click_cell = cell
+		auto_click_elapsed = 0.0
+	auto_click_elapsed += delta
+	if auto_click_elapsed >= AUTO_CLICK_INTERVAL:
+		# One real mining hit per interval; never replay a backlog after a slow frame.
+		auto_click_elapsed = 0.0
+		game.get("mining").mine(cell)
+
 func _process(_delta: float) -> void:
+	advance_auto_click(_delta)
 	if (placing_furnace or placing_iron or placing_gold or placing_saw) and (game.get("cycle").is_night or game.get("cycle").defeated): cancel_active()
 	var cycle: RefCounted = game.get("cycle")
 	if not placing_resource.is_empty() and (not game.get("economy").developer_mode or cycle.is_night or cycle.defeated):

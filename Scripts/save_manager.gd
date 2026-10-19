@@ -54,7 +54,7 @@ func initialize() -> void:
 		Engine.remove_meta(INTRO_KEY)
 		save_game()
 		timer.start()
-		game.shop.ensure_intro()
+		game.display_settings.ask_auto_click(game.shop.ensure_intro)
 	elif action == "continue":
 		var data: Dictionary = read_save()
 		if not data.is_empty() and restore_snapshot(data):
