@@ -542,8 +542,8 @@ func update_cycle() -> void:
 			cycle_goal.text += "\n" + tutorial_navigation_text()
 	elif cycle.defeated:
 		cycle_title.text = "Base destruida"
-		cycle_goal.text = "La entrada ha caído. Vuelve a empezar."
-		cycle_action.text = "REINICIAR PARTIDA"
+		cycle_goal.text = "Vuelve al inicio de este día."
+		cycle_action.text = "REINTENTAR DÍA %d" % cycle.day
 		cycle_action.disabled = false
 	elif cycle.is_night:
 		cycle_title.text = "Noche %d · Defensa" % cycle.day

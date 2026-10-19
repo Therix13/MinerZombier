@@ -131,6 +131,8 @@ func run_checks() -> void:
 	saves.path = real_path
 	# Tutorial and developer state survive independently of the larger fixture.
 	var tutorial: Dictionary = saves.snapshot()
+	# This synthetic fixture changes days, so it has no matching dawn checkpoint.
+	tutorial.erase("day_checkpoint")
 	tutorial["cycle"]["day"] = 1
 	tutorial["cycle"]["tutorial_step"] = 3
 	tutorial["cycle"]["tutorial_skipped"] = false

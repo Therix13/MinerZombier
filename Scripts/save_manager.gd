@@ -27,6 +27,7 @@ var start_screen: CanvasLayer
 var last_message := ""
 var urgent_pending := false
 var last_cycle_state: Array = []
+var day_checkpoint: Dictionary = {}
 
 func _ready() -> void:
 	game = get_parent()
@@ -39,12 +40,14 @@ func _ready() -> void:
 	timer.timeout.connect(save_game)
 	add_child(timer)
 	status_changed.connect(func(message: String, _success: bool): game.display_settings.save_status.text = message)
+	game.cycle.changed.connect(update_day_checkpoint)
 	initialize.call_deferred()
 
 func initialize() -> void:
 	test_mode = bool(Engine.get_meta(SKIP_START, false))
 	if test_mode:
 		playing = true
+		capture_day_start()
 		game.shop.ensure_intro()
 		return
 	var action: String = str(Engine.get_meta(SESSION_ACTION, ""))
@@ -53,6 +56,7 @@ func initialize() -> void:
 		playing = true
 		get_tree().paused = false
 		Engine.remove_meta(INTRO_KEY)
+		capture_day_start()
 		save_game()
 		timer.start()
 		game.display_settings.ask_auto_click(game.shop.ensure_intro)
@@ -70,6 +74,55 @@ func initialize() -> void:
 	game.cycle.changed.connect(schedule_save)
 	game.progression.items_unlocked.connect(func(_items: Array[String]): queue_save())
 	game.get_node("Construction").completed.connect(func(_cell: Vector2i): queue_save())
+
+func update_day_checkpoint() -> void:
+	if restoring or game.cycle.is_night or game.cycle.defeated: return
+	if day_checkpoint.is_empty() or day_checkpoint["cycle"]["day"] != game.cycle.day:
+		capture_day_start()
+
+func dawn_snapshot(data: Dictionary) -> Dictionary:
+	var result: Dictionary = data.duplicate(true)
+	result.erase("day_checkpoint")
+	result["cycle"]["is_night"] = false
+	result["cycle"]["defeated"] = false
+	result["cycle"]["day_remaining"] = 300.0
+	result["victory"] = false
+	result["enemies"] = []
+	result["acid_shots"] = []
+	result["acid_pools"] = []
+	var wave: Dictionary = result["wave"]
+	for key: String in ["spawn_timer","spawn_count","wave_total","cleared_time","wave_elapsed"]: wave[key] = 0
+	wave["active_wave"] = false
+	wave["retreat_started"] = false
+	wave["wave_day"] = result["cycle"]["day"]
+	# Old saves have no dawn checkpoint; preserve their assets and give a viable retry.
+	if float(wave["base_health"]) <= 0: wave["base_health"] = 100.0
+	var camera: Dictionary = result["camera"]
+	camera["defense_view"] = false
+	camera["combat_mine_active"] = false
+	camera["position"] = camera["mine_position"]
+	camera["zoom"] = camera["mine_zoom"]
+	return result
+
+func capture_day_start() -> void:
+	if restoring or game.cycle.is_night or game.cycle.defeated: return
+	day_checkpoint = dawn_snapshot(snapshot(false))
+
+func retry_day() -> bool:
+	if not game.cycle.defeated: return false
+	var checkpoint: Dictionary = day_checkpoint.duplicate(true)
+	if checkpoint.is_empty() or checkpoint["cycle"]["day"] != game.cycle.day:
+		checkpoint = dawn_snapshot(snapshot(false))
+	if not restore_snapshot(checkpoint): return false
+	get_tree().paused = false
+	Engine.time_scale = 1.0
+	var barrier: Node = game.get_node_or_null("TutorialBarrier")
+	if barrier != null:
+		barrier.destruction = 0.0
+		barrier.present()
+	game.phase_clock.update_clock()
+	if not test_mode: save_game()
+	return true
 
 func cycle_signature() -> Array:
 	return [game.cycle.day,game.cycle.is_night,game.cycle.defeated,game.cycle.tutorial_step]
@@ -142,7 +195,7 @@ func properties(object: Object, names: Array) -> Dictionary:
 		result[key] = value.duplicate(true) if value is Dictionary or value is Array else value
 	return result
 
-func snapshot() -> Dictionary:
+func snapshot(include_checkpoint: bool = true) -> Dictionary:
 	var enemies: Array = []
 	for enemy: Node in get_tree().get_nodes_in_group("zombies"):
 		if enemy is ZombieScript and game.is_ancestor_of(enemy) and enemy.health > 0:
@@ -152,7 +205,7 @@ func snapshot() -> Dictionary:
 	var camera_data: Dictionary = properties(game.camera_controller, CAMERA_FIELDS)
 	camera_data["position"] = game.camera.position
 	camera_data["zoom"] = game.camera.zoom.x
-	return {
+	var result: Dictionary = {
 		"version": VERSION, "tutorial_revision": TUTORIAL_REVISION, "material_revision": 2, "compactor_revision": 2, "combat_revision": 2, "saved_at": int(Time.get_unix_time_from_system()),
 		"coins": game.economy.coins, "developer_mode": game.economy.developer_mode,
 		"grid": {"width": game.grid.cave_width, "height": game.grid.cave_height, "platforms": not game.grid.defense_tiles.is_empty()},
@@ -169,6 +222,9 @@ func snapshot() -> Dictionary:
 		"enemies": enemies, "acid_shots":game.zombie_manager.acid_shots.duplicate(true), "acid_pools":game.zombie_manager.acid_pools.duplicate(true), "camera": camera_data, "victory": game.night_victory_overlay.visible,
 		"notices": game.shop.notice_item_ids.duplicate(),
 	}
+	if include_checkpoint and not day_checkpoint.is_empty() and day_checkpoint["cycle"]["day"] == game.cycle.day:
+		result["day_checkpoint"] = day_checkpoint.duplicate(true)
+	return result
 
 func checksum(bytes: PackedByteArray) -> String:
 	var hash := HashingContext.new()
@@ -388,6 +444,7 @@ func restore_snapshot(data: Dictionary) -> bool:
 	game.shop.announce_unlocks(notices)
 	game.zombie_manager.queue_redraw()
 	game.redraw_world()
+	day_checkpoint = data["day_checkpoint"].duplicate(true) if data.has("day_checkpoint") else dawn_snapshot(snapshot(false))
 	restoring = false
 	return true
 
@@ -528,4 +585,9 @@ func valid_snapshot(data: Dictionary) -> bool:
 	if not number(data.get("belt_time"),0,4) or not number(data.get("drill_time"),0,1) or not data.get("victory") is bool or not data.get("notices") is Array: return false
 	for item: Variant in data["notices"]:
 		if item not in game.shop.UNLOCK_VIEW: return false
+	if data.has("day_checkpoint"):
+		var checkpoint: Variant = data["day_checkpoint"]
+		if not checkpoint is Dictionary or checkpoint.has("day_checkpoint") or not valid_snapshot(checkpoint): return false
+		if checkpoint["cycle"]["day"] != cycle["day"] or checkpoint["cycle"]["is_night"] or checkpoint["cycle"]["defeated"] or checkpoint["cycle"]["day_remaining"] != 300: return false
+		if checkpoint["wave"]["active_wave"] or checkpoint["wave"]["base_health"] <= 0 or not checkpoint["enemies"].is_empty() or not checkpoint["acid_shots"].is_empty() or not checkpoint["acid_pools"].is_empty() or checkpoint["victory"]: return false
 	return true

@@ -163,6 +163,6 @@ func update_clock() -> void:
 		time_label.text = "Base destruida"
 		day_label.text = ""
 		action.text = "↻"
-		action.tooltip_text = "Nueva partida"
+		action.tooltip_text = "Reintentar el día %d desde las 06:00" % cycle.day
 		action.visible = true
 		action.disabled = false

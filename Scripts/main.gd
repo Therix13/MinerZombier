@@ -518,4 +518,7 @@ func on_base_destroyed() -> void:
 	cycle.lose_night()
 
 func restart_game() -> void:
-	get_node("SaveGame").begin("new")
+	if cycle.defeated:
+		get_node("SaveGame").retry_day()
+	else:
+		get_node("SaveGame").begin("new")
