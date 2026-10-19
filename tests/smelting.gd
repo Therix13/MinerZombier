@@ -29,7 +29,7 @@ func run_checks() -> void:
 	var b := c + Vector2i.RIGHT
 	var out := c + Vector2i.UP
 	furnace.place(c)
-	for kind: String in ["coal", "coal_2", "coal_3", "brass", "brass_2", "brass_3", "brass_ingot", "brass_ingot_4"]:
+	for kind: String in ["brass", "brass_2", "brass_3", "brass_ingot", "brass_ingot_4"]:
 		put(a, {kind: 1})
 		check(not mover.drop("nugget", a, c) and game.mining.nugget_type(a) == kind, "The furnace preserves rejected %s" % kind)
 		game.mining.items_for(kind).clear()

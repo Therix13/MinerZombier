@@ -185,6 +185,7 @@ func redraw_world() -> void:
 	renderer.queue_redraw()
 
 func buy_expansion() -> void:
+	if not progression.is_item_unlocked("expansion"): return
 	if not cycle.allows_action("expand"):
 		return
 	if cycle.is_night or cycle.defeated:

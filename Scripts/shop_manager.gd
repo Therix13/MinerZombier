@@ -40,6 +40,7 @@ const ITEM_CATEGORIES := {
 const RESOURCE_LABELS := {"gold": "ORO · NIVEL 1", "gold_2": "ORO · NIVEL 2", "gold_3": "ORO · NIVEL 3", "gold_4": "ORO · NIVEL 4", "gold_ingot": "LINGOTE DE ORO · NIVEL 1", "gold_ingot_2": "LINGOTE DE ORO · NIVEL 2", "gold_ingot_3": "LINGOTE DE ORO · NIVEL 3", "gold_ingot_4": "LINGOTE DE ORO · NIVEL 4","iron": "HIERRO · NIVEL 1", "iron_2": "HIERRO · NIVEL 2", "iron_3": "HIERRO · NIVEL 3", "iron_4": "HIERRO · NIVEL 4", "iron_ingot": "LINGOTE DE HIERRO · NIVEL 1", "iron_ingot_2": "LINGOTE DE HIERRO · NIVEL 2", "iron_ingot_3": "LINGOTE DE HIERRO · NIVEL 3", "iron_ingot_4": "LINGOTE DE HIERRO · NIVEL 4", "coal": "CARBÓN · NIVEL 1", "brass": "LATÓN · NIVEL 1", "coal_2": "CARBÓN · NIVEL 2", "brass_2": "LATÓN · NIVEL 2", "coal_3": "CARBÓN · NIVEL 3", "brass_3": "LATÓN · NIVEL 3", "coal_4": "CARBÓN · NIVEL 4", "brass_4": "LATÓN · NIVEL 4", "brass_ingot": "LINGOTE DE LATÓN · NIVEL 1", "brass_ingot_2": "LINGOTE DE LATÓN · NIVEL 2", "brass_ingot_3": "LINGOTE DE LATÓN · NIVEL 3", "brass_ingot_4": "LINGOTE DE LATÓN · NIVEL 4"}
 const CATEGORY_ART := {"EXPANSION": "expansion", "VETAS": "coal", "HERRAMIENTAS": "drill", "AUTOMATIZACIÓN": "junction", "DEFENSA": "launcher", "RECURSOS": "resources"}
 const UNLOCK_VIEW := {
+	"expansion": ["expansion", "Expansión", "Amplía tu mina"],
 	"brass": ["brass", "Latón", "Nueva veta"],
 	"iron": ["iron", "Hierro", "Nueva veta"],
 	"gold": ["gold", "Oro", "Nueva veta"],
@@ -244,7 +245,11 @@ func _process(_delta: float) -> void:
 
 func update_progression() -> void:
 	if progression == null: return
-	if shop_open and shop_title.text in ITEM_CATEGORIES and item_buttons.keys() != visible_shop_items(shop_title.text):
+	if shop_title.text == "TIENDA" and category_buttons.keys() != visible_categories():
+		show_categories()
+	elif shop_title.text in CATEGORIES and not category_has_items(shop_title.text):
+		show_categories()
+	elif shop_open and shop_title.text in ITEM_CATEGORIES and item_buttons.keys() != visible_shop_items(shop_title.text):
 		rebuild_catalog()
 	elif shop_open and shop_title.text == "DEFENSA":
 		var has_launcher: bool = purchase_buttons.has("launcher")
@@ -863,13 +868,26 @@ func clear_content() -> void:
 		shop_content.remove_child(child)
 		child.queue_free()
 
+func category_has_items(category: String) -> bool:
+	if category == "RECURSOS": return economy.developer_mode
+	if progression == null: return category in ["VETAS","DEFENSA"]
+	if category == "EXPANSION": return progression.is_item_unlocked("expansion")
+	if category == "DEFENSA": return progression.is_item_unlocked("defense_platforms") or progression.is_item_unlocked("launcher")
+	return not visible_shop_items(category).is_empty()
+
+func visible_categories() -> Array[String]:
+	var result: Array[String] = []
+	for category: String in CATEGORIES:
+		if category_has_items(category): result.append(category)
+	if economy.developer_mode: result.append("RECURSOS")
+	return result
+
 func show_categories() -> void:
 	shop_title.text = "TIENDA"
 	fixed_back_button.hide()
 	shop_scroll.scroll_vertical = 0
 	clear_content()
-	var categories: Array = CATEGORIES.duplicate()
-	if economy.developer_mode: categories.append("RECURSOS")
+	var categories: Array[String] = visible_categories()
 	for category in categories:
 		var button := create_art_button(CATEGORY_ART[category], category.capitalize())
 		button.disabled = false
@@ -880,6 +898,7 @@ func show_categories() -> void:
 
 func open_category(category: String) -> void:
 	if category not in CATEGORIES and category != "RECURSOS": return
+	if not category_has_items(category): return
 	if category == "RECURSOS" and not economy.developer_mode: return
 	if shop_animating:
 		return
@@ -948,7 +967,7 @@ func add_item_button(text: String, price: int, item: String, request: Signal) ->
 	refresh_item_buttons()
 
 func request_item(item: String, request: Signal) -> void:
-	if progression != null and item != "expansion" and not progression.is_item_unlocked(item):
+	if progression != null and not progression.is_item_unlocked(item):
 		return
 	if cycle != null and (cycle.is_night or cycle.defeated or not tutorial_allows_item(item)):
 		return
@@ -967,6 +986,7 @@ func refresh_item_buttons() -> void:
 		button.tooltip_text = item_buttons[item].get("name", item)
 		var construction: Node = get_parent().get_parent().get_node_or_null("Construction")
 		if construction != null and construction.has_recipe(item): button.tooltip_text += "\n" + construction.recipe_text(item)
+		if item == "furnace": button.tooltip_text += "\nCarbón Nv. 1 / 2 / 3 / 4: aporta 1 / 3 / 8 / 20 de combustible. Capacidad: 40."
 		if item == "launcher": button.tooltip_text += "\nDispara solo en las plataformas de defensa. Munición: pepitas Nv. 1."
 
 func unlock_defense_platforms() -> void:

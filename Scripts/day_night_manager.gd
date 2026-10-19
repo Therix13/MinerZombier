@@ -310,11 +310,11 @@ func tutorial_text() -> String:
 			if needs_tutorial_income(): return "Vende pepitas hasta reunir 350 de oro."
 			if furnace_blueprint_exists(): return "Entrega 2 pepitas de carbón Nv. 4 al plano."
 			return "Compra y coloca el plano del horno."
-		8: return "Mete una pepita de carbón Nv. 4 en el horno."
+		8: return "Carga 20 de combustible en el horno.\nPuedes usar carbón de cualquier nivel."
 		9:
 			if mining.furnaces != null:
 				var data: Dictionary = mining.furnaces.machines.get(furnace_cell,{})
-				if not data.get("burning",false) and int(data.get("fuel",0)) < mining.furnaces.FUEL_COST: return "Carga carbón Nv. 4: cada lingote consume 20 de combustible."
+				if not data.get("burning",false) and int(data.get("fuel",0)) < mining.furnaces.FUEL_COST: return "Carga carbón: cada lingote consume 20 de combustible."
 				if not str(data.get("input","")).is_empty(): return "Espera a que se cree el lingote."
 			return "Fusiona latón hasta Nv. 4.\nMételo en el horno para crear un lingote."
 	if tutorial_step in [2,3,4]:

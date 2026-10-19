@@ -61,7 +61,7 @@ func run_checks() -> void:
 	shop.open_category("DEFENSA")
 	check(not shop.purchase_buttons.has("launcher") and not mover.select_item("launcher"),"Launcher is hidden and cannot be selected before its material milestone")
 	shop.open_category("HERRAMIENTAS")
-	check(shop.purchase_buttons.is_empty(),"No tools are available before their crafting materials exist")
+	check(shop.shop_title.text != "HERRAMIENTAS" and not shop.category_has_items("HERRAMIENTAS"),"The empty tool category remains hidden and cannot be opened")
 	shop.close_shop()
 	await create_timer(0.4).timeout
 	await fuse_resource("coal_3")

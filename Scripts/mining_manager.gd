@@ -6,6 +6,7 @@ signal changed
 signal sale_completed(kind: String)
 signal fusion_completed(kind: String)
 signal vein_fused(cell: Vector2i)
+signal vein_placed(cell: Vector2i)
 
 const COAL_CLICKS := 5
 const BRASS_CLICKS := 7
@@ -166,6 +167,7 @@ func place_vein(cell: Vector2i, direction: int, kind: String = "coal") -> bool:
 		return false
 	var dictionary: Dictionary = veins_for(kind)
 	dictionary[cell] = {"direction": direction, "progress": 0, "level": 1}
+	vein_placed.emit(cell)
 	changed.emit()
 	return true
 

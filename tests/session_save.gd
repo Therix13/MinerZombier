@@ -245,7 +245,7 @@ func make_fixture() -> void:
 	game.get_node("Construction").receive(Vector2i(18,2),"iron_ingot")
 	game.mining.items_for("coal_4")[Vector2i(15,4)] = 1
 	game.mining.items_for("gold_ingot_4")[Vector2i(18,4)] = 1
-	game.progression.unlocked = {"brass":true,"iron":true,"furnace":true,"launcher":true,"straight":true}
+	game.progression.unlocked = {"expansion":true,"brass":true,"iron":true,"furnace":true,"launcher":true,"straight":true}
 	game.progression.created_resources = {"coal_4":true,"brass_ingot_3":true}
 	game.progression.completed_veins = {"coal":true,"brass":true}
 	game.zombie_manager.base_health = 73

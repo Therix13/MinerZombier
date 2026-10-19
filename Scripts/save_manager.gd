@@ -258,6 +258,7 @@ func restore_snapshot(data: Dictionary) -> bool:
 	for pair: Array in [["Compactors","compactors"],["Furnaces","furnaces"],["Saws","saws"],["Construction","blueprints"]]:
 		replace_dictionary(game.get_node(pair[0]).get("plans" if pair[1] == "blueprints" else "machines"),data[pair[1]])
 	for key: String in data["progression"]: replace_dictionary(game.progression.get(key),data["progression"][key])
+	game.progression.restore_vein_milestones()
 	var crafted: Dictionary = data["progression"]["created_resources"]
 	var tutorial_defaults := {
 		"brass_ingot_created": crafted.has("brass_ingot"),

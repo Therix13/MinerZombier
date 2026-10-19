@@ -38,7 +38,7 @@ func place(cell: Vector2i, output_direction: int = 0) -> bool:
 	return true
 
 func can_receive_state(data: Dictionary, kind: String) -> bool:
-	if kind == "coal_4": return int(data["fuel"]) + FUEL_VALUES[kind] <= CAPACITY
+	if FUEL_VALUES.has(kind): return int(data["fuel"]) + FUEL_VALUES[kind] <= CAPACITY
 	return kind in ["brass_4", "iron_4", "gold_4"] and str(data.get("input", "")).is_empty() and str(data.get("output", "")).is_empty()
 
 func can_receive(cell: Vector2i, kind: String) -> bool:
@@ -46,7 +46,7 @@ func can_receive(cell: Vector2i, kind: String) -> bool:
 
 func receive(cell: Vector2i, kind: String) -> bool:
 	if not can_receive(cell, kind): return false
-	if kind == "coal_4":
+	if FUEL_VALUES.has(kind):
 		machines[cell]["fuel"] = int(machines[cell]["fuel"]) + FUEL_VALUES[kind]
 		machines[cell].erase("fuel_items")
 	else:
@@ -64,7 +64,7 @@ func plan_inputs(cell: Vector2i, candidates: Array) -> Array:
 		var kind: String = candidate["kind"]
 		if not can_receive_state(reserved, kind): continue
 		accepted.append(candidate)
-		if kind == "coal_4": reserved["fuel"] = int(reserved["fuel"]) + FUEL_VALUES[kind]
+		if FUEL_VALUES.has(kind): reserved["fuel"] = int(reserved["fuel"]) + FUEL_VALUES[kind]
 		else: reserved["input"] = kind
 	return accepted
 

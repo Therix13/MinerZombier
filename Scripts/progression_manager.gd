@@ -21,17 +21,30 @@ func setup(mining_manager: RefCounted) -> void:
 	mining = mining_manager
 	mining.resource_created.connect(record_resource)
 	mining.vein_fused.connect(record_vein)
+	mining.vein_placed.connect(record_placed_vein)
 
 func dispose() -> void:
 	if mining != null:
 		mining.resource_created.disconnect(record_resource)
 		mining.vein_fused.disconnect(record_vein)
+		mining.vein_placed.disconnect(record_placed_vein)
 	mining = null
 
 func is_item_unlocked(item: String) -> bool:
-	return item in BASE_ITEMS or unlocked.has(item) or (developer_mode and (item in NEXT_VEIN.values() or ConstructionScript.RECIPES.has(item)))
+	return item in BASE_ITEMS or unlocked.has(item) or (developer_mode and (item == "expansion" or item in NEXT_VEIN.values() or ConstructionScript.RECIPES.has(item)))
+
+func record_placed_vein(cell: Vector2i) -> void:
+	if mining.vein_at(cell) == "brass":
+		var items: Array[String] = ["expansion"]
+		unlock_items(items)
+
+func restore_vein_milestones() -> void:
+	# Older saves did not track the first brass placement as a separate milestone.
+	if not mining.brass_veins.is_empty() or completed_veins.has("brass") or unlocked.has("iron") or unlocked.has("gold"):
+		unlocked["expansion"] = true
 
 func record_vein(cell: Vector2i) -> void:
+	record_placed_vein(cell)
 	if mining.vein_level(cell) != 4: return
 	var material: String = mining.vein_at(cell)
 	completed_veins[material] = true
