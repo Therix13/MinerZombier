@@ -12,7 +12,7 @@ func run_checks() -> void:
 	var cell := Vector2i(15,1)
 	var output := cell + Vector2i.UP
 	check(furnace.place(cell),"A furnace can be placed for fuel accounting")
-	furnace.receive(cell,"brass_4")
+	furnace.receive(cell,"copper_4")
 	furnace.machines[cell]["fuel"] = 19
 	check(not game.cycle.furnace_fueled(),"The tutorial does not treat nineteen fuel as ready to smelt")
 	furnace.process_smelting(100)
@@ -22,15 +22,15 @@ func run_checks() -> void:
 	check(game.cycle.furnace_fueled(),"The fuel lesson recognizes a furnace with at least twenty fuel")
 	check(not furnace.receive(cell,"coal_4"),"A full furnace rejects more fuel")
 	for batch in range(2):
-		if batch > 0: furnace.receive(cell,"brass_4")
+		if batch > 0: furnace.receive(cell,"copper_4")
 		furnace.process_smelting(1.0)
 		check(furnace.machines[cell]["fuel"] == 20 * (1-batch) and furnace.machines[cell]["burning"],"Batch %d consumes exactly twenty fuel once at ignition" % batch)
 		furnace.process_smelting(3.0)
-		check(game.mining.nugget_type(output) == "brass_ingot" and furnace.machines[cell]["fuel"] == 20 * (1-batch),"Batch %d finishes without charging fuel a second time" % batch)
-		game.mining.items_for("brass_ingot").erase(output)
-	furnace.receive(cell,"brass_4")
+		check(game.mining.nugget_type(output) == "copper_ingot" and furnace.machines[cell]["fuel"] == 20 * (1-batch),"Batch %d finishes without charging fuel a second time" % batch)
+		game.mining.items_for("copper_ingot").erase(output)
+	furnace.receive(cell,"copper_4")
 	furnace.process_smelting(100)
-	check(furnace.machines[cell]["fuel"] == 0 and furnace.machines[cell]["input"] == "brass_4" and game.mining.nuggets_at(output) == 0,"Forty fuel makes two ingots and cannot make a third")
+	check(furnace.machines[cell]["fuel"] == 0 and furnace.machines[cell]["input"] == "copper_4" and game.mining.nuggets_at(output) == 0,"Forty fuel makes two ingots and cannot make a third")
 	game.queue_free()
 	await process_frame
 	print("RESULT: %d passed, %d failed; furnace fuel accounting" % [passed,failed])

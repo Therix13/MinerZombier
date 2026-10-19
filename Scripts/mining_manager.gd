@@ -9,8 +9,8 @@ signal vein_fused(cell: Vector2i)
 signal vein_placed(cell: Vector2i)
 
 const COAL_CLICKS := 5
-const BRASS_CLICKS := 7
-const ORE_KINDS := ["coal", "brass", "coal_2", "brass_2", "coal_3", "brass_3", "coal_4", "brass_4", "brass_ingot", "brass_ingot_2", "brass_ingot_3", "brass_ingot_4", "iron", "iron_2", "iron_3", "iron_4", "iron_ingot", "iron_ingot_2", "iron_ingot_3", "iron_ingot_4", "gold", "gold_2", "gold_3", "gold_4", "gold_ingot", "gold_ingot_2", "gold_ingot_3", "gold_ingot_4"]
+const COPPER_CLICKS := 7
+const ORE_KINDS := ["coal", "copper", "coal_2", "copper_2", "coal_3", "copper_3", "coal_4", "copper_4", "copper_ingot", "copper_ingot_2", "copper_ingot_3", "copper_ingot_4", "iron", "iron_2", "iron_3", "iron_4", "iron_ingot", "iron_ingot_2", "iron_ingot_3", "iron_ingot_4", "gold", "gold_2", "gold_3", "gold_4", "gold_ingot", "gold_ingot_2", "gold_ingot_3", "gold_ingot_4"]
 const DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 
 var launchers: RefCounted
@@ -23,21 +23,21 @@ var grid: RefCounted
 var mining_clicks: int = COAL_CLICKS
 var drop_random := RandomNumberGenerator.new()
 var coal_veins: Dictionary = {}
-var brass_veins: Dictionary = {}
+var copper_veins: Dictionary = {}
 var gold_veins: Dictionary = {}
 var gold_items: Dictionary = {"gold": {}, "gold_2": {}, "gold_3": {}, "gold_4": {}, "gold_ingot": {}, "gold_ingot_2": {}, "gold_ingot_3": {}, "gold_ingot_4": {}}
 var iron_veins: Dictionary = {}
 var iron_items: Dictionary = {"iron": {}, "iron_2": {}, "iron_3": {}, "iron_4": {}, "iron_ingot": {}, "iron_ingot_2": {}, "iron_ingot_3": {}, "iron_ingot_4": {}}
 var construction: Node2D
 var coal_nuggets: Dictionary = {}
-var brass_nuggets: Dictionary = {}
+var copper_nuggets: Dictionary = {}
 var coal_level2_nuggets: Dictionary = {}
-var brass_level2_nuggets: Dictionary = {}
+var copper_level2_nuggets: Dictionary = {}
 var coal_level3_nuggets: Dictionary = {}
-var brass_level3_nuggets: Dictionary = {}
+var copper_level3_nuggets: Dictionary = {}
 var coal_level4_nuggets: Dictionary = {}
-var brass_level4_nuggets: Dictionary = {}
-var ingots: Dictionary = {"brass_ingot": {}, "brass_ingot_2": {}, "brass_ingot_3": {}, "brass_ingot_4": {}}
+var copper_level4_nuggets: Dictionary = {}
+var ingots: Dictionary = {"copper_ingot": {}, "copper_ingot_2": {}, "copper_ingot_3": {}, "copper_ingot_4": {}}
 
 func setup(grid_manager: RefCounted) -> void:
 	grid = grid_manager
@@ -56,14 +56,14 @@ func dispose() -> void:
 func vein_at(cell: Vector2i) -> String:
 	if coal_veins.has(cell):
 		return "coal"
-	if brass_veins.has(cell):
-		return "brass"
+	if copper_veins.has(cell):
+		return "copper"
 	if iron_veins.has(cell): return "iron"
 	if gold_veins.has(cell): return "gold"
 	return ""
 
 func veins_for(kind: String) -> Dictionary:
-	return gold_veins if kind == "gold" else (iron_veins if kind == "iron" else (brass_veins if kind == "brass" else coal_veins))
+	return gold_veins if kind == "gold" else (iron_veins if kind == "iron" else (copper_veins if kind == "copper" else coal_veins))
 
 func vein_level(cell: Vector2i) -> int:
 	var data: Dictionary = veins_for(vein_at(cell)).get(cell, {})
@@ -100,7 +100,7 @@ func nuggets_at(cell: Vector2i) -> int:
 	return count
 
 func nugget_stores() -> Dictionary:
-	var result: Dictionary = {"coal": coal_nuggets, "brass": brass_nuggets, "coal_2": coal_level2_nuggets, "brass_2": brass_level2_nuggets, "coal_3": coal_level3_nuggets, "brass_3": brass_level3_nuggets, "coal_4": coal_level4_nuggets, "brass_4": brass_level4_nuggets, "brass_ingot": ingots["brass_ingot"], "brass_ingot_2": ingots["brass_ingot_2"], "brass_ingot_3": ingots["brass_ingot_3"], "brass_ingot_4": ingots["brass_ingot_4"]}
+	var result: Dictionary = {"coal": coal_nuggets, "copper": copper_nuggets, "coal_2": coal_level2_nuggets, "copper_2": copper_level2_nuggets, "coal_3": coal_level3_nuggets, "copper_3": copper_level3_nuggets, "coal_4": coal_level4_nuggets, "copper_4": copper_level4_nuggets, "copper_ingot": ingots["copper_ingot"], "copper_ingot_2": ingots["copper_ingot_2"], "copper_ingot_3": ingots["copper_ingot_3"], "copper_ingot_4": ingots["copper_ingot_4"]}
 
 	result.merge(iron_items)
 	result.merge(gold_items)
@@ -172,7 +172,7 @@ func place_vein(cell: Vector2i, direction: int, kind: String = "coal") -> bool:
 	return true
 
 func hardness(kind: String) -> int:
-	return {"coal": COAL_CLICKS, "brass": BRASS_CLICKS, "iron": 9, "gold": 11}.get(kind, COAL_CLICKS)
+	return {"coal": COAL_CLICKS, "copper": COPPER_CLICKS, "iron": 9, "gold": 11}.get(kind, COAL_CLICKS)
 
 func mine(cell: Vector2i) -> bool:
 	var kind: String = vein_at(cell)

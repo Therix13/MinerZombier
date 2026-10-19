@@ -70,7 +70,7 @@ func run_checks() -> void:
 	await click_control(shop.shop_button)
 	await wait_shop()
 	await click_control(shop.category_buttons["INVESTIGACIÓN"])
-	check(shop.research_buttons.keys() == ["brass"] and not shop.research_buttons["brass"].disabled, "Only the brass vein can be researched at level two")
+	check(shop.research_buttons.keys() == ["copper"] and not shop.research_buttons["copper"].disabled, "Only the copper vein can be researched at level two")
 	shop.close_shop()
 	await wait_shop()
 	check(cycle.is_research_tutorial_active() and not cycle.can_start_night(), "Opening and closing research without spending a point does not finish the lesson")
@@ -80,8 +80,8 @@ func run_checks() -> void:
 	if DisplayServer.get_name() != "headless" and "--capture" in args:
 		await RenderingServer.frame_post_draw
 		root.get_texture().get_image().save_png("/workspace/.onboarding/display-test/research-day-two.png")
-	await click_control(shop.research_buttons["brass"])
-	check(player.has_research("brass") and not player.has_research("drill") and player.research_points == 0, "Researching brass spends the level-up point without requiring the level-three drill")
+	await click_control(shop.research_buttons["copper"])
+	check(player.has_research("copper") and not player.has_research("drill") and player.research_points == 0, "Researching copper spends the level-up point without requiring the level-three drill")
 	check(not cycle.is_research_tutorial_active() and cycle.can_start_night() and not shop.view_button.disabled, "Either valid choice unlocks normal play and the next night")
 	shop.show_categories()
 	for category: String in shop.category_buttons:

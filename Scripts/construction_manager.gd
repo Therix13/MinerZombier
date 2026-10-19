@@ -5,15 +5,15 @@ signal completed(cell: Vector2i)
 
 const ArtAtlas = preload("res://Scripts/art_atlas.gd")
 const RECIPES := {
-	"launcher": {"brass_ingot_3": 1, "brass_ingot": 1},
+	"launcher_2": {"copper_ingot_3": 1, "copper_ingot": 1},
 	"saw": {"iron_3": 1, "iron": 1},
 	"furnace": {"coal_4": 2},
-	"straight": {"brass_ingot_3": 1},
-	"corner_right": {"brass_ingot_3": 1},
-	"corner_left": {"brass_ingot_3": 1},
-	"junction": {"brass_ingot_3": 1},
+	"straight": {"copper_ingot_3": 1},
+	"corner_right": {"copper_ingot_3": 1},
+	"corner_left": {"copper_ingot_3": 1},
+	"junction": {"copper_ingot_3": 1},
 	"compactor": {"iron_ingot_4": 1, "iron_ingot": 2},
-	"drill": {"brass_ingot_3": 2, "brass_ingot": 2},
+	"drill": {"copper_ingot_3": 2, "copper_ingot": 2},
 }
 var plans: Dictionary = {}
 var game: Node2D
@@ -69,6 +69,9 @@ func receive(cell: Vector2i, kind: String) -> bool:
 			return true
 	plans.erase(cell)
 	game.get_node("WorldInteractions").build_selected(cell, data["item"], int(data["direction"]))
+	if data["item"] == "launcher_2":
+		game.get("launchers").launchers[cell]["ammo"] = data.get("ammo",[]).duplicate()
+		game.get("launchers").changed.emit()
 	completed.emit(cell)
 	changed.emit()
 	return true
@@ -90,11 +93,14 @@ func cancel(cell: Vector2i) -> bool:
 		if at != cell and at != game.get("grid").sale_cell and mining.can_move_nugget(at): free.append(at)
 	var count: int = 0
 	for amount: int in data["delivered"].values(): count += amount
+	count += data.get("ammo",[]).size()
 	if count > free.size(): return false
 	plans.erase(cell)
 	for material: String in data["delivered"]:
 		for index in range(int(data["delivered"][material])):
 			mining.items_for(material)[free.pop_front()] = 1
+	for material: String in data.get("ammo",[]):
+		mining.items_for(material)[free.pop_front()] = 1
 	game.get("economy").add(int(data["paid"]))
 	mining.changed.emit()
 	changed.emit()
@@ -125,8 +131,8 @@ func draw_plan(center: Vector2, data: Dictionary) -> void:
 	var key: String = "%s:%d" % [item, direction]
 	if item == "furnace": key = "furnace:%d:0" % direction
 	elif item in ["straight", "corner_right", "corner_left", "junction"]: key = "belt:%s:%d" % [item,direction]
-	if item == "launcher":
-		game.get("renderer").draw_launcher_on(self, center, {"ammo": []}, true)
+	if item == "launcher_2":
+		game.get("renderer").draw_launcher_on(self, center, {"ammo": [], "level": 2}, true)
 		draw_rect(rect,Color("#4d9bde88"))
 	elif item == "saw":
 		preload("res://Scripts/saw_manager.gd").draw_machine(self,center,{"direction":direction})

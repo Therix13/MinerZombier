@@ -104,7 +104,7 @@ func cancel_placement() -> void:
 	queue_redraw()
 
 func other_placement() -> bool:
-	return game.get("placing_coal") or game.get("placing_brass") or game.get("placing_belt") or game.get("placing_drill") or game.get("placing_launcher")
+	return game.get("placing_coal") or game.get("placing_copper") or game.get("placing_belt") or game.get("placing_drill") or game.get("placing_launcher")
 
 func _process(delta: float) -> void:
 	if placing and (other_placement() or not game.get("cycle").allows_action("buy_compactor") or game.get("cycle").is_night or game.get("cycle").defeated): cancel_placement()
@@ -161,7 +161,7 @@ func draw_machine(center: Vector2, data: Dictionary) -> void:
 	for index in range(INPUT_COUNT):
 		draw_circle(center + Vector2(-5 + index * 10, 16), 2, Color("#eac978") if index < count else Color("#303638"))
 	if count > 0:
-		draw_circle(center + Vector2(0, -1), 5, Color("#dbb36b") if str(data["kind"]).begins_with("brass") else Color("#29292d"))
+		draw_circle(center + Vector2(0, -1), 5, Color("#dbb36b") if str(data["kind"]).begins_with("copper") else Color("#29292d"))
 	if count == INPUT_COUNT:
 		draw_rect(Rect2(center + Vector2(-12, -3), Vector2(24, 4)), Color("#303638"))
 		draw_rect(Rect2(center + Vector2(-12, -3), Vector2(24 * clampf(float(data.get("elapsed", 0.0)) / PROCESS_TIME, 0, 1), 4)), Color("#eac978"))

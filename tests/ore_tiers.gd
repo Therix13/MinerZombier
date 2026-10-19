@@ -19,7 +19,7 @@ func run_checks() -> void:
 	var c := Vector2i(16, 1)
 	var platform: Vector2i = game.grid.defense_cell("left")
 	game.launchers.place(platform)
-	for material: String in ["coal", "brass"]:
+	for material: String in ["coal", "copper"]:
 		for level in range(1, 5):
 			clear_items()
 			game.launchers.place(platform)
@@ -60,7 +60,7 @@ func run_checks() -> void:
 				check(game.mining.nugget_type(c) == material + "_" + str(level + 1) and compactors.machines[b]["count"] == 0, "Four seconds output the correct next tier")
 				compactors.process_outputs(4.0)
 				check(game.mining.nuggets_at(c) == 1, "Idle compactors cannot duplicate their output")
-			var prices: Array = [5,15,40,100] if material == "brass" else [3,8,20,50]
+			var prices: Array = [5,15,40,100] if material == "copper" else [3,8,20,50]
 			check(game.economy.sale_value(kind) == prices[level-1] and game.mining.material_units(kind) == int(pow(2, level - 1)), "Tier %d has its configured sale value and preserves input units" % level)
 			clear_items()
 			put(a, {kind: 1})
@@ -77,9 +77,9 @@ func run_checks() -> void:
 			check(game.mining.nuggets_at(sale_belt) == 0 and game.economy.coins == cash + game.economy.sale_value(kind) and game.progression.total_experience == xp + game.progression.SALE_EXPERIENCE[kind], "Conveyor %s sales cannot duplicate ore, coins, or EXP" % kind)
 	clear_items()
 	put(a, {"coal": 1})
-	put(b, {"brass": 1})
+	put(b, {"copper": 1})
 	check(not game.mining.fuse(a, b), "Different materials never fuse")
-	game.mining.brass_nuggets.erase(b)
+	game.mining.copper_nuggets.erase(b)
 	put(b, {"coal_2": 1})
 	check(not game.mining.fuse(a, b), "Different levels never fuse")
 	clear_items()

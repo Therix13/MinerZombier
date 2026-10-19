@@ -18,7 +18,7 @@ Ganas **EXP** por derrotar zombis y vender minerales, tanto manualmente como por
 | --- | --- |
 | Derrotar un zombi | 10 |
 | Vender una pepita de carbón | 2 |
-| Vender una pepita de latón | 3 |
+| Vender una pepita de cobre | 3 |
 
 El primer nivel requiere 25 EXP. Cada nivel posterior necesita 15 EXP más que el anterior: 25, 40, 55, 70… La EXP sobrante se conserva y una recompensa grande puede otorgar varios niveles. Cada subida da **1 punto de investigación (PI)**.
 

@@ -79,7 +79,7 @@ func run_checks() -> void:
 	check(game.mining.nugget_type(Vector2i(15,4)) == "coal_4" and game.mining.nugget_type(Vector2i(18,4)) == "gold_ingot_4","Resource material, form and tier survive loading")
 	check(game.conveyors.belt_shape(Vector2i(14,1)) == "junction" and game.conveyors.last_junction_entry[Vector2i(14,1)] == 2,"Belts retain their shape, direction and junction state")
 	check(game.drills.drills[Vector2i(13,0)] == 1,"Drills retain their placement and rotation")
-	check(game.launchers.launchers[Vector2i(12,-3)]["ammo"] == ["coal","brass"] and game.launchers.launchers[Vector2i(12,-3)]["cooldown"] > 0.75 and game.launchers.launchers[Vector2i(12,-3)]["cooldown"] <= 1.25,"Launcher ammunition and cooldown survive loading")
+	check(game.launchers.launchers[Vector2i(12,-3)]["ammo"] == ["coal","copper"] and game.launchers.launchers[Vector2i(12,-3)]["cooldown"] > 0.75 and game.launchers.launchers[Vector2i(12,-3)]["cooldown"] <= 1.25,"Launcher ammunition and cooldown survive loading")
 	check(machine_resumed("Compactors",Vector2i(12,2),"compactors"),"A partially processing compactor retains its inputs and progress")
 	check(machine_resumed("Furnaces",Vector2i(14,2),"furnaces"),"A burning furnace retains fuel, input, output and elapsed time")
 	check(machine_resumed("Saws",Vector2i(16,2),"saws"),"The saw preserves processing and both outlet states")
@@ -89,10 +89,10 @@ func run_checks() -> void:
 	check(is_equal_approx(game.zombie_manager.base_health,73.0),"Base health is preserved")
 	check(game.camera.position.is_equal_approx(original["camera"]["position"]),"Loading preserves the camera instead of refocusing the tutorial")
 	var legacy: Dictionary = saves.snapshot()
-	legacy["cycle"].erase("brass_ingot_created")
-	legacy["cycle"].erase("brass_ingot_3_created")
+	legacy["cycle"].erase("copper_ingot_created")
+	legacy["cycle"].erase("copper_ingot_3_created")
 	check(saves.valid_snapshot(legacy) and saves.restore_snapshot(legacy),"Saves from before the expanded tutorial remain loadable")
-	check(not game.cycle.brass_ingot_created,"An old save without a crafted ingot starts with the proper default")
+	check(not game.cycle.copper_ingot_created,"An old save without a crafted ingot starts with the proper default")
 	# Persist a saw with one output blocked, then release only its pending item.
 	game.mining.items_for("coal")[Vector2i(17,3)] = 1
 	game.get_node("Saws").process_cutting(3.0)
@@ -105,12 +105,12 @@ func run_checks() -> void:
 	check(game.mining.items_for("iron_3").size() == 2 and game.get_node("Saws").machines[Vector2i(16,2)]["count"] == 0,"Reloading a saw cannot duplicate the output it already delivered")
 	game.get_node("Furnaces").process_smelting(2.0)
 	var pending_furnace: Dictionary = saves.snapshot()
-	check(pending_furnace["furnaces"][Vector2i(14,2)]["output"] == "brass_ingot","A furnace waiting for a free outlet keeps its completed ingot")
+	check(pending_furnace["furnaces"][Vector2i(14,2)]["output"] == "copper_ingot","A furnace waiting for a free outlet keeps its completed ingot")
 	check(saves.restore_snapshot(pending_furnace),"A blocked furnace product survives loading")
 	game.mining.items_for("coal_3").erase(Vector2i(14,1))
 	game.conveyors.belts[Vector2i(14,1)]["direction"] = 0
 	game.get_node("Furnaces").try_output(Vector2i(14,2))
-	check(game.mining.nugget_type(Vector2i(14,1)) == "brass_ingot" and game.get_node("Furnaces").machines[Vector2i(14,2)]["fuel"] == 0,"A restored furnace releases its existing ingot without burning fuel again")
+	check(game.mining.nugget_type(Vector2i(14,1)) == "copper_ingot" and game.get_node("Furnaces").machines[Vector2i(14,2)]["fuel"] == 0,"A restored furnace releases its existing ingot without burning fuel again")
 	# Actual save/read operations cover integrity checks and backup recovery.
 	game.economy.coins = 5000
 	check(saves.save_game(),"A second snapshot can replace the first atomically")
@@ -213,8 +213,8 @@ func make_fixture() -> void:
 	game.cycle.funded_steps = {2:true,3:true,4:true}
 	game.cycle.barrier_broken = true
 	game.cycle.tutorial_skipped = true
-	for material: String in ["coal","brass","iron","gold"]:
-		var at: Vector2i = {"coal":Vector2i(14,0),"brass":Vector2i(16,0),"iron":Vector2i(12,0),"gold":Vector2i(18,0)}[material]
+	for material: String in ["coal","copper","iron","gold"]:
+		var at: Vector2i = {"coal":Vector2i(14,0),"copper":Vector2i(16,0),"iron":Vector2i(12,0),"gold":Vector2i(18,0)}[material]
 		game.mining.place_vein(at,1,material)
 	game.mining.coal_veins[Vector2i(14,0)]["level"] = 4
 	game.mining.coal_veins[Vector2i(14,0)]["progress"] = 3
@@ -224,7 +224,7 @@ func make_fixture() -> void:
 	game.drills.place(Vector2i(13,0),1)
 	game.launchers.place(Vector2i(12,-3))
 	game.launchers.receive(Vector2i(12,-3),"coal")
-	game.launchers.receive(Vector2i(12,-3),"brass")
+	game.launchers.receive(Vector2i(12,-3),"copper")
 	game.launchers.launchers[Vector2i(12,-3)]["cooldown"] = 1.25
 	game.launchers.place(Vector2i(16,4))
 	var compactors: Node = game.get_node("Compactors")
@@ -235,7 +235,7 @@ func make_fixture() -> void:
 	var furnace: Node = game.get_node("Furnaces")
 	furnace.place(Vector2i(14,2))
 	furnace.receive(Vector2i(14,2),"coal_4")
-	furnace.receive(Vector2i(14,2),"brass_4")
+	furnace.receive(Vector2i(14,2),"copper_4")
 	furnace.process_smelting(2)
 	var saw: Node = game.get_node("Saws")
 	saw.place(Vector2i(16,2),1)
@@ -245,9 +245,9 @@ func make_fixture() -> void:
 	game.get_node("Construction").receive(Vector2i(18,2),"iron_ingot")
 	game.mining.items_for("coal_4")[Vector2i(15,4)] = 1
 	game.mining.items_for("gold_ingot_4")[Vector2i(18,4)] = 1
-	game.progression.unlocked = {"expansion":true,"brass":true,"iron":true,"furnace":true,"launcher":true,"straight":true}
-	game.progression.created_resources = {"coal_4":true,"brass_ingot_3":true}
-	game.progression.completed_veins = {"coal":true,"brass":true}
+	game.progression.unlocked = {"expansion":true,"copper":true,"iron":true,"furnace":true,"launcher":true,"straight":true}
+	game.progression.created_resources = {"coal_4":true,"copper_ingot_3":true}
+	game.progression.completed_veins = {"coal":true,"copper":true}
 	game.zombie_manager.base_health = 73
 	game.redraw_world()
 

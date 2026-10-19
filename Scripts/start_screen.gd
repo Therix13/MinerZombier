@@ -41,7 +41,7 @@ func _ready() -> void:
 	art_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	art_row.add_theme_constant_override("separation",14)
 	column.add_child(art_row)
-	for kind: String in ["ore:coal_3","ore:brass_ingot_3","launcher"]:
+	for kind: String in ["ore:coal_3","ore:copper_ingot_3","launcher"]:
 		art_row.add_child(session.game.shop.create_item_preview(kind,Vector2(58,58)))
 	add_text(column,"MINER ZOMBIER",34,Color("#ffe0a1"))
 	add_text(column,"Extrae · Fusiona · Resiste",15,Color("#aac7b2"))
@@ -155,7 +155,7 @@ class MineBackdrop extends Control:
 				draw_rect(rect,Color("#233b30") if absi(int(float(x)*tile-center_x)) < 265 else Color("#192b29"))
 				if x%4 == 0 and y%3 == 1:
 					draw_circle(rect.position+Vector2(17,19),4,Color("#435244"))
-		# A quiet mine entrance and brass rails frame the menu without animating the world.
+		# A quiet mine entrance and copper rails frame the menu without animating the world.
 		for x: float in [center_x-295,center_x+295]:
 			draw_rect(Rect2(x-4,horizon-6,8,size.y-horizon+6),Color("#8f6c3d"))
 			for y in range(int((size.y-horizon)/tile)+1):

@@ -59,7 +59,7 @@ func run_checks() -> void:
 		game.get("cycle").day = 2
 		game.get("progression").add_experience(260)
 		game.call("research_technology", "drill")
-		game.call("research_technology", "brass")
+		game.call("research_technology", "copper")
 		var refs: Array[WeakRef] = manager_refs(game)
 		game.call("restart_game")
 		await scene_changed

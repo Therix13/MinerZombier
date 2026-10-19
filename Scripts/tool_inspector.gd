@@ -119,7 +119,8 @@ func refresh() -> void:
 	match kind:
 		"blueprint":
 			var plan: Dictionary = game.get_node("Construction").plans[cell]
-			status.text = "Plano: %s\nEntrega los recursos aquí." % {"furnace": "Horno", "drill": "Taladro", "compactor": "Compactador", "saw": "Sierra"}.get(plan["item"], "Cinta transportadora")
+			status.text = "Plano: %s\nEntrega los recursos aquí." % {"furnace": "Horno", "drill": "Taladro", "compactor": "Compactador", "saw": "Sierra", "launcher_2": "Lanzapepitas Nv. 2"}.get(plan["item"], "Cinta transportadora")
+			if not plan.get("ammo",[]).is_empty(): status.text += "\nMunición guardada: %d" % plan["ammo"].size()
 			for material: String in game.get_node("Construction").RECIPES[plan["item"]]:
 				items[material] = int(plan["delivered"].get(material, 0))
 		"furnace":
@@ -136,7 +137,12 @@ func refresh() -> void:
 			var data: Dictionary = game.get_node("Compactors").machines[cell]
 			status.text = "Compactador"
 			if int(data["count"]) == 2: status.text += " · %.1f / 4 s" % float(data["elapsed"])
-		"launcher": status.text = "Lanzapepitas" if game.get("launchers").is_active_position(cell) else "Lanzapepitas · Fuera de defensa"
+		"launcher":
+			var level: int = game.get("launchers").level_at(cell)
+			status.text = "Lanzapepitas · Nv. %d" % level
+			if level == 1: status.text += " · Oxidado"
+			if not game.get("launchers").is_active_position(cell): status.text += " · Fuera de defensa"
+			if level == 1: status.text += "\nFusiona dos Nv. 1 (máx. 5 pepitas entre ambos)."
 		"drill": status.text = "Taladro"
 	if withdrawal_blocked: status.text += " · Sin espacio libre."
 	var signature: String = var_to_str(items)
@@ -170,7 +176,7 @@ func refresh() -> void:
 		withdraw_buttons[item] = button
 	if items.is_empty():
 		var empty := make_slot()
-		empty.tooltip_text = "Entrada: latón o hierro Nv. 4." if kind == "furnace" else ("Entrada: pepitas o lingotes de nivel 2–4. Salidas: dos casillas diagonales delanteras." if kind == "saw" else "Sin materiales almacenados.")
+		empty.tooltip_text = "Entrada: cobre o hierro Nv. 4." if kind == "furnace" else ("Entrada: pepitas o lingotes de nivel 2–4. Salidas: dos casillas diagonales delanteras." if kind == "saw" else "Sin materiales almacenados.")
 		var tray := SlotSymbol.new()
 		tray.custom_minimum_size = Vector2(48, 48)
 		fill_slot(empty, tray, "—")

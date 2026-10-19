@@ -40,7 +40,7 @@ func run_checks() -> void:
 				game.mining.items_for(material)[a] = 1
 				check(mover.drop("nugget",a,b) and game.mining.nuggets_at(a) == 0, "A valid delivery is consumed exactly once")
 		check(not construction.plans.has(b) and mover.pick_kind(b,Vector2.ZERO) != "", item + " activates only after its complete recipe")
-		check(not construction.receive(b,"brass_ingot"), "Completed plans cannot consume another item")
+		check(not construction.receive(b,"copper_ingot"), "Completed plans cannot consume another item")
 	clear_items()
 	check(mover.select_item("furnace") and mover.place_selected(b), "Furnace blueprint placed for inspector")
 	game.redraw_world()
@@ -63,7 +63,7 @@ func run_checks() -> void:
 	mover.select_item("drill")
 	mover.place_selected(b)
 	game.conveyors.place(a,1)
-	for material: String in ["brass_ingot_3","brass_ingot_3","brass_ingot","brass_ingot"]:
+	for material: String in ["copper_ingot_3","copper_ingot_3","copper_ingot","copper_ingot"]:
 		game.mining.items_for(material)[a] = 1
 		game.conveyors.tick()
 	check(game.drills.drills.has(b) and game.mining.nuggets_at(a) == 0, "Conveyors can supply a complete construction recipe")
@@ -81,7 +81,7 @@ func run_checks() -> void:
 	check(game.mining.nugget_type(b) == "iron", "Nine mining hits produce a raw iron nugget")
 	game.mining.remove_one_nugget(b,"iron")
 	game.mining.place_vein(b,1,"iron")
-	check(mover.drop("vein",a,b) and game.mining.vein_level(b) == 2, "Iron veins fuse like coal and brass")
+	check(mover.drop("vein",a,b) and game.mining.vein_level(b) == 2, "Iron veins fuse like coal and copper")
 	clear_items()
 	game.mining.items_for("iron")[a] = 1
 	game.mining.items_for("iron")[b] = 1

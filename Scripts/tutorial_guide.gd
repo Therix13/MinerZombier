@@ -37,8 +37,8 @@ func _ready() -> void:
 	barrier.live_game = game
 	barrier.grid = cycle.grid
 	game.add_child(barrier)
-	cycle.brass_ingot_created = cycle.brass_ingot_created or game.get("progression").created_resources.has("brass_ingot")
-	cycle.brass_ingot_3_created = cycle.brass_ingot_3_created or game.get("progression").created_resources.has("brass_ingot_3") or game.get("progression").created_resources.has("brass_ingot_4")
+	cycle.copper_ingot_created = cycle.copper_ingot_created or game.get("progression").created_resources.has("copper_ingot")
+	cycle.copper_ingot_3_created = cycle.copper_ingot_3_created or game.get("progression").created_resources.has("copper_ingot_3") or game.get("progression").created_resources.has("copper_ingot_4")
 	cycle.refresh_tutorial()
 	on_step_changed()
 
@@ -126,7 +126,7 @@ func resupply_targets() -> Array[Vector2i]:
 	var controller: RefCounted = game.get("camera_controller")
 	if not resupply_active() or resupply_step != 1 or controller.defense_view or controller.transitioning:
 		return result
-	for kind: String in ["coal", "brass"]:
+	for kind: String in ["coal", "copper"]:
 		var items: Dictionary = cycle.mining.items_for(kind)
 		for cell: Vector2i in items:
 			if int(items[cell]) <= 0: continue
@@ -136,7 +136,7 @@ func resupply_targets() -> Array[Vector2i]:
 					result.append(platform)
 					return result
 			return result
-	for veins: Dictionary in [cycle.mining.coal_veins, cycle.mining.brass_veins]:
+	for veins: Dictionary in [cycle.mining.coal_veins, cycle.mining.copper_veins]:
 		if not veins.is_empty():
 			result.append(veins.keys()[0])
 			break
@@ -144,14 +144,14 @@ func resupply_targets() -> Array[Vector2i]:
 
 func placing_kind() -> String:
 	if game.get_node("WorldInteractions").placing_furnace: return "furnace"
-	if game.get("placing_brass"): return "brass"
+	if game.get("placing_copper"): return "copper"
 	if game.get("placing_coal"):
 		return "coal"
 	if game.get("placing_belt"):
 		return "belt"
 	if game.get("placing_launcher"):
 		return "launcher"
-	return "other" if game.get("placing_brass") or game.get("placing_drill") else ""
+	return "other" if game.get("placing_copper") or game.get("placing_drill") else ""
 
 func clear_interaction() -> void:
 	game.set("holding_object", false)

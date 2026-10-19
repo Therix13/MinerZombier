@@ -81,11 +81,11 @@ func run_checks() -> void:
 	var b := Vector2i(16, 1)
 	var samples := [
 		{"coal_vein": {"direction": 3, "progress": 4}},
-		{"brass_vein": {"direction": 3, "progress": 2}},
+		{"copper_vein": {"direction": 3, "progress": 2}},
 		{"drill": 3},
 		{"belt": {"direction": 3, "shape": "junction"}, "coal": 3, "entry": 2},
 		{"coal": 2},
-		{"brass": 4},
+		{"copper": 4},
 	]
 	var types := ["vein", "vein", "drill", "belt", "nugget", "nugget"]
 	var coins: int = game.economy.coins
@@ -103,7 +103,7 @@ func run_checks() -> void:
 	check(game.economy.coins == coins and game.progression.total_experience == 0, "Swapping never grants coins or EXP")
 	var before: Dictionary = mover.cell_data(a)
 	check(not mover.drop("nugget", a, Vector2i(0, 0)) and mover.cell_data(a) == before, "A rejected swap outside owned land preserves all contents")
-	for ore: String in ["coal", "brass"]:
+	for ore: String in ["coal", "copper"]:
 		clear_items()
 		put(a, {"belt": {"direction": 1, "shape": "junction"}, "entry": 2, ore: 2})
 		before = mover.cell_data(a)
@@ -116,8 +116,8 @@ func run_checks() -> void:
 	game.grid.purchase_defense_platforms()
 	var left: Vector2i = game.grid.defense_cell("left")
 	var right: Vector2i = game.grid.defense_cell("right")
-	put(left, {"launcher": {"ammo": ["coal", "brass"], "cooldown": 2.3, "angle": 0.7}})
-	put(right, {"launcher": {"ammo": ["brass"], "cooldown": 1.2, "angle": 1.3}})
+	put(left, {"launcher": {"ammo": ["coal", "copper"], "cooldown": 2.3, "angle": 0.7}})
+	put(right, {"launcher": {"ammo": ["copper"], "cooldown": 1.2, "angle": 1.3}})
 	var left_data: Dictionary = mover.cell_data(left)
 	var right_data: Dictionary = mover.cell_data(right)
 	check(mover.drop("launcher", left, right) and mover.cell_data(left) == right_data and mover.cell_data(right) == left_data, "Launcher swaps preserve ammunition, cooldown, and aim")
@@ -129,7 +129,7 @@ func run_checks() -> void:
 	check(mover.drop("nugget", a, game.grid.sale_cell) and game.economy.coins == coins + 5 and game.progression.total_experience == 1, "Selling still consumes one nugget and awards the normal rewards")
 	clear_items()
 	put(a, {"coal": 1})
-	put(b, {"brass": 1})
+	put(b, {"copper": 1})
 	game.cycle.is_night = true
 	check(not mover.drop("nugget", a, b), "Nighttime cannot bypass movement restrictions")
 	game.cycle.is_night = false
@@ -148,9 +148,9 @@ func run_checks() -> void:
 	check(game.conveyors.belts.has(b) and game.mining.nuggets_at(a) == 1 and not game.holding_object, "A real drag swaps a belt with the nugget blocking its destination")
 	clear_items()
 	put(a, {"belt": {"direction": 1, "shape": "straight"}, "coal": 1})
-	put(b, {"brass_vein": {"direction": 2, "progress": 5}})
+	put(b, {"copper_vein": {"direction": 2, "progress": 5}})
 	await drag(a, b, Vector2(18, 0))
-	check(game.conveyors.belts.has(a) and game.mining.nuggets_at(a) == 1 and game.mining.brass_veins[b]["progress"] == 5 and not game.holding_object, "Dragging the edge cannot move a loaded belt or swap its destination")
+	check(game.conveyors.belts.has(a) and game.mining.nuggets_at(a) == 1 and game.mining.copper_veins[b]["progress"] == 5 and not game.holding_object, "Dragging the edge cannot move a loaded belt or swap its destination")
 	await drag(a, Vector2i(15, 2), Vector2(18, 0))
 	check(game.conveyors.belts.has(a) and game.mining.nuggets_at(a) == 0 and game.mining.nuggets_at(Vector2i(15, 2)) == 1, "Dragging a loaded cell removes only its ore and leaves the conveyor in place")
 	clear_items()

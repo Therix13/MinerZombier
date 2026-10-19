@@ -53,12 +53,12 @@ func run() -> void:
 		game.conveyors.place(Vector2i(13, row), 1)
 		game.conveyors.place(Vector2i(14, row), 1)
 		compactors.place(Vector2i(15, row), 1)
-		compactors.receive(Vector2i(15, row), "brass")
-		compactors.receive(Vector2i(15, row), "brass")
+		compactors.receive(Vector2i(15, row), "copper")
+		compactors.receive(Vector2i(15, row), "copper")
 		furnaces.place(Vector2i(16, row), 1)
 		furnaces.receive(Vector2i(16, row), "coal_4")
-		furnaces.receive(Vector2i(16, row), "brass_4")
-		game.mining.items_for("brass")[Vector2i(14,row)] = 1
+		furnaces.receive(Vector2i(16, row), "copper_4")
+		game.mining.items_for("copper")[Vector2i(14,row)] = 1
 	game.redraw_world()
 	await measure("factory")
 	var intro: Node = load("res://Scripts/intro_cinematic.gd").new()

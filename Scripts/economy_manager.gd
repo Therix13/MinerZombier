@@ -7,11 +7,11 @@ const EXPANSION_PRICE := 500
 const COAL_VEIN_PRICE := 100
 const CONVEYOR_PRICE := 50
 const DRILL_PRICE := 200
-const LAUNCHER_PRICE := 200
+const LAUNCHER_PRICE := 500
 const DEFENSE_TILE_PRICE := 1000
 const COAL_SELL_PRICE := 3
-const BRASS_VEIN_PRICE := 500
-const BRASS_SELL_PRICE := 5
+const COPPER_VEIN_PRICE := 500
+const COPPER_SELL_PRICE := 5
 const IRON_VEIN_PRICE := 5000
 const IRON_SELL_PRICE := 10
 const GOLD_VEIN_PRICE := 50000
@@ -19,12 +19,12 @@ const GOLD_SELL_PRICE := 30
 
 const NUGGET_SELL_PRICES := {
 	"coal": [3, 8, 20, 50],
-	"brass": [5, 15, 40, 100],
+	"copper": [5, 15, 40, 100],
 	"iron": [10, 30, 75, 175],
 	"gold": [30, 75, 200, 500],
 }
 const INGOT_SELL_PRICES := {
-	"brass": [150, 400, 1000, 2500],
+	"copper": [150, 400, 1000, 2500],
 	"iron": [350, 1000, 2500, 7500],
 	"gold": [1000, 2500, 7500, 20000],
 }

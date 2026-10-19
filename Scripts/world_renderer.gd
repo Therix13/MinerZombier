@@ -17,7 +17,7 @@ var placing_launcher: bool = false
 var hovered_cell := Vector2i(-999, -999)
 var sale_hovered := false
 var placing_coal := false
-var placing_brass := false
+var placing_copper := false
 var placing_belt := false
 var placement_belt_shape: String = "straight"
 var held_belt_shape: String = "straight"
@@ -80,7 +80,7 @@ func _draw() -> void:
 				var rhythm: Node = get_parent().get_node_or_null("WorkshopRhythm")
 				if rhythm != null: center = rhythm.nugget_position(cell, kind, center)
 				draw_nugget(center, kind, amount)
-	for material: String in ["coal", "brass", "iron", "gold"]:
+	for material: String in ["coal", "copper", "iron", "gold"]:
 		for cell: Vector2i in mining.veins_for(material):
 			if holding_object and dragging_object and held_object_type == "vein" and cell == held_object_cell: continue
 			draw_vein(grid.get_cell_rect(cell).get_center(), material, mining.veins_for(material)[cell])
@@ -92,12 +92,12 @@ func _draw() -> void:
 		var defense_outline: Rect2 = grid.get_cell_rect(cell)
 		draw_rect(defense_outline.grow(-1.0), Color("#eab958"), false, 3.0)
 	for shot in launchers.shots:
-		draw_line(shot["from"], shot["to"], Color("#d9b46a") if str(shot["kind"]).begins_with("brass") else Color("#444444"), 5.0 if str(shot["kind"]).ends_with("_2") else 3.0)
+		draw_line(shot["from"], shot["to"], Color("#d9b46a") if str(shot["kind"]).begins_with("copper") else Color("#444444"), 5.0 if str(shot["kind"]).ends_with("_2") else 3.0)
 	draw_sale_cell()
 	if placing_coal and preview_allowed("coal") and grid.owned_tiles.has(hovered_cell) and mining.can_place_vein(hovered_cell) and not conveyors.belts.has(hovered_cell) and not drills.drills.has(hovered_cell) and not launchers.launchers.has(hovered_cell):
 		draw_coal_vein(grid.get_cell_rect(hovered_cell).get_center(), placement_direction, 0, true)
-	if placing_brass and grid.owned_tiles.has(hovered_cell) and mining.can_place_vein(hovered_cell) and not conveyors.belts.has(hovered_cell) and not drills.drills.has(hovered_cell) and not launchers.launchers.has(hovered_cell):
-		draw_brass_vein(grid.get_cell_rect(hovered_cell).get_center(), placement_direction, 0, true)
+	if placing_copper and grid.owned_tiles.has(hovered_cell) and mining.can_place_vein(hovered_cell) and not conveyors.belts.has(hovered_cell) and not drills.drills.has(hovered_cell) and not launchers.launchers.has(hovered_cell):
+		draw_copper_vein(grid.get_cell_rect(hovered_cell).get_center(), placement_direction, 0, true)
 	if placing_belt and preview_allowed("belt") and grid.owned_tiles.has(hovered_cell) and conveyors.can_place(hovered_cell):
 		draw_conveyor(grid.get_cell_rect(hovered_cell).get_center(), placement_direction, true, placement_belt_shape)
 	if placing_launcher and (grid.is_valid_cell(hovered_cell) or grid.is_defense_position(hovered_cell)):
@@ -119,7 +119,7 @@ func _draw() -> void:
 		elif held_object_type == "belt":
 			valid = destination == held_object_cell or conveyors.can_place(destination)
 		elif held_object_type == "launcher":
-			valid = destination == held_object_cell or launchers.can_place(destination)
+			valid = destination == held_object_cell or launchers.can_place(destination) or launchers.can_fuse(held_object_cell,destination)
 		elif held_object_type == "nugget":
 			valid = mining.can_move_nugget(destination) or destination == grid.sale_cell or launchers.can_receive(destination)
 		if is_instance_valid(interactions):
@@ -140,8 +140,8 @@ func _draw() -> void:
 			draw_conveyor(drag_world_position, placement_direction, true, held_belt_shape)
 			if mining.nugget_type(held_object_cell) == "coal":
 				draw_coal_nugget(drag_world_position, mining.nuggets_at(held_object_cell))
-			elif mining.nugget_type(held_object_cell) == "brass":
-				draw_brass_nugget(drag_world_position, mining.nuggets_at(held_object_cell))
+			elif mining.nugget_type(held_object_cell) == "copper":
+				draw_copper_nugget(drag_world_position, mining.nuggets_at(held_object_cell))
 		elif held_object_type == "launcher":
 			draw_launcher(drag_world_position, launchers.launchers[held_object_cell], true)
 		elif held_object_type == "nugget":
@@ -164,7 +164,7 @@ func draw_nugget(center: Vector2, kind: String, amount: int) -> void:
 	elif "_ingot" in kind: draw_ingot(center, kind, amount)
 	elif mining.ore_level(kind) >= 3: draw_cluster_nugget(center, kind, amount)
 	elif mining.ore_level(kind) == 2: draw_refined_nugget(center, kind, amount)
-	elif kind.begins_with("brass"): draw_brass_nugget(center, amount)
+	elif kind.begins_with("copper"): draw_copper_nugget(center, amount)
 	else: draw_coal_nugget(center, amount)
 
 func draw_iron_nugget(center: Vector2, kind: String, amount: int) -> void:
@@ -207,21 +207,21 @@ func draw_ingot(center: Vector2, kind: String, amount: int) -> void:
 	if amount > 1: draw_string(ThemeDB.fallback_font, center + Vector2(12, 20), str(amount), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#ffdb85"))
 
 func draw_cluster_nugget(center: Vector2, kind: String, amount: int) -> void:
-	var brass: bool = kind.begins_with("brass")
+	var copper: bool = kind.begins_with("copper")
 	var level: int = mining.ore_level(kind)
 	var offsets: Array[Vector2] = [Vector2(-8, 3), Vector2(8, 3), Vector2(0, -7)]
 	if level == 4: offsets = [Vector2(-9, 6), Vector2(9, 6), Vector2(-6, -8), Vector2(7, -8)]
 	for offset: Vector2 in offsets:
 		var at: Vector2 = center + offset
 		var points := PackedVector2Array([at + Vector2(-11, 1), at + Vector2(-7, -8), at + Vector2(3, -10), at + Vector2(11, -3), at + Vector2(8, 8), at + Vector2(-4, 10)])
-		draw_colored_polygon(points, Color("#a47740") if brass else Color("#222427"))
+		draw_colored_polygon(points, Color("#ad6439") if copper else Color("#222427"))
 		points.append(points[0])
-		draw_polyline(points, Color("#62462a") if brass else Color("#101113"), 1.5)
-		draw_colored_polygon(PackedVector2Array([at + Vector2(-7, -6), at + Vector2(2, -8), at + Vector2(6, -3), at + Vector2(-3, 1)]), Color("#e2b97b") if brass else Color("#51555a"))
+		draw_polyline(points, Color("#62462a") if copper else Color("#101113"), 1.5)
+		draw_colored_polygon(PackedVector2Array([at + Vector2(-7, -6), at + Vector2(2, -8), at + Vector2(6, -3), at + Vector2(-3, 1)]), Color("#f0b17d") if copper else Color("#51555a"))
 	if amount > 1: draw_string(ThemeDB.fallback_font, center + Vector2(12, 20), str(amount), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#ffdb85"))
 
 func draw_refined_nugget(center: Vector2, kind: String, amount: int) -> void:
-	var brass: bool = kind.begins_with("brass")
+	var copper: bool = kind.begins_with("copper")
 	# A modest step up from raw ore; larger tiers can grow into fuller clusters.
 	var outline := PackedVector2Array([
 		center + Vector2(-15, -3), center + Vector2(-11, -10),
@@ -231,26 +231,26 @@ func draw_refined_nugget(center: Vector2, kind: String, amount: int) -> void:
 		center + Vector2(4, 14), center + Vector2(-5, 15),
 		center + Vector2(-13, 10), center + Vector2(-16, 3),
 	])
-	draw_colored_polygon(outline, Color("#a3753e") if brass else Color("#171719"))
+	draw_colored_polygon(outline, Color("#ab6238") if copper else Color("#171719"))
 	draw_colored_polygon(PackedVector2Array([
 		center + Vector2(-13, -3), center + Vector2(-9, -9),
 		center + Vector2(-3, -13), center + Vector2(4, -12),
 		center + Vector2(6, -7), center + Vector2(1, -1),
 		center + Vector2(-5, 3), center + Vector2(-11, 3),
-	]), Color("#dfb578") if brass else Color("#444649"))
+	]), Color("#edaf78") if copper else Color("#444649"))
 	draw_colored_polygon(PackedVector2Array([
 		center + Vector2(3, -5), center + Vector2(9, -7),
 		center + Vector2(13, -3), center + Vector2(13, 3),
 		center + Vector2(8, 8), center + Vector2(1, 7), center + Vector2(-1, 2),
-	]), Color("#bf8c4e") if brass else Color("#2d2f32"))
+	]), Color("#cb7e48") if copper else Color("#2d2f32"))
 	draw_colored_polygon(PackedVector2Array([
 		center + Vector2(-9, 7), center + Vector2(-4, 3),
 		center + Vector2(2, 4), center + Vector2(5, 10),
 		center + Vector2(0, 12), center + Vector2(-6, 12),
-	]), Color("#8f7744") if brass else Color("#222326"))
+	]), Color("#87573b") if copper else Color("#222326"))
 	var closed: PackedVector2Array = outline.duplicate()
 	closed.append(outline[0])
-	draw_polyline(closed, Color("#5c4026") if brass else Color("#0c0d0e"), 1.5)
+	draw_polyline(closed, Color("#5c4026") if copper else Color("#0c0d0e"), 1.5)
 	if amount > 1:
 		draw_string(ThemeDB.fallback_font, center + Vector2(12, 20), str(amount), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#ffdb85"))
 
@@ -259,7 +259,7 @@ func preview_allowed(kind: String) -> bool:
 
 func draw_vein(center: Vector2, kind: String, data: Dictionary, preview: bool = false) -> void:
 	if kind in ["iron", "gold"]: draw_iron_vein(center, int(data["direction"]), int(data["progress"]), kind)
-	elif kind == "brass": draw_brass_vein(center, int(data["direction"]), int(data["progress"]), preview)
+	elif kind == "copper": draw_copper_vein(center, int(data["direction"]), int(data["progress"]), preview)
 	else: draw_coal_vein(center, int(data["direction"]), int(data["progress"]), preview)
 	var level: int = clampi(int(data.get("level", 1)), 1, 4)
 	if level == 1: return
@@ -480,8 +480,8 @@ func draw_drill(center: Vector2, direction_index: int, preview: bool) -> void:
 	var arrow := PackedVector2Array([tip, tip - direction * 11.0 + side * 5.0, tip - direction * 11.0 - side * 5.0])
 	draw_colored_polygon(arrow, Color("#ffe084"))
 
-func draw_brass_vein(center: Vector2, direction_index: int, progress: int, preview: bool) -> void:
-	if not rasterizing and not preview and ArtAtlas.paint(self, "brass:%d:%d" % [direction_index, progress], center): return
+func draw_copper_vein(center: Vector2, direction_index: int, progress: int, preview: bool) -> void:
+	if not rasterizing and not preview and ArtAtlas.paint(self, "copper:%d:%d" % [direction_index, progress], center): return
 	var rect := Rect2(center - Vector2.ONE * grid.TILE_SIZE * 0.5, Vector2.ONE * grid.TILE_SIZE).grow(-3.0)
 	var base := Color("#634525")
 	if preview:
@@ -490,16 +490,16 @@ func draw_brass_vein(center: Vector2, direction_index: int, progress: int, previ
 	draw_rect(rect, Color("#e1b65f"), false, 2.0)
 	for offset in [Vector2(-10, -9), Vector2(9, -8), Vector2(-1, 8), Vector2(12, 11)]:
 		draw_circle(center + offset + Vector2(2, 2), 9.0, Color("#43301c"))
-		draw_circle(center + offset, 7.0, Color("#b68a4b"))
-		draw_circle(center + offset + Vector2(-2, -2), 3.0, Color("#e4ca7e"))
+		draw_circle(center + offset, 7.0, Color("#c77c48"))
+		draw_circle(center + offset + Vector2(-2, -2), 3.0, Color("#f4bc88"))
 	draw_direction_arrow(center, direction_index)
 	if not preview:
 		draw_rect(Rect2(rect.position + Vector2(3, 36), Vector2(36, 4)), Color("#302117"))
-		draw_rect(Rect2(rect.position + Vector2(3, 36), Vector2(36.0 * minf(float(progress) / float(mining.hardness("brass")), 1.0), 4)), Color("#f5d283"))
+		draw_rect(Rect2(rect.position + Vector2(3, 36), Vector2(36.0 * minf(float(progress) / float(mining.hardness("copper")), 1.0), 4)), Color("#f5d283"))
 
-func draw_brass_nugget(center: Vector2, amount: int) -> void:
+func draw_copper_nugget(center: Vector2, amount: int) -> void:
 	var points := PackedVector2Array([center + Vector2(-13, -4), center + Vector2(-6, -12), center + Vector2(7, -10), center + Vector2(13, 1), center + Vector2(6, 12), center + Vector2(-9, 9)])
-	draw_colored_polygon(points, Color("#a3753e"))
+	draw_colored_polygon(points, Color("#ab6238"))
 	draw_circle(center + Vector2(-3, -4), 5.0, Color("#e0b76b"))
 	if amount > 1:
 		draw_string(ThemeDB.fallback_font, center + Vector2(9, 17), str(amount), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#ffdb85"))
@@ -508,28 +508,38 @@ func draw_launcher(center: Vector2, data: Dictionary, preview: bool) -> void:
 	draw_launcher_on(self, center, data, preview)
 
 func draw_launcher_on(canvas: Node2D, center: Vector2, data: Dictionary, preview: bool) -> void:
+	var level: int = int(data.get("level",1))
+	var rusty: bool = level == 1
 	var rect := Rect2(center - Vector2(21,21), Vector2(42,42))
-	var brass := Color("#bd843f")
-	if preview: brass.a = 0.65
-	canvas.draw_rect(rect, Color("#4d3423"))
-	canvas.draw_rect(rect.grow(-3), brass)
-	canvas.draw_rect(rect, Color("#efbc6c"), false, 2)
-	canvas.draw_line(rect.position + Vector2(3,3),rect.position + Vector2(38,3),Color("#ffda91"),2)
+	var metal := Color("#806954") if rusty else Color("#cb783e")
+	if preview: metal.a = 0.65
+	var edge := Color("#493f35") if rusty else Color("#63351f")
+	var light := Color("#b39b78") if rusty else Color("#ffc68a")
+	canvas.draw_rect(rect,edge)
+	canvas.draw_rect(rect.grow(-3),metal)
+	canvas.draw_rect(rect,light,false,2)
+	canvas.draw_line(rect.position + Vector2(3,3),rect.position + Vector2(38,3),light,2)
 	for bolt: Vector2 in [Vector2(-16,-16),Vector2(16,-16)]:
-		canvas.draw_circle(center + bolt, 2, Color("#ffe0a0"))
-	canvas.draw_circle(center, 14, Color("#634324"))
-	canvas.draw_circle(center, 11, Color("#e8ac58"))
-	canvas.draw_arc(center, 9, PI, TAU, 12, Color("#ffdb91"), 2)
-	var direction := Vector2.RIGHT.rotated(float(data.get("angle", -PI * 0.5)))
+		canvas.draw_circle(center + bolt,2,light)
+	if rusty:
+		for patch: Vector2 in [Vector2(-12,-8),Vector2(10,9),Vector2(-14,12),Vector2(13,-13)]:
+			canvas.draw_circle(center + patch,3.5,Color("#a14f2d"))
+			canvas.draw_circle(center + patch + Vector2(1,1),1.5,Color("#633d2c"))
+	canvas.draw_circle(center,14,edge)
+	canvas.draw_circle(center,11,metal)
+	canvas.draw_arc(center,9,PI,TAU,12,light,2)
+	var direction := Vector2.RIGHT.rotated(float(data.get("angle",-PI * 0.5)))
 	var muzzle: Vector2 = center + direction * 18
-	canvas.draw_line(center, muzzle, Color("#633f21"), 12)
-	canvas.draw_line(center, muzzle, brass, 8)
-	canvas.draw_line(center + direction.orthogonal()*2, muzzle + direction.orthogonal()*2, Color("#ffd08a"), 2)
-	canvas.draw_circle(muzzle, 5, Color("#e6b05c"))
-	canvas.draw_circle(muzzle, 3, Color("#3e2b20"))
-	var ammo: Array = data.get("ammo", [])
+	canvas.draw_line(center,muzzle,edge,12)
+	canvas.draw_line(center,muzzle,metal,8)
+	canvas.draw_line(center + direction.orthogonal()*2,muzzle + direction.orthogonal()*2,light,2)
+	canvas.draw_circle(muzzle,5,metal)
+	canvas.draw_circle(muzzle,3,edge)
+	var ammo: Array = data.get("ammo",[])
 	for i in range(5):
-		canvas.draw_circle(center + Vector2(-14 + i*7,16), 1.8, Color("#ffe2a0") if i < ammo.size() else Color("#624527"))
+		canvas.draw_circle(center + Vector2(-14 + i*7,16),1.8,light if i < ammo.size() else edge)
+	if level == 2:
+		for x in [-3,3]: canvas.draw_line(center + Vector2(x,-19),center + Vector2(x,-14),light,2)
 
 func draw_defense_platform(rect: Rect2) -> void:
 	if not rasterizing and rect.size == Vector2.ONE * 48 and ArtAtlas.paint(self, "platform", rect.get_center()): return

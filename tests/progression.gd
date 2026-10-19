@@ -29,7 +29,7 @@ func check_level_rules() -> void:
 		curve.append(player.experience_to_next_level())
 	check(curve == [50, 80, 128, 205, 328], "Level requirements follow the exponential curve")
 	player.level = 1
-	check(ProgressionScript.ZOMBIE_EXPERIENCE >= 12 * ProgressionScript.SALE_EXPERIENCE["brass"], "Zombie kills dominate the small mineral-sale rewards")
+	check(ProgressionScript.ZOMBIE_EXPERIENCE >= 12 * ProgressionScript.SALE_EXPERIENCE["copper"], "Zombie kills dominate the small mineral-sale rewards")
 	var levels: Array[int] = []
 	player.level_up.connect(func(value: int) -> void: levels.append(value))
 	player.add_experience(-50)
@@ -72,11 +72,11 @@ func run_checks() -> void:
 	manager.set_process(false)
 	var coins: int = game.economy.coins
 	game.buy_drill()
-	game.buy_brass_vein()
+	game.buy_copper_vein()
 	game.buy_corner_conveyor()
 	game.buy_left_corner_conveyor()
 	game.buy_junction_conveyor()
-	check(game.economy.coins == coins and not game.placing_drill and not game.placing_brass and not game.placing_belt, "Controller refuses all locked purchases without spending coins")
+	check(game.economy.coins == coins and not game.placing_drill and not game.placing_copper and not game.placing_belt, "Controller refuses all locked purchases without spending coins")
 	mining.place_vein(Vector2i(15, 1), 0)
 	for index in range(5): mining.mine(Vector2i(15, 1))
 	check(player.total_experience == 0, "Mining alone does not duplicate sale EXP")
@@ -86,10 +86,10 @@ func run_checks() -> void:
 	for index in range(5): mining.mine(Vector2i(15, 1))
 	belts.advance(4.0)
 	check(player.total_experience == 2, "Conveyor sale awards the same small EXP reward")
-	mining.place_vein(Vector2i(14, 1), 0, "brass")
+	mining.place_vein(Vector2i(14, 1), 0, "copper")
 	for index in range(7): mining.mine(Vector2i(14, 1))
 	mining.move_nugget(Vector2i(14, 0), game.grid.sale_cell)
-	check(player.total_experience == 4, "Brass sales retain a small EXP reward")
+	check(player.total_experience == 4, "Copper sales retain a small EXP reward")
 	manager.start_wave(1)
 	var enemy: Node = get_nodes_in_group("zombies")[0]
 	enemy.take_damage(0.25)
@@ -112,7 +112,7 @@ func run_checks() -> void:
 	await create_timer(0.4).timeout
 	shop.open_category("VETAS")
 	check(not shop.item_buttons["coal"]["button"].disabled and not shop.item_buttons.has("straight"), "Coal is available while unresearched conveyors stay absent")
-	check(not shop.item_buttons.has("drill") and not shop.item_buttons.has("brass") and not shop.item_buttons.has("corner_left") and not shop.item_buttons.has("junction"), "Unresearched items have no store controls")
+	check(not shop.item_buttons.has("drill") and not shop.item_buttons.has("copper") and not shop.item_buttons.has("corner_left") and not shop.item_buttons.has("junction"), "Unresearched items have no store controls")
 	var locked_coins: int = game.economy.coins
 	shop.request_item("drill", shop.drill_requested)
 	check(not game.placing_drill and game.economy.coins == locked_coins, "Synthetic locked-button events cannot buy a locked item")
@@ -132,10 +132,10 @@ func run_checks() -> void:
 	player.add_experience(1)
 	game.economy.add(1)
 	check(shop.research_buttons["drill"].get_instance_id() == button_id, "EXP without a level threshold and coin changes preserve research controls")
-	shop.research_buttons["brass"].pressed.emit()
-	check(player.has_research("brass") and player.research_points == 0, "The next level and prerequisite unlock the new mineral")
+	shop.research_buttons["copper"].pressed.emit()
+	check(player.has_research("copper") and player.research_points == 0, "The next level and prerequisite unlock the new mineral")
 	shop.open_category("VETAS")
-	check(not shop.item_buttons["brass"]["button"].disabled, "Unlocked veins appear in the veins category")
+	check(not shop.item_buttons["copper"]["button"].disabled, "Unlocked veins appear in the veins category")
 	shop.open_category("HERRAMIENTAS")
 	check(not shop.item_buttons["drill"]["button"].disabled, "Unlocked tools appear in the tools category")
 	shop.item_buttons["drill"]["button"].pressed.emit()

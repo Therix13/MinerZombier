@@ -12,7 +12,7 @@ func shift(pressed: bool) -> void:
 func purchase(kind: String) -> void:
 	match kind:
 		"coal": mover.select_item("coal")
-		"brass": mover.select_item("brass")
+		"copper": mover.select_item("copper")
 		"belt": mover.select_item("straight")
 		"drill": mover.select_item("drill")
 		"launcher": mover.select_item("launcher")
@@ -48,17 +48,17 @@ func run_checks() -> void:
 	game.grid.expand()
 	game.grid.purchase_defense_platforms()
 	game.progression.add_experience(10000)
-	for id in ["drill", "straight_belt", "brass", "curved_belts", "junction_belt", "compactor"]: game.research_technology(id)
+	for id in ["drill", "straight_belt", "copper", "curved_belts", "junction_belt", "compactor"]: game.research_technology(id)
 	game.economy.add(10000)
 	game.cycle.free_launcher_available = false
 	await settle()
 	shop.open_shop()
 	await wait_shop()
 	check(shop.category_buttons.has("VETAS") and shop.category_buttons.has("HERRAMIENTAS") and shop.category_buttons.has("AUTOMATIZACIÓN") and not shop.category_buttons.has("BASE"), "The shop replaces Base with veins, tools, and automation categories")
-	for category: String in {"VETAS": ["coal", "brass"], "HERRAMIENTAS": ["drill", "compactor"], "AUTOMATIZACIÓN": ["straight", "corner_right", "corner_left", "junction"]}:
+	for category: String in {"VETAS": ["coal", "copper"], "HERRAMIENTAS": ["drill", "compactor"], "AUTOMATIZACIÓN": ["straight", "corner_right", "corner_left", "junction"]}:
 		shop.open_category(category)
 		check(shop.item_buttons.keys() == shop.visible_shop_items(category), category + " contains only its researched items")
-		if category == "VETAS": check(shop.item_buttons.keys() == ["coal", "brass"], "All veins are grouped together")
+		if category == "VETAS": check(shop.item_buttons.keys() == ["coal", "copper"], "All veins are grouped together")
 		if category == "HERRAMIENTAS": check(shop.item_buttons.keys() == ["drill", "compactor"], "Drills and compactors are grouped as tools")
 		if category == "AUTOMATIZACIÓN": check(shop.item_buttons.keys() == ["straight", "corner_right", "corner_left", "junction"], "Every conveyor shape is grouped under automation")
 	shop.close_shop()
@@ -67,7 +67,7 @@ func run_checks() -> void:
 	var b := Vector2i(16, 1)
 	var left: Vector2i = game.grid.defense_cell("left")
 	var right: Vector2i = game.grid.defense_cell("right")
-	var prices := {"coal": 100, "brass": 150, "belt": 50, "drill": 200, "launcher": 200, "compactor": 300}
+	var prices := {"coal": 100, "copper": 150, "belt": 50, "drill": 200, "launcher": 200, "compactor": 300}
 	for kind: String in prices:
 		clear_items()
 		var coins: int = game.economy.coins
@@ -142,13 +142,13 @@ func run_checks() -> void:
 	check(game.mining.coal_veins.has(a) and not game.mining.coal_veins.has(b) and not game.holding_object and not display.menu_open, "ESC cancels a dragged building without moving it or pausing")
 	var samples := [
 		["vein", {"coal_vein": {"direction": 1, "progress": 0}}, 50],
-		["vein", {"brass_vein": {"direction": 1, "progress": 0}}, 75],
+		["vein", {"copper_vein": {"direction": 1, "progress": 0}}, 75],
 		["belt", {"belt": {"direction": 1, "shape": "straight"}}, 25],
 		["belt", {"belt": {"direction": 1, "shape": "corner"}}, 25],
 		["belt", {"belt": {"direction": 1, "shape": "junction"}}, 25],
 		["drill", {"drill": 1}, 100],
-		["launcher", {"launcher": {"ammo": ["coal", "brass", "coal_2", "brass_2"], "cooldown": 0.0, "angle": 0.0}}, 100],
-		["compactor", {"compactor": {"direction": 1, "kind": "brass", "count": 3}}, 150],
+		["launcher", {"launcher": {"ammo": ["coal", "copper", "coal_2", "copper_2"], "cooldown": 0.0, "angle": 0.0}}, 100],
+		["compactor", {"compactor": {"direction": 1, "kind": "copper", "count": 3}}, 150],
 	]
 	for sample in samples:
 		clear_items()
@@ -159,7 +159,7 @@ func run_checks() -> void:
 		check(mover.drop(sample[0], source, game.grid.sale_cell) and game.economy.coins == coins + sample[2] and game.progression.total_experience == xp, sample[0] + " resells for half without granting EXP")
 		check(not mover.sell(sample[0], source) and game.economy.coins == coins + sample[2], "Repeated sale never duplicates payment")
 		if sample[0] == "launcher": check(game.mining.nuggets_at(source) == 4, "Selling a turret preserves all ammunition kinds")
-		if sample[0] == "compactor": check(game.mining.items_for("brass").get(source, 0) == 3, "Selling a compactor preserves its partial batch")
+		if sample[0] == "compactor": check(game.mining.items_for("copper").get(source, 0) == 3, "Selling a compactor preserves its partial batch")
 	clear_items()
 	put(a, {"belt": {"direction": 1, "shape": "straight"}, "coal": 1})
 	check(not mover.drop("belt", a, game.grid.sale_cell) and game.conveyors.belts.has(a) and game.mining.nuggets_at(a) == 1, "Loaded belts remain immovable and cannot be sold underneath ore")

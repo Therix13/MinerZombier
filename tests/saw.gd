@@ -39,7 +39,7 @@ func run_checks() -> void:
 	game.get_node("Construction").receive(c,"iron")
 	check(saw.machines.has(c) and saw.machines[c]["direction"] == 2 and game.economy.coins == cash - saw.PRICE,"A completed blueprint becomes a Sierra with its chosen outlet")
 	clear_items()
-	for material in ["coal","brass","iron","brass_ingot","iron_ingot"]:
+	for material in ["coal","copper","iron","copper_ingot","iron_ingot"]:
 		for tier in range(2,5):
 			clear_items()
 			saw.place(c,1)
@@ -75,7 +75,7 @@ func run_checks() -> void:
 		check(game.mining.nugget_type(destinations[0]) == "iron_ingot_3" and game.mining.nugget_type(destinations[1]) == "iron_ingot_3" and saw.stored_items(c).is_empty(),"Both diagonal outlets emit simultaneously for orientation " + str(direction))
 	clear_items()
 	saw.place(c,1)
-	for kind: String in ["coal","brass","iron","brass_ingot","iron_ingot","coal_ingot_2","coal_5",""]:
+	for kind: String in ["coal","copper","iron","copper_ingot","iron_ingot","coal_ingot_2","coal_5",""]:
 		check(not saw.receive(c,kind),"Sierra rejects level-one or invalid material: " + kind)
 	game.mining.items_for("coal")[a] = 1
 	check(not mover.drop("nugget",a,c) and game.mining.nuggets_at(a) == 1,"A rejected raw nugget stays in the player's source cell")
@@ -83,17 +83,17 @@ func run_checks() -> void:
 	saw.place(c,1)
 	game.conveyors.place(a,1)
 	game.conveyors.place(c+Vector2i.UP,2)
-	game.mining.items_for("brass_3")[a] = 1
+	game.mining.items_for("copper_3")[a] = 1
 	game.mining.items_for("iron_4")[c+Vector2i.UP] = 1
 	game.conveyors.tick()
-	check(saw.stored_items(c) == {"brass_3":1} and game.mining.nugget_type(c+Vector2i.UP) == "iron_4","Two incoming belts cannot overfill or lose a second input")
+	check(saw.stored_items(c) == {"copper_3":1} and game.mining.nugget_type(c+Vector2i.UP) == "iron_4","Two incoming belts cannot overfill or lose a second input")
 	game.conveyors.place(out,3)
 	game.mining.items_for("coal")[out2] = 1
 	saw.process_cutting(4)
-	check(saw.stored_items(c) == {"brass_2":2} and game.mining.nuggets_at(out) == 0,"A belt facing the wrong way blocks the output safely")
+	check(saw.stored_items(c) == {"copper_2":2} and game.mining.nuggets_at(out) == 0,"A belt facing the wrong way blocks the output safely")
 	game.conveyors.belts[out]["direction"] = 1
 	saw.process_cutting(0)
-	check(game.mining.nugget_type(out) == "brass_2" and saw.stored_items(c) == {"brass_2":1},"Correcting the conveyor releases one of the two products")
+	check(game.mining.nugget_type(out) == "copper_2" and saw.stored_items(c) == {"copper_2":1},"Correcting the conveyor releases one of the two products")
 	clear_items()
 	saw.place(c,1)
 	saw.receive(c,"iron_4")
@@ -129,7 +129,7 @@ func run_checks() -> void:
 	check(game.mining.nuggets_at(out) + game.mining.nuggets_at(out2) == 1 and saw.stored_items(c).is_empty(),"Only the remaining product emits after withdrawal")
 	clear_items()
 	saw.place(c,1)
-	saw.receive(c,"brass_4")
+	saw.receive(c,"copper_4")
 	saw.process_cutting(2)
 	game.redraw_world()
 	await settle()

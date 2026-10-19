@@ -8,13 +8,13 @@ const TUTORIAL_COAL_CELL := Vector2i(14, 0)
 const TUTORIAL_NEW_VEIN_CELL := Vector2i(14, 1)
 const TUTORIAL_ORE_CELL := Vector2i(15, 0)
 const TUTORIAL_FUSION_CELL := Vector2i(15, 1)
-const TUTORIAL_BRASS_CELL := Vector2i(14, 2)
+const TUTORIAL_COPPER_CELL := Vector2i(14, 2)
 const TUTORIAL_FURNACE_CELL := Vector2i(16, 1)
 const TUTORIAL_SALES_TARGET: int = 5
 const TUTORIAL_TITLES := [
 	"Tu primera veta", "Pepitas hasta nivel 4", "Fusiona tus vetas",
 	"Una veta de nivel 3", "Una veta de nivel 4", "El siguiente mineral",
-	"Tu primera veta de latón", "Construye un horno", "Enciende el horno",
+	"Tu primera veta de cobre", "Construye un horno", "Enciende el horno",
 	"Tu primer lingote", "Lingotes hasta nivel 3", "Compra la expansión", "Compra las defensas",
 	"Construye un lanzapepitas", "Carga la munición", "Comienza la primera noche",
 	"¡Tutorial completado!",
@@ -26,7 +26,7 @@ const TUTORIAL_DISPLAY_STEPS: int = 16
 var funded_steps: Dictionary = {}
 
 var coal_cell := TUTORIAL_COAL_CELL
-var brass_cell := TUTORIAL_BRASS_CELL
+var copper_cell := TUTORIAL_COPPER_CELL
 var furnace_cell := TUTORIAL_FURNACE_CELL
 var refreshing_tutorial: bool = false
 
@@ -38,9 +38,9 @@ var fusion_taught: bool = false
 var vein_fusion_taught: bool = false
 var barrier_broken: bool = false
 var fusion_sold: bool = false
-var brass_ingot_sold: bool = false
-var brass_ingot_created: bool = false
-var brass_ingot_3_created: bool = false
+var copper_ingot_sold: bool = false
+var copper_ingot_created: bool = false
+var copper_ingot_3_created: bool = false
 var level3_sold: bool = false
 var level4_sold: bool = false
 var coal_sold: int = 0
@@ -138,9 +138,9 @@ func _on_fusion(kind: String) -> void:
 	refresh_tutorial()
 
 func _on_resource_created(kind: String) -> void:
-	if not kind.begins_with("brass_ingot"): return
-	brass_ingot_created = true
-	if mining.ore_level(kind) >= 3: brass_ingot_3_created = true
+	if not kind.begins_with("copper_ingot"): return
+	copper_ingot_created = true
+	if mining.ore_level(kind) >= 3: copper_ingot_3_created = true
 	# Furnace output is announced before its slots finish updating.
 	refresh_tutorial.call_deferred()
 
@@ -148,7 +148,7 @@ func furnace_ready() -> bool:
 	return mining.furnaces != null and not mining.furnaces.machines.is_empty()
 
 func furnace_fueled() -> bool:
-	if brass_ingot_created: return true
+	if copper_ingot_created: return true
 	if not furnace_ready(): return false
 	for data: Dictionary in mining.furnaces.machines.values():
 		if int(data.get("fuel",0)) >= mining.furnaces.FUEL_COST or data.get("burning",false): return true
@@ -161,7 +161,7 @@ func _on_money_changed(_amount: int) -> void:
 func _on_sale(kind: String) -> void:
 	if kind == "coal_4": level4_sold = true
 	if kind.begins_with("coal_") and "ingot" not in kind: fusion_sold = true
-	if kind.begins_with("brass_ingot"): brass_ingot_sold = true
+	if kind.begins_with("copper_ingot"): copper_ingot_sold = true
 	if kind.get_slice("_",0) == "coal" and "ingot" not in kind: coal_sold += 1
 	refresh_tutorial()
 
@@ -180,7 +180,7 @@ func is_guided_tutorial_active() -> bool:
 
 func tutorial_purchase_price() -> int:
 	if tutorial_step == 1: return 100
-	if tutorial_step in [5,6]: return economy.BRASS_VEIN_PRICE
+	if tutorial_step in [5,6]: return economy.COPPER_VEIN_PRICE
 	if tutorial_step == 7:
 		if furnace_ready() or furnace_blueprint_exists(): return 0
 		return mining.furnaces.PRICE if mining.furnaces != null else 350
@@ -217,9 +217,9 @@ func income_targets() -> Array[Vector2i]:
 	if mining.nuggets_at(coal_output()) > 0:
 		var staging: Array[Vector2i] = [TUTORIAL_FUSION_CELL, Vector2i(14, 1), Vector2i(16, 2)]
 		for cell: Vector2i in grid.owned_tiles:
-			if grid.is_valid_cell(cell) and cell not in [furnace_cell,brass_cell] and not staging.has(cell): staging.append(cell)
+			if grid.is_valid_cell(cell) and cell not in [furnace_cell,copper_cell] and not staging.has(cell): staging.append(cell)
 		for cell: Vector2i in staging:
-			if cell not in [coal_output(),furnace_cell,brass_cell] and mining.can_move_nugget(cell): return [coal_output(), cell]
+			if cell not in [coal_output(),furnace_cell,copper_cell] and mining.can_move_nugget(cell): return [coal_output(), cell]
 		return [coal_output(),grid.sale_cell]
 	return [coal_cell]
 
@@ -269,12 +269,12 @@ func refresh_tutorial() -> void:
 			2: completed = not mining.coal_veins.is_empty() and mining.vein_level(coal_cell) >= 2
 			3: completed = not mining.coal_veins.is_empty() and mining.vein_level(coal_cell) >= 3
 			4: completed = not mining.coal_veins.is_empty() and mining.vein_level(coal_cell) >= 4
-			5: completed = economy.coins >= economy.BRASS_VEIN_PRICE or not mining.brass_veins.is_empty()
-			6: completed = not mining.brass_veins.is_empty()
+			5: completed = economy.coins >= economy.COPPER_VEIN_PRICE or not mining.copper_veins.is_empty()
+			6: completed = not mining.copper_veins.is_empty()
 			7: completed = furnace_ready()
 			8: completed = furnace_fueled()
-			9: completed = brass_ingot_created
-			10: completed = brass_ingot_3_created
+			9: completed = copper_ingot_created
+			10: completed = copper_ingot_3_created
 			11: completed = grid.cave_width >= 7
 			12: completed = platforms_ready()
 			13: completed = launcher_ready()
@@ -289,13 +289,13 @@ func coal_output() -> Vector2i:
 	return coal_cell + mining.DIRECTIONS[int(data["direction"])]
 
 func sync_tutorial_cells() -> void:
-	for material: String in ["coal","brass"]:
+	for material: String in ["coal","copper"]:
 		var veins: Dictionary = mining.veins_for(material)
-		var selected: Vector2i = coal_cell if material == "coal" else brass_cell
+		var selected: Vector2i = coal_cell if material == "coal" else copper_cell
 		for cell: Vector2i in veins:
 			if not veins.has(selected) or mining.vein_level(cell) > mining.vein_level(selected): selected = cell
 		if material == "coal": coal_cell = selected
-		else: brass_cell = selected
+		else: copper_cell = selected
 	if mining.furnaces != null and not mining.furnaces.machines.is_empty():
 		if not mining.furnaces.machines.has(furnace_cell): furnace_cell = mining.furnaces.machines.keys()[0]
 	elif mining.construction != null:
@@ -306,8 +306,8 @@ func tutorial_text() -> String:
 	match tutorial_step:
 		0: return "Compra una veta de carbón."
 		1: return "Puedes fusionar pepitas hasta Nv. 4.\nVéndelas hasta reunir 100 de oro."
-		5: return "Reúne 500 de oro para una veta de latón."
-		6: return "Reúne 500 de oro." if needs_tutorial_income() else "Compra y coloca una veta de latón."
+		5: return "Reúne 500 de oro para una veta de cobre."
+		6: return "Reúne 500 de oro." if needs_tutorial_income() else "Compra y coloca una veta de cobre."
 		7:
 			if needs_tutorial_income(): return "Vende pepitas hasta reunir 350 de oro."
 			if furnace_blueprint_exists(): return "Entrega 2 pepitas de carbón Nv. 4 al plano."
@@ -318,7 +318,7 @@ func tutorial_text() -> String:
 				var data: Dictionary = mining.furnaces.machines.get(furnace_cell,{})
 				if not data.get("burning",false) and int(data.get("fuel",0)) < mining.furnaces.FUEL_COST: return "Carga carbón: cada lingote consume 20 de combustible."
 				if not str(data.get("input","")).is_empty(): return "Espera a que se cree el lingote."
-			return "Fusiona latón hasta Nv. 4.\nMételo en el horno para crear un lingote."
+			return "Fusiona cobre hasta Nv. 4.\nMételo en el horno para crear un lingote."
 	if tutorial_step in [2,3,4]:
 		if needs_tutorial_income():
 			return "Vende carbón Nv. 4 hasta reunir %d de oro." % tutorial_purchase_price()
@@ -329,16 +329,16 @@ func tutorial_text() -> String:
 		var count: int = 2 if tutorial_step == 3 else 4
 		return "Coloca %d vetas manteniendo Shift.\nFusiónalas hasta Nv. %d." % [count,goal]
 	if tutorial_step == 10:
-		return "Fusiona lingotes de latón hasta Nv. 3.\nCada lingote nuevo consume 20 de combustible."
+		return "Fusiona lingotes de cobre hasta Nv. 3.\nCada lingote nuevo consume 20 de combustible."
 	if tutorial_step == 11:
 		return "Reúne 500 de oro para ampliar la mina." if needs_tutorial_income() else "Compra la expansión de la mina."
 	if tutorial_step == 12:
 		return "Reúne 1000 de oro para las plataformas." if needs_tutorial_income() else "Compra las plataformas de defensa."
 	if tutorial_step == 13:
-		if needs_tutorial_income(): return "Reúne 200 de oro para el lanzapepitas."
-		if launcher_blueprint_cell() != Vector2i(-999,-999): return "Entrega un lingote de latón Nv. 3 y uno Nv. 1."
+		if needs_tutorial_income(): return "Reúne 500 de oro para el lanzapepitas."
+		if launcher_blueprint_cell() != Vector2i(-999,-999): return "Entrega un lingote de cobre Nv. 3 y uno Nv. 1."
 		if not launchers.launchers.is_empty(): return "Mueve el lanzapepitas a una plataforma."
-		return "Coloca el plano del lanzapepitas en una plataforma."
+		return "Coloca el lanzapepitas Nv. 1 en una plataforma."
 	if tutorial_step == 14: return "Llena el lanzapepitas con 5 pepitas Nv. 1."
 	if tutorial_step == 15: return "Pulsa INICIAR NOCHE."
 	return "¡Tutorial completado!"
@@ -366,16 +366,16 @@ func resource_targets(material: String, tier: int, destination: Vector2i) -> Arr
 			if grid.owned_tiles.has(cell): cells.append(cell)
 		if level == tier and not cells.is_empty(): return [cells[0],destination]
 		if cells.size() >= 2: return [cells[1],cells[0]]
-	var vein: Vector2i = brass_cell if material == "brass" else coal_cell
+	var vein: Vector2i = copper_cell if material == "copper" else coal_cell
 	var data: Dictionary = mining.veins_for(material).get(vein,{"direction":1})
 	var output: Vector2i = vein + mining.DIRECTIONS[int(data["direction"])]
 	if mining.nuggets_at(output) > 0:
 		return park_resource(output,material)
 	return [vein]
 
-func park_resource(source: Vector2i, material: String = "brass") -> Array[Vector2i]:
+func park_resource(source: Vector2i, material: String = "copper") -> Array[Vector2i]:
 	for at: Vector2i in grid.owned_tiles:
-		if at != source and at != grid.sale_cell and at not in [coal_cell,brass_cell,furnace_cell] and grid.is_valid_cell(at) and mining.can_move_nugget(at): return [source,at]
+		if at != source and at != grid.sale_cell and at not in [coal_cell,copper_cell,furnace_cell] and grid.is_valid_cell(at) and mining.can_move_nugget(at): return [source,at]
 	for kind: String in mining.ORE_KINDS:
 		if kind.get_slice("_",0) == material or "_ingot" in kind: continue
 		for at: Vector2i in mining.items_for(kind): return [at,grid.sale_cell]
@@ -385,7 +385,7 @@ func park_resource(source: Vector2i, material: String = "brass") -> Array[Vector
 func workshop_targets() -> Array[Vector2i]:
 	if needs_tutorial_income(): return income_targets()
 	if tutorial_step == 6:
-		if mining.can_place_vein(brass_cell): return [brass_cell]
+		if mining.can_place_vein(copper_cell): return [copper_cell]
 		return []
 	if tutorial_step == 7:
 		if furnace_blueprint_exists(): return resource_targets("coal",4,furnace_cell)
@@ -398,7 +398,7 @@ func workshop_targets() -> Array[Vector2i]:
 		var plan: Vector2i = launcher_blueprint_cell()
 		if plan != Vector2i(-999,-999):
 			var delivered: Dictionary = mining.construction.plans[plan]["delivered"]
-			return ingot_targets(3,plan) if int(delivered.get("brass_ingot_3",0)) < 1 else ingot_targets(1,plan)
+			return ingot_targets(3,plan) if int(delivered.get("copper_ingot_3",0)) < 1 else ingot_targets(1,plan)
 		for cell: Vector2i in launchers.launchers:
 			if not launchers.is_active_position(cell): return [cell,grid.defense_cell("left")]
 		return [grid.defense_cell("left")]
@@ -418,11 +418,11 @@ func launcher_full() -> bool:
 func launcher_blueprint_cell() -> Vector2i:
 	if mining.construction != null:
 		for cell: Vector2i in mining.construction.plans:
-			if mining.construction.plans[cell]["item"] == "launcher": return cell
+			if mining.construction.plans[cell]["item"] == "launcher_2": return cell
 	return Vector2i(-999,-999)
 
 func ammo_vein() -> Vector2i:
-	for material: String in ["coal","brass"]:
+	for material: String in ["coal","copper"]:
 		for cell: Vector2i in mining.veins_for(material):
 			if mining.vein_level(cell) == 1: return cell
 	return Vector2i(-999,-999)
@@ -433,7 +433,7 @@ func ammo_targets() -> Array[Vector2i]:
 		if launchers.is_active_position(cell) and launchers.can_receive(cell):
 			weapon = cell
 			break
-	for material: String in ["coal","brass"]:
+	for material: String in ["coal","copper"]:
 		for cell: Vector2i in mining.items_for(material): return [cell,weapon]
 	var vein: Vector2i = ammo_vein()
 	if vein == Vector2i(-999,-999): return [next_vein_cell()]
@@ -452,11 +452,11 @@ func smelting_targets() -> Array[Vector2i]:
 	if not data.get("burning",false) and int(data.get("fuel",0)) < mining.furnaces.FUEL_COST:
 		return resource_targets("coal",4,furnace_cell)
 	if not str(data.get("input","")).is_empty(): return [furnace_cell]
-	return resource_targets("brass",4,furnace_cell)
+	return resource_targets("copper",4,furnace_cell)
 
 func ingot_targets(tier: int, destination := Vector2i(-999,-999)) -> Array[Vector2i]:
 	for level in range(tier,0,-1):
-		var kind: String = "brass_ingot" + ("" if level == 1 else "_" + str(level))
+		var kind: String = "copper_ingot" + ("" if level == 1 else "_" + str(level))
 		var cells: Array[Vector2i] = []
 		for cell: Vector2i in mining.items_for(kind):
 			if grid.owned_tiles.has(cell): cells.append(cell)

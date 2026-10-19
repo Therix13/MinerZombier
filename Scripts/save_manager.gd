@@ -11,7 +11,7 @@ const SESSION_ACTION: StringName = &"mine_defense_session_action"
 const SKIP_START: StringName = &"mine_defense_skip_start_screen"
 const INTRO_KEY: StringName = &"mine_defense_intro_seen"
 const AUTOSAVE_SECONDS := 15.0
-const CYCLE_FIELDS := ["day", "is_night", "defeated", "tutorial_step", "fusion_taught", "vein_fusion_taught", "barrier_broken", "fusion_sold", "brass_ingot_sold", "brass_ingot_created", "brass_ingot_3_created", "level3_sold", "level4_sold", "coal_sold", "expansion_bonus_granted", "free_launcher_available", "tutorial_skipped", "funded_steps", "coal_cell", "brass_cell", "furnace_cell"]
+const CYCLE_FIELDS := ["day", "is_night", "defeated", "tutorial_step", "fusion_taught", "vein_fusion_taught", "barrier_broken", "fusion_sold", "copper_ingot_sold", "copper_ingot_created", "copper_ingot_3_created", "level3_sold", "level4_sold", "coal_sold", "expansion_bonus_granted", "free_launcher_available", "tutorial_skipped", "funded_steps", "coal_cell", "copper_cell", "furnace_cell"]
 const WAVE_FIELDS := ["spawn_timer", "spawn_from_left", "spawn_count", "wave_total", "wave_day", "active_wave", "base_health", "cleared_time"]
 const ENEMY_FIELDS := ["position", "destination", "health", "max_health", "walking_time", "attacking", "attack_timer", "limbs"]
 const CAMERA_FIELDS := ["mine_position", "mine_zoom", "combat_mine_active", "combat_mine_position", "combat_mine_zoom", "defense_view"]
@@ -148,12 +148,12 @@ func snapshot() -> Dictionary:
 		if enemy is ZombieScript and game.is_ancestor_of(enemy) and enemy.health > 0:
 			enemies.append(properties(enemy, ENEMY_FIELDS))
 	var veins: Dictionary = {}
-	for material: String in ["coal", "brass", "iron", "gold"]: veins[material] = game.mining.veins_for(material).duplicate(true)
+	for material: String in ["coal", "copper", "iron", "gold"]: veins[material] = game.mining.veins_for(material).duplicate(true)
 	var camera_data: Dictionary = properties(game.camera_controller, CAMERA_FIELDS)
 	camera_data["position"] = game.camera.position
 	camera_data["zoom"] = game.camera.zoom.x
 	return {
-		"version": VERSION, "tutorial_revision": TUTORIAL_REVISION, "saved_at": int(Time.get_unix_time_from_system()),
+		"version": VERSION, "tutorial_revision": TUTORIAL_REVISION, "material_revision": 2, "saved_at": int(Time.get_unix_time_from_system()),
 		"coins": game.economy.coins, "developer_mode": game.economy.developer_mode,
 		"grid": {"width": game.grid.cave_width, "height": game.grid.cave_height, "platforms": not game.grid.defense_tiles.is_empty()},
 		"veins": veins, "resources": game.mining.nugget_stores().duplicate(true),
@@ -226,13 +226,40 @@ func read_file(filename: String) -> Dictionary:
 	file.close()
 	if checksum(bytes) != expected_hash: return {}
 	var decoded: Variant = bytes_to_var(bytes)
+	if decoded is Dictionary: decoded = migrate_materials(decoded)
 	return decoded if decoded is Dictionary and valid_snapshot(decoded) else {}
 
 func read_save() -> Dictionary:
 	var data: Dictionary = read_file(path)
 	return read_file(path + ".bak") if data.is_empty() else data
 
+func renamed_material(value: Variant) -> Variant:
+	if value is String: return value.replace("brass","copper")
+	if value is Dictionary:
+		var result: Dictionary = {}
+		for key: Variant in value: result[renamed_material(key)] = renamed_material(value[key])
+		return result
+	if value is Array:
+		var result: Array = []
+		for entry: Variant in value: result.append(renamed_material(entry))
+		return result
+	return value
+
+func migrate_materials(data: Dictionary) -> Dictionary:
+	if data.get("material_revision",1) != 1: return data
+	var result: Dictionary = renamed_material(data)
+	# Previously built copper weapons retain their finished tier-two version.
+	if result.get("launchers") is Dictionary:
+		for launcher: Variant in result["launchers"].values():
+			if launcher is Dictionary and not launcher.has("level"): launcher["level"] = 2
+	if result.get("blueprints") is Dictionary:
+		for plan: Variant in result["blueprints"].values():
+			if plan is Dictionary and plan.get("item") == "launcher": plan["item"] = "launcher_2"
+	result["material_revision"] = 2
+	return result
+
 func restore_snapshot(data: Dictionary) -> bool:
+	data = migrate_materials(data)
 	if not valid_snapshot(data): return false
 	restoring = true
 	loaded_game = true
@@ -262,8 +289,8 @@ func restore_snapshot(data: Dictionary) -> bool:
 	game.progression.restore_vein_milestones()
 	var crafted: Dictionary = data["progression"]["created_resources"]
 	var tutorial_defaults := {
-		"brass_ingot_created": crafted.has("brass_ingot"),
-		"brass_ingot_3_created": crafted.has("brass_ingot_3") or crafted.has("brass_ingot_4"),
+		"copper_ingot_created": crafted.has("copper_ingot"),
+		"copper_ingot_3_created": crafted.has("copper_ingot_3") or crafted.has("copper_ingot_4"),
 	}
 	for key: String in CYCLE_FIELDS:
 		game.cycle.set(key,data["cycle"].get(key,tutorial_defaults.get(key,game.cycle.get(key))))
@@ -334,13 +361,15 @@ func dictionary_keys(data: Dictionary, names: Array) -> bool:
 	return true
 
 func valid_snapshot(data: Dictionary) -> bool:
+	data = migrate_materials(data)
+	if not data.get("material_revision") is int or data.get("material_revision") != 2: return false
 	if not data.get("tutorial_revision",1) is int or data.get("tutorial_revision",1) not in [1,TUTORIAL_REVISION]: return false
 	if data.get("version") != VERSION or not number(data.get("saved_at"),0,1e12) or not number(data.get("coins"),0,1e12) or not data.get("developer_mode") is bool: return false
 	if not dictionary_keys(data,["grid","veins","resources","belts","junctions","drills","launchers","compactors","furnaces","saws","blueprints","progression","cycle","wave","camera"]): return false
 	var map: Dictionary = data["grid"]
 	if not map.get("width") is int or not map.get("height") is int: return false
 	if Vector2i(map.get("width",0),map.get("height",0)) not in [Vector2i(3,3),Vector2i(7,5)] or not map.get("platforms") is bool: return false
-	for material: String in ["coal","brass","iron","gold"]:
+	for material: String in ["coal","copper","iron","gold"]:
 		if not cells(data["veins"].get(material)): return false
 		for vein: Variant in data["veins"][material].values():
 			if not vein is Dictionary or not number(vein.get("level"),1,4) or not number(vein.get("direction"),0,3) or not number(vein.get("progress"),0,11): return false
@@ -359,9 +388,10 @@ func valid_snapshot(data: Dictionary) -> bool:
 	for entry: Variant in data["junctions"].values():
 		if not entry is int or not number(entry,-1,3): return false
 	for launcher: Variant in data["launchers"].values():
+		if not launcher is Dictionary or not launcher.get("level",1) is int or launcher.get("level",1) not in [1,2]: return false
 		if not launcher is Dictionary or not number(launcher.get("cooldown"),0,4) or not number(launcher.get("angle"),-100,100) or not launcher.get("ammo") is Array or launcher["ammo"].size() > 5: return false
 		for kind: Variant in launcher["ammo"]:
-			if kind not in ["coal","brass"]: return false
+			if kind not in ["coal","copper"]: return false
 	for key: String in ["compactors","furnaces","saws","blueprints"]:
 		for machine: Variant in data[key].values():
 			if not machine is Dictionary or not number(machine.get("direction"),0,3): return false
@@ -370,6 +400,10 @@ func valid_snapshot(data: Dictionary) -> bool:
 				if machine.get("item") not in recipes or not number(machine.get("paid"),0,1e12) or not machine.get("delivered") is Dictionary: return false
 				for item: Variant in machine["delivered"]:
 					if item not in recipes[machine["item"]] or not number(machine["delivered"][item],0,recipes[machine["item"]][item]): return false
+				if machine.has("ammo"):
+					if machine["item"] != "launcher_2" or not machine["ammo"] is Array or machine["ammo"].size() > 5: return false
+					for ammo: Variant in machine["ammo"]:
+						if ammo not in ["coal","copper"]: return false
 				continue
 			if not number(machine.get("elapsed"),0,4): return false
 			if key == "compactors":
@@ -387,13 +421,13 @@ func valid_snapshot(data: Dictionary) -> bool:
 	for item: Variant in data["progression"]["created_resources"]:
 		if item not in game.mining.ORE_KINDS or not data["progression"]["created_resources"][item] is bool: return false
 	for item: Variant in data["progression"]["completed_veins"]:
-		if item not in ["coal","brass","iron","gold"] or not data["progression"]["completed_veins"][item] is bool: return false
+		if item not in ["coal","copper","iron","gold"] or not data["progression"]["completed_veins"][item] is bool: return false
 	var cycle: Dictionary = data["cycle"]
 	for key: String in CYCLE_FIELDS:
-		if key not in ["brass_ingot_created","brass_ingot_3_created"] and not cycle.has(key): return false
+		if key not in ["copper_ingot_created","copper_ingot_3_created"] and not cycle.has(key): return false
 	if not number(cycle["day"],1,1e6) or not number(cycle["tutorial_step"],0,game.cycle.TUTORIAL_LAST_STEP) or not number(cycle["coal_sold"],0,1e12) or not cycle["funded_steps"] is Dictionary: return false
 	for key: String in CYCLE_FIELDS:
-		if key in ["day","tutorial_step","coal_sold","funded_steps"] or (key in ["brass_ingot_created","brass_ingot_3_created"] and not cycle.has(key)): continue
+		if key in ["day","tutorial_step","coal_sold","funded_steps"] or (key in ["copper_ingot_created","copper_ingot_3_created"] and not cycle.has(key)): continue
 		if key.ends_with("_cell"):
 			if not cycle[key] is Vector2i: return false
 		elif not cycle[key] is bool: return false

@@ -16,7 +16,7 @@ class Painter extends "res://Scripts/world_renderer.gd":
 			var center := Vector2(index % 8 * 64 + 32, index / 8 * 64 + 32)
 			match parts[0]:
 				"coal": draw_coal_vein(center, int(parts[1]), int(parts[2]), false)
-				"brass": draw_brass_vein(center, int(parts[1]), int(parts[2]), false)
+				"copper": draw_copper_vein(center, int(parts[1]), int(parts[2]), false)
 				"belt": draw_conveyor(center, int(parts[2]), false, parts[1])
 				"drill": draw_drill(center, int(parts[1]), false)
 				"ore": draw_nugget(center, parts[1], 1)
@@ -49,7 +49,7 @@ func _initialize() -> void:
 func run() -> void:
 	for direction in range(4):
 		for progress in range(5): recipes.append("coal:%d:%d" % [direction, progress])
-		for progress in range(7): recipes.append("brass:%d:%d" % [direction, progress])
+		for progress in range(7): recipes.append("copper:%d:%d" % [direction, progress])
 		for shape in ["straight", "corner_right", "corner_left", "junction"]: recipes.append("belt:%s:%d" % [shape, direction])
 		recipes.append("drill:%d" % direction)
 		recipes.append("compactor:%d" % direction)

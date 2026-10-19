@@ -42,7 +42,7 @@ var night_victory_continue_button: Button
 
 var placement_paid: bool = false
 var placing_coal: bool = false
-var placing_brass: bool = false
+var placing_copper: bool = false
 var placing_belt: bool = false
 var belt_shape: String = "straight"
 var placing_drill: bool = false
@@ -111,7 +111,7 @@ func _ready() -> void:
 	shop.view_toggle_requested.connect(toggle_view)
 	shop.expansion_requested.connect(buy_expansion)
 	shop.coal_vein_requested.connect(buy_coal_vein)
-	shop.brass_vein_requested.connect(buy_brass_vein)
+	shop.copper_vein_requested.connect(buy_copper_vein)
 	shop.conveyor_requested.connect(buy_conveyor)
 	shop.corner_conveyor_requested.connect(buy_corner_conveyor)
 	shop.left_corner_conveyor_requested.connect(buy_left_corner_conveyor)
@@ -170,7 +170,7 @@ func _process(delta: float) -> void:
 
 func redraw_world() -> void:
 	renderer.placing_coal = placing_coal and not shop.shop_open
-	renderer.placing_brass = placing_brass and not shop.shop_open
+	renderer.placing_copper = placing_copper and not shop.shop_open
 	renderer.placing_belt = placing_belt and not shop.shop_open
 	renderer.placement_belt_shape = belt_shape
 	renderer.held_belt_shape = conveyors.belt_shape(held_object_cell) if holding_object and held_object_type == "belt" else "straight"
@@ -197,8 +197,8 @@ func buy_expansion() -> void:
 	redraw_world()
 	shop.close_shop()
 
-func buy_brass_vein() -> void:
-	get_node("WorldInteractions").select_item("brass")
+func buy_copper_vein() -> void:
+	get_node("WorldInteractions").select_item("copper")
 
 func buy_coal_vein() -> void:
 	get_node("WorldInteractions").select_item("coal")
@@ -255,10 +255,10 @@ func cancel_placement() -> void:
 		placing_free_launcher = false
 		if placement_paid:
 			economy.add(economy.LAUNCHER_PRICE)
-	elif placing_brass:
-		placing_brass = false
+	elif placing_copper:
+		placing_copper = false
 		if placement_paid:
-			economy.add(economy.BRASS_VEIN_PRICE)
+			economy.add(economy.COPPER_VEIN_PRICE)
 	elif placing_drill:
 		placing_drill = false
 		if placement_paid:
@@ -277,7 +277,7 @@ func cancel_placement() -> void:
 	redraw_world()
 
 func on_sale_completed(kind: String) -> void:
-	economy.add(economy.BRASS_SELL_PRICE if kind == "brass" else economy.COAL_SELL_PRICE)
+	economy.add(economy.COPPER_SELL_PRICE if kind == "copper" else economy.COAL_SELL_PRICE)
 
 func _input(event: InputEvent) -> void:
 	# Handle pause before placement, victory dialogs, or gameplay shortcuts.
@@ -296,12 +296,12 @@ func _input(event: InputEvent) -> void:
 			toggle_view()
 		elif event.keycode == KEY_F10 and cycle.allows_action("developer"):
 			economy.toggle_developer_mode()
-		elif event.keycode == KEY_R and not cycle.is_tutorial_active() and (placing_coal or placing_brass or placing_belt or placing_drill or placing_launcher or (holding_object and held_object_type in ["vein", "belt", "drill"])):
+		elif event.keycode == KEY_R and not cycle.is_tutorial_active() and (placing_coal or placing_copper or placing_belt or placing_drill or placing_launcher or (holding_object and held_object_type in ["vein", "belt", "drill"])):
 			placement_direction = (placement_direction + 1) % 4
 			if holding_object:
 				dragging_object = true
 			redraw_world()
-		elif event.keycode == KEY_BACKSPACE and (placing_coal or placing_brass or placing_belt or placing_drill or placing_launcher):
+		elif event.keycode == KEY_BACKSPACE and (placing_coal or placing_copper or placing_belt or placing_drill or placing_launcher):
 			cancel_placement()
 	if event is InputEventMouseButton:
 		camera_controller.handle_button(event, shop.shop_open or shop.shop_animating)
@@ -317,7 +317,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if cycle.is_night or cycle.defeated or shop.shop_open or holding_object:
 			return
 		var cell: Vector2i = grid.world_to_cell(get_local_mouse_position())
-		var placing: String = "launcher" if placing_launcher else ("coal" if placing_coal else ("belt" if placing_belt else ("other" if placing_brass or placing_drill else "")))
+		var placing: String = "launcher" if placing_launcher else ("coal" if placing_coal else ("belt" if placing_belt else ("other" if placing_copper or placing_drill else "")))
 		if not cycle.allows_world_press(cell, placing):
 			return
 		if get_node("WorldInteractions").placement_active():
@@ -391,7 +391,7 @@ func toggle_view() -> void:
 func start_night() -> void:
 	if not cycle.can_start_night():
 		return
-	if placing_coal or placing_brass or placing_belt or placing_drill or placing_launcher:
+	if placing_coal or placing_copper or placing_belt or placing_drill or placing_launcher:
 		cancel_placement()
 	holding_object = false
 	dragging_object = false

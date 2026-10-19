@@ -45,12 +45,12 @@ func run_checks() -> void:
 		game.conveyors.place(Vector2i(13, row), 1)
 		game.conveyors.place(Vector2i(14, row), 1)
 		compactors.place(Vector2i(15, row), 1)
-		compactors.receive(Vector2i(15, row), "brass")
-		compactors.receive(Vector2i(15, row), "brass")
+		compactors.receive(Vector2i(15, row), "copper")
+		compactors.receive(Vector2i(15, row), "copper")
 		furnace.place(Vector2i(16, row), 1)
 		furnace.receive(Vector2i(16, row), "coal_4")
-		furnace.receive(Vector2i(16, row), "brass_4")
-		game.mining.items_for("brass")[Vector2i(14,row)] = 1
+		furnace.receive(Vector2i(16, row), "copper_4")
+		game.mining.items_for("copper")[Vector2i(14,row)] = 1
 	furnace.process_smelting(2)
 	game.redraw_world()
 	await settle()

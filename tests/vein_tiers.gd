@@ -19,8 +19,8 @@ func run_checks() -> void:
 	var out := Vector2i(16,1)
 	var cash: int = game.economy.coins
 	var xp: int = game.progression.total_experience
-	for material: String in ["coal", "brass"]:
-		var veins: Dictionary = mining.brass_veins if material == "brass" else mining.coal_veins
+	for material: String in ["coal", "copper"]:
+		var veins: Dictionary = mining.copper_veins if material == "copper" else mining.coal_veins
 		for tier in range(1, 4):
 			clear_items()
 			mining.place_vein(a, 3, material)
@@ -37,7 +37,7 @@ func run_checks() -> void:
 			else: check(mover.drop("vein",a,b,3), "Programmatic vein drops use the same fusion path")
 			check(not veins.has(a) and mining.vein_level(b) == tier + 1 and veins[b]["direction"] == 1 and veins[b]["progress"] == 0, "Fusion creates exactly one next-tier vein, preserves its outlet and resets progress")
 			check(game.economy.coins == cash and game.progression.total_experience == xp, "Vein fusion grants no free coins or EXP")
-			var price: int = game.economy.BRASS_VEIN_PRICE if material == "brass" else game.economy.COAL_VEIN_PRICE
+			var price: int = game.economy.COPPER_VEIN_PRICE if material == "copper" else game.economy.COAL_VEIN_PRICE
 			check(mover.resale_value("vein",b) == price * int(pow(2,tier)) / 2, "The fused vein retains half the combined purchase value")
 		clear_items()
 		mining.place_vein(a,3,material)
@@ -78,8 +78,8 @@ func run_checks() -> void:
 		check(mining.nugget_type(out) in [material+"_4", material+"_3"] and mining.nuggets_at(out) == 1, "Automatic drills use the upgraded vein's drops")
 		clear_items()
 	mining.place_vein(a,1,"coal")
-	mining.place_vein(b,1,"brass")
-	check(not mining.can_fuse_veins(a,b), "Coal and brass veins cannot fuse together")
+	mining.place_vein(b,1,"copper")
+	check(not mining.can_fuse_veins(a,b), "Coal and copper veins cannot fuse together")
 	clear_items()
 	mining.place_vein(a,3)
 	mining.place_vein(b,1)
@@ -102,10 +102,10 @@ func run_checks() -> void:
 	if DisplayServer.get_name() != "headless":
 		clear_items()
 		for tier in range(1,5):
-			for material: String in ["coal","brass"]:
+			for material: String in ["coal","copper"]:
 				var cell := Vector2i(12 + tier,1 if material == "coal" else 3)
 				mining.place_vein(cell,1,material)
-				var veins: Dictionary = mining.brass_veins if material == "brass" else mining.coal_veins
+				var veins: Dictionary = mining.copper_veins if material == "copper" else mining.coal_veins
 				veins[cell]["level"] = tier
 		game.redraw_world()
 		await settle()
