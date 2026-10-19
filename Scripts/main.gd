@@ -193,7 +193,7 @@ func buy_expansion() -> void:
 	if not progression.is_item_unlocked("expansion"): return
 	if not cycle.allows_action("expand"):
 		return
-	if cycle.is_night or cycle.defeated:
+	if cycle.defeated:
 		return
 	if grid.cave_width >= 7 or not economy.spend(economy.EXPANSION_PRICE):
 		return
@@ -235,7 +235,7 @@ func buy_right_defense_tile() -> void:
 func buy_defense_tile(_side: String) -> void:
 	if not cycle.allows_action("unlock_defense"):
 		return
-	if cycle.is_night or cycle.defeated:
+	if cycle.defeated:
 		return
 	var left_cell: Vector2i = grid.defense_cell("left")
 	var right_cell: Vector2i = grid.defense_cell("right")

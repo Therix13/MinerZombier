@@ -558,7 +558,7 @@ func update_cycle() -> void:
 		if cycle.needs_defense_warning():
 			cycle_goal.text = "Alto riesgo de perder. Coloca al menos 2 torretas."
 			cycle_goal.add_theme_color_override("default_color", Color("#edbb76"))
-	shop_button.disabled = cycle.is_night or cycle.defeated
+	shop_button.disabled = cycle.defeated
 	view_button.disabled = cycle.defeated
 	var guide: Node = get_parent().get_parent().get_node_or_null("TutorialGuide")
 	if guide != null and guide.resupply_active():
@@ -972,7 +972,7 @@ func add_item_button(text: String, price: int, item: String, request: Signal) ->
 func request_item(item: String, request: Signal) -> void:
 	if progression != null and not progression.is_item_unlocked(item):
 		return
-	if cycle != null and (cycle.is_night or cycle.defeated or not tutorial_allows_item(item)):
+	if cycle != null and (cycle.defeated or not tutorial_allows_item(item)):
 		return
 	var interactions: Node = get_parent().get_parent().get_node("WorldInteractions")
 	if interactions.item_price(item) >= 0:
@@ -985,7 +985,7 @@ func refresh_item_buttons() -> void:
 	for item in item_buttons:
 		var button: Button = item_buttons[item]["button"]
 		var unlocked: bool = progression == null or progression.is_item_unlocked(item)
-		button.disabled = not unlocked or not economy.can_afford(item_buttons[item]["price"]) or not tutorial_allows_item(item) or (cycle != null and (cycle.is_night or cycle.defeated))
+		button.disabled = not unlocked or not economy.can_afford(item_buttons[item]["price"]) or not tutorial_allows_item(item) or (cycle != null and cycle.defeated)
 		button.tooltip_text = item_buttons[item].get("name", item)
 		var construction: Node = get_parent().get_parent().get_node_or_null("Construction")
 		if construction != null and construction.has_recipe(item): button.tooltip_text += "\n" + construction.recipe_text(item)
@@ -1029,7 +1029,7 @@ func handle_outside_click(event: InputEvent) -> bool:
 	return true
 
 func open_shop() -> void:
-	if shop_open or shop_animating or (cycle != null and (cycle.is_night or cycle.defeated)):
+	if shop_open or shop_animating or (cycle != null and cycle.defeated):
 		return
 	show_categories()
 	shop_open = true

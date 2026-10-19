@@ -131,7 +131,7 @@ func _process(delta: float) -> void:
 func _input(event: InputEvent) -> void:
 	if not event is InputEventKey or not event.pressed or event.echo or event.keycode != KEY_R: return
 	var mover: Node = game.get_node_or_null("WorldInteractions")
-	if mover == null or not mover.phase_allows() or game.get("cycle").is_night: return
+	if mover == null or not mover.phase_allows() or (game.get("cycle").is_night and not mover.placing_saw): return
 	if not mover.placing_saw and not (game.get("holding_object") and game.get("held_object_type") == "saw"): return
 	game.set("placement_direction",posmod(int(game.get("placement_direction")) + 1,4))
 	if game.get("holding_object"): game.set("dragging_object",true)

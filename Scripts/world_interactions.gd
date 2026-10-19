@@ -332,7 +332,7 @@ func select_item(item: String) -> bool:
 	var cycle: RefCounted = game.get("cycle")
 	var shop: Control = game.get("shop")
 	var action: String = "buy_conveyor" if item in ["straight", "corner_right", "corner_left", "junction"] else "buy_" + item
-	if get_tree().paused or cycle.is_night or cycle.defeated or not cycle.allows_action(action) or not shop.tutorial_allows_item(item) or not game.get("progression").is_item_unlocked(item): return false
+	if get_tree().paused or cycle.defeated or not cycle.allows_action(action) or not shop.tutorial_allows_item(item) or not game.get("progression").is_item_unlocked(item): return false
 	var price: int = item_price(item)
 	if price < 0 or not game.get("economy").can_afford(price): return false
 	cancel_active()
@@ -376,7 +376,7 @@ func place_selected(cell: Vector2i) -> bool:
 	var item: String = selected_item()
 	var cycle: RefCounted = game.get("cycle")
 	var placing: String = item if item in ["coal", "copper", "furnace", "launcher"] else ("belt" if game.get("placing_belt") else "other")
-	if item.is_empty() or not selection_available() or not phase_allows() or cycle.is_night or not cycle.allows_world_press(cell, placing): return false
+	if item.is_empty() or not selection_available() or not phase_allows() or not cycle.allows_world_press(cell, placing): return false
 	if not can_place_item(cell, item): return false
 	var economy: RefCounted = game.get("economy")
 	var price: int = item_price(item)
@@ -463,7 +463,7 @@ func advance_auto_click(delta: float) -> void:
 
 func _process(_delta: float) -> void:
 	advance_auto_click(_delta)
-	if (placing_furnace or placing_iron or placing_gold or placing_saw) and (game.get("cycle").is_night or game.get("cycle").defeated): cancel_active()
+	if (placing_furnace or placing_iron or placing_gold or placing_saw) and game.get("cycle").defeated: cancel_active()
 	var cycle: RefCounted = game.get("cycle")
 	if not placing_resource.is_empty() and (not game.get("economy").developer_mode or cycle.is_night or cycle.defeated):
 		cancel_active()

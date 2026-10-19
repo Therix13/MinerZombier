@@ -164,7 +164,7 @@ func other_placement() -> bool:
 	return game.get("placing_coal") or game.get("placing_copper") or game.get("placing_belt") or game.get("placing_drill") or game.get("placing_launcher")
 
 func _process(delta: float) -> void:
-	if placing and (other_placement() or not game.get("cycle").allows_action("buy_compactor") or game.get("cycle").is_night or game.get("cycle").defeated): cancel_placement()
+	if placing and (other_placement() or not game.get("cycle").allows_action("buy_compactor") or game.get("cycle").defeated): cancel_placement()
 	if not game.get("cycle").defeated: process_outputs(delta)
 	if placing or (game.get("holding_object") and game.get("held_object_type") == "compactor"): queue_redraw()
 
