@@ -10,7 +10,7 @@ const SESSION_ACTION: StringName = &"mine_defense_session_action"
 const SKIP_START: StringName = &"mine_defense_skip_start_screen"
 const INTRO_KEY: StringName = &"mine_defense_intro_seen"
 const AUTOSAVE_SECONDS := 15.0
-const CYCLE_FIELDS := ["day", "is_night", "defeated", "tutorial_step", "fusion_taught", "vein_fusion_taught", "barrier_broken", "fusion_sold", "brass_ingot_sold", "level3_sold", "level4_sold", "coal_sold", "expansion_bonus_granted", "free_launcher_available", "tutorial_skipped", "funded_steps", "coal_cell", "brass_cell", "furnace_cell"]
+const CYCLE_FIELDS := ["day", "is_night", "defeated", "tutorial_step", "fusion_taught", "vein_fusion_taught", "barrier_broken", "fusion_sold", "brass_ingot_sold", "brass_ingot_created", "level3_sold", "level4_sold", "coal_sold", "expansion_bonus_granted", "free_launcher_available", "tutorial_skipped", "funded_steps", "coal_cell", "brass_cell", "furnace_cell"]
 const WAVE_FIELDS := ["spawn_timer", "spawn_from_left", "spawn_count", "wave_total", "wave_day", "active_wave", "base_health", "cleared_time"]
 const ENEMY_FIELDS := ["position", "destination", "health", "max_health", "walking_time", "attacking", "attack_timer", "limbs"]
 const CAMERA_FIELDS := ["mine_position", "mine_zoom", "combat_mine_active", "combat_mine_position", "combat_mine_zoom", "defense_view"]
@@ -258,7 +258,8 @@ func restore_snapshot(data: Dictionary) -> bool:
 	for pair: Array in [["Compactors","compactors"],["Furnaces","furnaces"],["Saws","saws"],["Construction","blueprints"]]:
 		replace_dictionary(game.get_node(pair[0]).get("plans" if pair[1] == "blueprints" else "machines"),data[pair[1]])
 	for key: String in data["progression"]: replace_dictionary(game.progression.get(key),data["progression"][key])
-	for key: String in CYCLE_FIELDS: game.cycle.set(key,data["cycle"][key])
+	for key: String in CYCLE_FIELDS:
+		game.cycle.set(key,data["cycle"].get(key, data["progression"]["created_resources"].has("brass_ingot") if key == "brass_ingot_created" else game.cycle.get(key)))
 	for enemy: Node in get_tree().get_nodes_in_group("zombies"):
 		if game.is_ancestor_of(enemy):
 			enemy.remove_from_group("zombies")
@@ -375,10 +376,10 @@ func valid_snapshot(data: Dictionary) -> bool:
 		if item not in ["coal","brass","iron","gold"] or not data["progression"]["completed_veins"][item] is bool: return false
 	var cycle: Dictionary = data["cycle"]
 	for key: String in CYCLE_FIELDS:
-		if not cycle.has(key): return false
-	if not number(cycle["day"],1,1e6) or not number(cycle["tutorial_step"],0,6) or not number(cycle["coal_sold"],0,1e12) or not cycle["funded_steps"] is Dictionary: return false
+		if key != "brass_ingot_created" and not cycle.has(key): return false
+	if not number(cycle["day"],1,1e6) or not number(cycle["tutorial_step"],0,game.cycle.TUTORIAL_LAST_STEP) or not number(cycle["coal_sold"],0,1e12) or not cycle["funded_steps"] is Dictionary: return false
 	for key: String in CYCLE_FIELDS:
-		if key in ["day","tutorial_step","coal_sold","funded_steps"]: continue
+		if key in ["day","tutorial_step","coal_sold","funded_steps"] or (key == "brass_ingot_created" and not cycle.has(key)): continue
 		if key.ends_with("_cell"):
 			if not cycle[key] is Vector2i: return false
 		elif not cycle[key] is bool: return false

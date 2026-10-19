@@ -86,7 +86,7 @@ func run_checks() -> void:
 	check(not player.is_item_unlocked("straight"),"Brass level two does not unlock belts")
 	await fuse_resource("brass_2")
 	for item: String in ["straight","corner_right","corner_left","junction"]:
-		check(player.is_item_unlocked(item),"Brass level three unlocks " + item)
+		check(not player.is_item_unlocked(item),"Brass nuggets level three do not unlock " + item)
 	await acknowledge()
 	await fuse_resource("iron")
 	check(not player.is_item_unlocked("saw"),"The saw waits for its highest required tier")
@@ -102,6 +102,8 @@ func run_checks() -> void:
 	check(not player.is_item_unlocked("drill") and not player.is_item_unlocked("launcher"),"Lower brass ingots unlock neither drill nor launcher")
 	await fuse_resource("brass_ingot_2")
 	check(player.is_item_unlocked("drill") and player.is_item_unlocked("launcher"),"Brass ingot level three unlocks drill and launcher together")
+	for item: String in ["straight","corner_right","corner_left","junction"]:
+		check(player.is_item_unlocked(item),"Brass ingot level three unlocks " + item)
 	await acknowledge()
 	shop.open_category("DEFENSA")
 	check(shop.purchase_buttons.has("launcher") and "LINGOTE DE LATÓN" in shop.purchase_buttons["launcher"].tooltip_text,"Launcher catalog includes the real brass recipe")
@@ -140,6 +142,12 @@ func run_checks() -> void:
 	check(construction.place(platform,"launcher",0,200),"Launcher blueprint can also be constructed directly on its platform")
 	construction.receive(platform,"brass_ingot_3")
 	check(construction.cancel(platform) and mining.nuggets_at(platform) == 0 and not mining.items_for("brass_ingot_3").is_empty(),"Canceling a platform blueprint returns its ingredients to usable mine cells")
+	for item: String in ["straight","corner_right","corner_left","junction"]:
+		var belt_at := Vector2i(17,3)
+		check(construction.place(belt_at,item,1,50),"Belt plan can be placed: " + item)
+		check(not construction.receive(belt_at,"brass_3") and construction.plans.has(belt_at),"Belt refuses a tier-three nugget: " + item)
+		check(construction.receive(belt_at,"brass_ingot_3") and game.conveyors.belts.has(belt_at),"One tier-three brass ingot builds: " + item)
+		game.conveyors.belts.erase(belt_at)
 	# Real furnace output and compactor output must also report material milestones.
 	player.unlocked.erase("furnace")
 	var compactors: Node = game.get_node("Compactors")

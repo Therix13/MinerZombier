@@ -85,9 +85,13 @@ func run_checks() -> void:
 	check(machine_resumed("Saws",Vector2i(16,2),"saws"),"The saw preserves processing and both outlet states")
 	check(game.get_node("Construction").plans[Vector2i(18,2)]["delivered"] == {"iron_ingot":1},"A partial blueprint remembers its delivered materials")
 	check(game.progression.unlocked == original["progression"]["unlocked"] and game.progression.created_resources == original["progression"]["created_resources"],"Automatic unlocks and crafting milestones are restored")
-	check(game.cycle.day == 3 and game.cycle.tutorial_step == 6 and game.cycle.funded_steps == {2:true,3:true,4:true},"Day and tutorial milestones are preserved")
+	check(game.cycle.day == 3 and game.cycle.tutorial_step == 9 and game.cycle.funded_steps == {2:true,3:true,4:true},"Day and tutorial milestones are preserved")
 	check(is_equal_approx(game.zombie_manager.base_health,73.0),"Base health is preserved")
 	check(game.camera.position.is_equal_approx(original["camera"]["position"]),"Loading preserves the camera instead of refocusing the tutorial")
+	var legacy: Dictionary = saves.snapshot()
+	legacy["cycle"].erase("brass_ingot_created")
+	check(saves.valid_snapshot(legacy) and saves.restore_snapshot(legacy),"Saves from before the expanded tutorial remain loadable")
+	check(not game.cycle.brass_ingot_created,"An old save without a crafted ingot starts with the proper default")
 	# Persist a saw with one output blocked, then release only its pending item.
 	game.mining.items_for("coal")[Vector2i(17,3)] = 1
 	game.get_node("Saws").process_cutting(3.0)
@@ -141,7 +145,7 @@ func run_checks() -> void:
 	game.economy.developer_mode = false
 	game.progression.developer_mode = false
 	game.cycle.day = 3
-	game.cycle.tutorial_step = 6
+	game.cycle.tutorial_step = 9
 	game.cycle.tutorial_skipped = true
 	game.shop.accept_unlock_notice()
 	# Resume an active horde, including damaged enemies and its spawn countdown.
@@ -204,7 +208,7 @@ func make_fixture() -> void:
 	game.grid.purchase_defense_platforms()
 	game.economy.coins = 4321
 	game.cycle.day = 3
-	game.cycle.tutorial_step = 6
+	game.cycle.tutorial_step = 9
 	game.cycle.funded_steps = {2:true,3:true,4:true}
 	game.cycle.barrier_broken = true
 	game.cycle.tutorial_skipped = true

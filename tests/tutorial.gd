@@ -120,7 +120,7 @@ func run_checks() -> void:
 	shop = game.shop
 	cycle = game.cycle
 	grid = game.grid
-	check(cycle.TUTORIAL_DISPLAY_STEPS == 6 and game.economy.coins == 100,"Six lessons start with exactly 100 gold")
+	check(cycle.TUTORIAL_DISPLAY_STEPS == 10 and game.economy.coins == 100,"Ten lessons start with exactly 100 gold")
 	check(not game.get_node("WorldInteractions").select_item("brass"),"Brass stays locked until a level-four coal vein is created")
 	await purchase_route("VETAS","coal")
 	await click_cell(cycle.coal_cell)
@@ -143,15 +143,51 @@ func run_checks() -> void:
 	check(game.progression.is_item_unlocked("brass"),"The level-four coal vein automatically unlocks brass before the final budget lesson")
 	await acknowledge_unlocks()
 	await fund_goal(500)
-	check(cycle.tutorial_step == 6 and not cycle.is_tutorial_active(),"Tutorial ends at 500 gold")
+	check(cycle.tutorial_step == 6 and cycle.is_tutorial_active(),"The tutorial continues with the brass purchase at 500 gold")
 	check(game.progression.is_item_unlocked("brass") and game.economy.coins == 500,"Final milestone leaves 500 gold available to purchase brass without research")
 	check(not cycle.is_night and not cycle.barrier_broken and game.get_node_or_null("BarrierBreach") == null,"Completing this guide does not automatically start a night")
+	check(shop.tutorial_purchase().get("item") == "brass","The guide points to the unlocked brass vein")
+	await purchase_route("VETAS","brass")
+	await click_cell(cycle.brass_cell)
+	check(cycle.tutorial_step == 7 and game.economy.coins == 0,"Placing brass advances to earning the furnace price")
+	check("350" in cycle.tutorial_text(),"Furnace lesson shows its real gold price")
+	await fund_goal(350)
+	check(shop.tutorial_purchase().get("item") == "furnace","The guide points to the furnace after saving enough gold")
+	await purchase_route("HERRAMIENTAS","furnace")
+	await click_cell(cycle.furnace_cell)
+	check(cycle.tutorial_step == 7 and cycle.furnace_blueprint_exists() and not cycle.furnace_ready(),"An unfinished furnace plan does not advance the lesson")
+	await finish_workshop_step(7)
+	check(cycle.tutorial_step == 8 and cycle.furnace_ready(),"Two real level-four coal nuggets complete the furnace")
+	await finish_workshop_step(8)
+	check(cycle.tutorial_step == 9 and cycle.furnace_fueled(),"Loading another level-four coal nugget teaches fuel separately")
+	await finish_workshop_step(9)
+	check(cycle.tutorial_step == 10 and not cycle.is_tutorial_active() and cycle.brass_ingot_created,"Smelting real level-four brass completes the expanded tutorial")
+	check(game.progression.created_resources.has("brass_ingot"),"The final lesson produces a real brass ingot milestone")
+	check(not cycle.is_night and not cycle.barrier_broken,"Making a lingot does not start an unprepared night")
 	# Finishing early or skipping should not leave a pointer behind.
 	cycle.skip_tutorial()
 	await settle()
 	check(shop.tutorial_purchase().is_empty(),"No additional tutorial or purchase prompt remains")
 	print("RESULT: %d passed, %d failed" % [passed,failed])
 	quit(0 if failed == 0 else 1)
+
+func finish_workshop_step(step: int) -> void:
+	var count := 0
+	while cycle.tutorial_step == step and count < 1000:
+		await acknowledge_unlocks()
+		var targets: Array[Vector2i] = cycle.workshop_targets()
+		if targets.size() == 2:
+			await drag_cell(targets[0],targets[1])
+		elif targets.size() == 1:
+			var material: String = game.mining.vein_at(targets[0])
+			if not material.is_empty():
+				for strike in range(game.mining.hardness(material)): await click_cell(targets[0])
+			else:
+				game.get_node("Furnaces").process_smelting(4)
+				await settle()
+		else: break
+		count += 1
+	check(count < 1000 and cycle.tutorial_step > step,"Workshop lesson %d advances through real resource delivery" % step)
 
 func fund_goal(goal: int) -> void:
 	var count := 0

@@ -35,6 +35,8 @@ func _ready() -> void:
 	barrier.live_game = game
 	barrier.grid = cycle.grid
 	game.add_child(barrier)
+	cycle.brass_ingot_created = cycle.brass_ingot_created or game.get("progression").created_resources.has("brass_ingot")
+	cycle.refresh_tutorial()
 	on_step_changed()
 
 func on_step_changed() -> void:
@@ -163,6 +165,7 @@ func _input(event: InputEvent) -> void:
 
 func targets() -> Array[Vector2i]:
 	if not cycle.is_tutorial_active(): return []
+	if cycle.tutorial_step >= 6: return cycle.workshop_targets()
 	if cycle.tutorial_step == 0:
 		var first: Array[Vector2i] = []
 		if game.get("placing_coal"): first.append(cycle.coal_cell)

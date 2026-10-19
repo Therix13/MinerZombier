@@ -562,6 +562,10 @@ func tutorial_purchase() -> Dictionary:
 	if cycle == null or not cycle.is_tutorial_active(): return {}
 	if cycle.needs_tutorial_income(): return {}
 	var game: Node = get_parent().get_parent()
+	if cycle.tutorial_step == 6 and not game.get("placing_brass"):
+		return {"category":"VETAS","item":"brass","instruction":"Elige la veta de latón."}
+	if cycle.tutorial_step == 7 and not cycle.furnace_ready() and not cycle.furnace_blueprint_exists() and not game.get_node("WorldInteractions").placing_furnace:
+		return {"category":"HERRAMIENTAS","item":"furnace","instruction":"Elige el horno."}
 	if cycle.tutorial_step in [0,2,3,4] and cycle.vein_fusion_targets().is_empty() and not game.get("placing_coal"):
 		return {"category":"VETAS","item":"coal","instruction":"Elige la veta de carbón."}
 	return {}
