@@ -31,6 +31,22 @@ func run_checks() -> void:
 	furnace.receive(cell,"copper_4")
 	furnace.process_smelting(100)
 	check(furnace.machines[cell]["fuel"] == 0 and furnace.machines[cell]["input"] == "copper_4" and game.mining.nuggets_at(output) == 0,"Forty fuel makes two ingots and cannot make a third")
+	furnace.remove_material(cell,"copper_4")
+	furnace.receive(cell,"iron_4")
+	for fuel in [20,39]:
+		furnace.machines[cell]["fuel"] = fuel
+		furnace.process_smelting(100)
+		check(furnace.machines[cell]["fuel"] == fuel and not furnace.machines[cell]["burning"] and furnace.machines[cell]["elapsed"] == 0 and furnace.machines[cell]["input"] == "iron_4","Iron cannot start or consume fuel with only %d fuel" % fuel)
+	furnace.receive(cell,"coal")
+	furnace.process_smelting(1)
+	check(furnace.machines[cell]["fuel"] == 0 and furnace.machines[cell]["burning"] and furnace.machines[cell]["elapsed"] == 1,"Iron consumes exactly forty fuel once at ignition")
+	furnace.process_smelting(3)
+	check(game.mining.nugget_type(output) == "iron_ingot" and furnace.machines[cell]["input"] == "" and furnace.machines[cell]["fuel"] == 0,"One level-four iron nugget yields one level-one iron ingot")
+	game.mining.items_for("iron_ingot").erase(output)
+	furnace.receive(cell,"gold_4")
+	furnace.receive(cell,"coal_4")
+	furnace.process_smelting(4)
+	check(game.mining.nugget_type(output) == "gold_ingot" and furnace.machines[cell]["fuel"] == 0,"Gold retains its existing twenty-fuel cost")
 	game.queue_free()
 	await process_frame
 	print("RESULT: %d passed, %d failed; furnace fuel accounting" % [passed,failed])

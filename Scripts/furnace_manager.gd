@@ -10,6 +10,7 @@ const PRICE: int = 350
 const CAPACITY: int = 40
 const PROCESS_TIME: float = 4.0
 const FUEL_COST: int = 20
+const IRON_FUEL_COST: int = 40
 const DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 const FUEL_VALUES := {"coal": 1, "coal_2": 3, "coal_3": 8, "coal_4": 20}
 var machines: Dictionary = {}
@@ -95,8 +96,9 @@ func process_smelting(delta: float) -> void:
 			continue
 		if str(data.get("input", "")).is_empty(): continue
 		if not data.get("burning", false):
-			if int(data["fuel"]) < FUEL_COST: continue
-			data["fuel"] = int(data["fuel"]) - FUEL_COST
+			var cost: int = IRON_FUEL_COST if data["input"] == "iron_4" else FUEL_COST
+			if int(data["fuel"]) < cost: continue
+			data["fuel"] = int(data["fuel"]) - cost
 			data["burning"] = true
 			changed.emit()
 		data["elapsed"] = minf(PROCESS_TIME, float(data.get("elapsed", 0.0)) + maxf(delta, 0.0))
