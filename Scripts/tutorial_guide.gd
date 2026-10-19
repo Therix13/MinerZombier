@@ -210,10 +210,7 @@ func _draw() -> void:
 		var destination: Vector2 = cycle.grid.get_cell_rect(cells[1]).get_center()
 		var direction: Vector2 = (destination - source).normalized()
 		var end: Vector2 = destination - direction * 15.0
-		var color := Color(0.94, 0.78, 0.47, glow)
-		draw_line(source + direction * 15.0, end, color, 1.5, true)
-		draw_line(end, end - direction.rotated(0.55) * 8.0, color, 1.5, true)
-		draw_line(end, end - direction.rotated(-0.55) * 8.0, color, 1.5, true)
+		GuidePointer.draw_arrow(self,source + direction * 12.0,end,Color("#ffdc73"),3.5,10.0)
 
 func draw_mining_click(cell: Vector2i) -> void:
 	var rect: Rect2 = cycle.grid.get_cell_rect(cell)
@@ -238,17 +235,36 @@ class GuidePointer extends Control:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		z_index = 100
 		outline.bg_color = Color.TRANSPARENT
-		outline.set_border_width_all(2)
+		outline.set_border_width_all(3)
+		outline.shadow_color = Color("#302417bb")
+		outline.shadow_size = 4
 		outline.set_corner_radius_all(9)
 
 	func _draw() -> void:
 		if not is_instance_valid(target) or not target.is_visible_in_tree(): return
 		var transform: Transform2D = get_global_transform_with_canvas().affine_inverse() * target.get_global_transform_with_canvas()
 		var rect: Rect2 = (transform * Rect2(Vector2.ZERO, target.size)).grow(4.0)
-		var color := Color(0.95, 0.78, 0.47, 0.75 + 0.25 * sin(pulse * 4.0))
+		var color := Color("#ffdc73")
 		outline.border_color = color
 		draw_style_box(outline, rect)
-		var tip := Vector2(rect.position.x - 7.0, rect.get_center().y)
-		var tail: Vector2 = tip - Vector2(20.0 + 3.0 * sin(pulse * 4.0), 0)
-		draw_line(tail, tip - Vector2(4, 0), color, 2.0, true)
-		draw_colored_polygon(PackedVector2Array([tip, tip - Vector2(9, 6), tip - Vector2(9, -6)]), color)
+		var travel: float = 56.0 + 5.0 * sin(pulse * 4.0)
+		var tip := Vector2(rect.position.x - 9.0,rect.get_center().y)
+		var tail: Vector2 = tip - Vector2(travel,0)
+		# Header buttons get an upward arrow below them, clear of the money counter.
+		if rect.position.y < 95 and rect.size.y < 90:
+			tip = Vector2(rect.get_center().x,rect.end.y + 9)
+			tail = tip + Vector2(0,travel)
+		draw_arrow(self,tail,tip,color,7.0,18.0)
+
+	static func draw_arrow(canvas: CanvasItem, tail: Vector2, tip: Vector2, color: Color, width: float, head_size: float) -> void:
+		var distance: float = tail.distance_to(tip)
+		if distance < 1: return
+		var direction: Vector2 = (tip-tail) / distance
+		var head: float = minf(head_size,distance * 0.55)
+		var base: Vector2 = tip - direction * head
+		var side: Vector2 = direction.orthogonal() * head * 0.65
+		var dark := Color("#302417")
+		canvas.draw_line(tail,base,dark,width+4,true)
+		canvas.draw_line(tail,base,color,width,true)
+		canvas.draw_colored_polygon(PackedVector2Array([tip,base+side,base-side]),color)
+		canvas.draw_polyline(PackedVector2Array([tip,base+side,base-side,tip]),dark,2.5,true)

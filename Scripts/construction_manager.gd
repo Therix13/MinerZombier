@@ -38,6 +38,22 @@ func place(cell: Vector2i, item: String, direction: int, price: int) -> bool:
 	changed.emit()
 	return true
 
+func can_move(source: Vector2i, destination: Vector2i) -> bool:
+	if not plans.has(source) or game.get("cycle").is_night or not game.get_node("WorldInteractions").phase_allows(): return false
+	return source == destination or game.get_node("WorldInteractions").can_place_item(destination,str(plans[source]["item"]))
+
+func move_plan(source: Vector2i, destination: Vector2i, direction: int = -1) -> bool:
+	if not can_move(source,destination): return false
+	var data: Dictionary = plans[source]
+	plans.erase(source)
+	if direction >= 0: data["direction"] = posmod(direction,4)
+	plans[destination] = data
+	var inspector: Node = game.get_node_or_null("ToolInspector")
+	if inspector != null and inspector.kind == "blueprint" and inspector.cell == source:
+		inspector.cell = destination
+	changed.emit()
+	return true
+
 func can_receive(cell: Vector2i, kind: String) -> bool:
 	if not plans.has(cell): return false
 	var data: Dictionary = plans[cell]
@@ -84,33 +100,42 @@ func cancel(cell: Vector2i) -> bool:
 	changed.emit()
 	return true
 
+func _process(_delta: float) -> void:
+	if game != null and game.get("dragging_object") and game.get("held_object_type") == "blueprint": queue_redraw()
+
 func _draw() -> void:
 	if game == null: return
 	var grid: RefCounted = game.get("grid")
+	var dragging: bool = game.get("dragging_object") and game.get("held_object_type") == "blueprint"
+	var held: Vector2i = game.get("held_object_cell")
 	for cell: Vector2i in plans:
-		var rect: Rect2 = grid.get_cell_rect(cell).grow(-2)
-		var center: Vector2 = rect.get_center()
-		draw_rect(rect, Color("#224b7099"))
-		draw_rect(rect, Color("#8ed7fa"), false, 1.5)
-		for offset in [-10, 0, 10]:
-			draw_line(center + Vector2(-20, offset), center + Vector2(20, offset), Color("#84cbf33a"), 1)
-			draw_line(center + Vector2(offset, -20), center + Vector2(offset, 20), Color("#84cbf33a"), 1)
-		var item: String = plans[cell]["item"]
-		var direction: int = int(plans[cell]["direction"])
-		var key: String = "%s:%d" % [item, direction]
-		if item == "furnace": key = "furnace:%d:0" % direction
-		elif item in ["straight", "corner_right", "corner_left", "junction"]: key = "belt:%s:%d" % [item,direction]
-		if item == "launcher":
-			game.get("renderer").draw_launcher_on(self, center, {"ammo": []}, true)
-			draw_rect(rect,Color("#4d9bde88"))
-		elif item == "saw":
-			preload("res://Scripts/saw_manager.gd").draw_machine(self,center,{"direction":direction})
-			draw_rect(rect,Color("#4d9bde88"))
-		elif ArtAtlas.prepare() and ArtAtlas.regions.has(key):
-			draw_texture_rect_region(ArtAtlas.texture, Rect2(center - Vector2(28,28), Vector2(56,56)), ArtAtlas.regions[key], Color(0.55,0.8,1,0.65))
-		var total: int = 0
-		var delivered: int = 0
-		for material: String in RECIPES[item]:
-			total += int(RECIPES[item][material])
-			delivered += int(plans[cell]["delivered"].get(material, 0))
-		draw_string(ThemeDB.fallback_font, center + Vector2(-12, 19), "%d/%d" % [delivered, total], HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#c4edff"))
+		if dragging and cell == held: continue
+		draw_plan(grid.get_cell_rect(cell).get_center(),plans[cell])
+	if dragging and plans.has(held): draw_plan(game.get("drag_world_position"),plans[held])
+
+func draw_plan(center: Vector2, data: Dictionary) -> void:
+	var rect := Rect2(center - Vector2(22,22),Vector2(44,44))
+	draw_rect(rect, Color("#224b7099"))
+	draw_rect(rect, Color("#8ed7fa"), false, 1.5)
+	for offset in [-10, 0, 10]:
+		draw_line(center + Vector2(-20, offset), center + Vector2(20, offset), Color("#84cbf33a"), 1)
+		draw_line(center + Vector2(offset, -20), center + Vector2(offset, 20), Color("#84cbf33a"), 1)
+	var item: String = data["item"]
+	var direction: int = int(data["direction"])
+	var key: String = "%s:%d" % [item, direction]
+	if item == "furnace": key = "furnace:%d:0" % direction
+	elif item in ["straight", "corner_right", "corner_left", "junction"]: key = "belt:%s:%d" % [item,direction]
+	if item == "launcher":
+		game.get("renderer").draw_launcher_on(self, center, {"ammo": []}, true)
+		draw_rect(rect,Color("#4d9bde88"))
+	elif item == "saw":
+		preload("res://Scripts/saw_manager.gd").draw_machine(self,center,{"direction":direction})
+		draw_rect(rect,Color("#4d9bde88"))
+	elif ArtAtlas.prepare() and ArtAtlas.regions.has(key):
+		draw_texture_rect_region(ArtAtlas.texture, Rect2(center - Vector2(28,28), Vector2(56,56)), ArtAtlas.regions[key], Color(0.55,0.8,1,0.65))
+	var total: int = 0
+	var delivered: int = 0
+	for material: String in RECIPES[item]:
+		total += int(RECIPES[item][material])
+		delivered += int(data["delivered"].get(material, 0))
+	draw_string(ThemeDB.fallback_font, center + Vector2(-12, 19), "%d/%d" % [delivered, total], HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#c4edff"))

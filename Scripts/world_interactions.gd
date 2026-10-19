@@ -83,6 +83,7 @@ func can_drop(kind: String, source: Vector2i, destination: Vector2i) -> bool:
 	if not phase_allows() or (not grid.owned_tiles.has(source) and not grid.defense_tiles.has(source)) or not has_kind(source, kind) or not game.get("cycle").allows_interaction(kind, source, destination, true):
 		return false
 	if destination == grid.sale_cell and kind != "nugget": return can_sell(kind, source)
+	if kind == "blueprint": return game.get_node("Construction").can_move(source,destination)
 	if game.get_node("Construction").plans.has(source): return false
 	if game.get_node("Construction").plans.has(destination):
 		return kind == "nugget" and game.get_node("Construction").can_receive(destination, game.get("mining").nugget_type(source))
@@ -195,6 +196,7 @@ func apply_cells(cells: Dictionary) -> void:
 func drop(kind: String, source: Vector2i, destination: Vector2i, direction: int = -1) -> bool:
 	if not can_drop(kind, source, destination):
 		return false
+	if kind == "blueprint": return game.get_node("Construction").move_plan(source,destination,direction)
 	if destination == grid.sale_cell and kind != "nugget": return sell(kind, source)
 	var mining: RefCounted = game.get("mining")
 	var launchers: RefCounted = game.get("launchers")
@@ -273,6 +275,7 @@ func clear_drag() -> void:
 	game.redraw_world()
 	game.get_node("Compactors").queue_redraw()
 	game.get_node("Furnaces").queue_redraw()
+	game.get_node("Construction").queue_redraw()
 
 func placement_active() -> bool:
 	return placing_saw or placing_iron or placing_gold or placing_furnace or not placing_resource.is_empty() or game.get("placing_coal") or game.get("placing_brass") or game.get("placing_belt") or game.get("placing_drill") or game.get("placing_launcher") or game.get_node("Compactors").placing
@@ -533,6 +536,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		game.set("placement_direction", int(data["belt"]["direction"]))
 	elif kind == "drill":
 		game.set("placement_direction", int(data["drill"]))
-	elif kind in ["compactor", "furnace", "saw"]:
+	elif kind in ["compactor", "furnace", "saw", "blueprint"]:
 		game.set("placement_direction", int(data[kind].get("direction", 0)))
 	get_viewport().set_input_as_handled()
