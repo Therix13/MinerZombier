@@ -519,7 +519,7 @@ func update_cycle() -> void:
 	if cycle == null or cycle_title == null:
 		return
 	update_shift_hint()
-	get_node("CyclePanel").visible = not (cycle.is_night and cycle.tutorial_step >= cycle.TUTORIAL_LAST_STEP)
+	get_node("CyclePanel").visible = cycle.day == 1 and not (cycle.is_night and cycle.tutorial_step >= cycle.TUTORIAL_LAST_STEP)
 	var tutorial: bool = cycle.is_tutorial_active()
 	cycle_heading.text = "PRIMEROS PASOS" if tutorial else "DEFENSA DE LA BASE"
 	cycle_badge.text = "%02d / %02d" % [cycle.tutorial_display_step(), cycle.TUTORIAL_DISPLAY_STEPS] if tutorial else "DÍA %d" % cycle.day
@@ -991,7 +991,7 @@ func refresh_item_buttons() -> void:
 		if construction != null and construction.has_recipe(item): button.tooltip_text += "\n" + construction.recipe_text(item)
 		if item == "compactor": button.tooltip_text += "\nAcumula 8 puntos para producir Nv. 4. Nv. 1/2/3/4: 1/2/4/8 puntos. Conserva el sobrante. Nv. 4: 1 s; otros: 4 s."
 		if item == "furnace": button.tooltip_text += "\nCarbón Nv. 1 / 2 / 3 / 4: aporta 1 / 3 / 8 / 20 de combustible. Capacidad: 40."
-		if item == "launcher": button.tooltip_text += "\nDispara solo en las plataformas de defensa. Munición: pepitas Nv. 1.\nFusiona dos Nv. 1 para crear el plano de Nv. 2. Sin materiales para Nv. 1."
+		if item == "launcher": button.tooltip_text += "\nDispara solo en las plataformas de defensa. Munición: cualquier pepita. Nv. 1/2/3/4 carga 1/2/3/4 disparos. Debe caber la carga completa. Alcance: 300.\nFusiona dos Nv. 1 para crear el plano de Nv. 2. Sin materiales para Nv. 1."
 
 func unlock_defense_platforms() -> void:
 	if not tutorial_allows_item("defense_platforms") or (cycle != null and not cycle.allows_action("unlock_defense")):

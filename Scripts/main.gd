@@ -40,6 +40,7 @@ var night_victory_shade: ColorRect
 var night_victory_center: CenterContainer
 var night_victory_continue_button: Button
 
+var phase_clock: Control
 var placement_paid: bool = false
 var placing_coal: bool = false
 var placing_copper: bool = false
@@ -122,6 +123,9 @@ func _ready() -> void:
 	shop.right_defense_tile_requested.connect(buy_right_defense_tile)
 	shop.defense_platforms_unlocked.connect(redraw_world)
 	shop.defense_platforms_unlocked.connect(cycle.refresh_tutorial)
+	phase_clock = preload("res://Scripts/phase_clock.gd").new()
+	phase_clock.name = "PhaseClock"
+	ui_layer.add_child(phase_clock)
 	build_night_victory_popup()
 	display_settings.changed.connect(update_display_layout)
 	get_viewport().size_changed.connect(update_display_layout)
@@ -139,6 +143,7 @@ func update_display_layout() -> void:
 	get_node("CapaVictoria").scale = Vector2.ONE * factor
 	update_night_victory_layout()
 	camera_controller.update_zoom_limits()
+	if phase_clock != null: phase_clock.update_layout()
 
 func _exit_tree() -> void:
 	# RefCounted managers refer to each other. Break those cycles on scene
@@ -152,8 +157,8 @@ func _process(delta: float) -> void:
 	conveyors.advance(delta)
 	drills.advance(delta)
 	launchers.advance(delta)
-	if cycle.is_night and not zombie_manager.active_wave and zombie_manager.wave_total > 0 and zombie_manager.spawn_count >= zombie_manager.wave_total and get_tree().get_nodes_in_group("zombies").is_empty():
-		on_wave_completed()
+	if phase_clock != null and phase_clock.can_tick() and cycle.advance_day(delta):
+		start_night(true)
 	if holding_object:
 		var mouse_position: Vector2 = get_viewport().get_mouse_position()
 		if not dragging_object and mouse_position.distance_to(drag_start_position) >= DRAG_THRESHOLD:
@@ -388,15 +393,18 @@ func toggle_view() -> void:
 	camera_controller.set_defense_view(next_view)
 	shop.set_view_mode(camera_controller.defense_view)
 
-func start_night() -> void:
-	if not cycle.can_start_night():
+func start_night(automatic: bool = false) -> void:
+	if not cycle.can_start_night() and not (automatic and cycle.day > 1 and not cycle.is_night and not cycle.defeated):
 		return
 	if placing_coal or placing_copper or placing_belt or placing_drill or placing_launcher:
 		cancel_placement()
 	holding_object = false
 	dragging_object = false
 	held_object_type = ""
-	if not cycle.start_night():
+	shop.close_shop()
+	get_node("ToolInspector").close_inspector()
+	get_node("WorldInteractions").cancel_active()
+	if not cycle.start_night(automatic):
 		return
 	camera_controller.set_defense_view(true)
 	shop.set_view_mode(true)
@@ -498,6 +506,8 @@ func on_wave_completed() -> void:
 		return
 	var completed_night: int = cycle.day
 	cycle.complete_night()
+	var guide: Node = get_node_or_null("TutorialGuide")
+	if guide != null: guide.retire()
 	defense_zone.set_night(false)
 	night_victory_title.text = "Noche %d: Superada" % completed_night
 	update_night_victory_layout()

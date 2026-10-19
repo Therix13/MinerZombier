@@ -5,7 +5,8 @@ signal changed
 
 const CAPACITY: int = 5
 const FIRE_INTERVAL: float = 4.0
-const RANGE: float = 500.0
+const RANGE: float = 300.0
+const ENGAGEMENT_TOP: float = -200.0
 const DAMAGE_MULTIPLIER: float = 0.5
 
 var grid: RefCounted
@@ -15,6 +16,7 @@ var drills: RefCounted
 var launchers: Dictionary = {}
 var world: Node2D
 var shots: Array[Dictionary] = []
+var focused_enemy: WeakRef
 var capacity: int = CAPACITY
 var fire_interval: float = FIRE_INTERVAL
 var damage_multiplier: float = DAMAGE_MULTIPLIER
@@ -78,16 +80,36 @@ func move(source: Vector2i, destination: Vector2i) -> bool:
 func is_active_position(cell: Vector2i) -> bool:
 	return grid.is_defense_position(cell) and grid.defense_tiles.has(cell)
 
+func ammo_units(kind: String) -> int:
+	if kind not in mining.ORE_KINDS or "_ingot" in kind: return 0
+	return mining.ore_level(kind)
+
+func round_kind(kind: String) -> String:
+	return kind.get_slice("_",0)
+
 func can_receive(cell: Vector2i, kind: String = "") -> bool:
-	return (kind.is_empty() or kind in ["coal", "copper"]) and launchers.has(cell) and (launchers[cell]["ammo"] as Array).size() < capacity
+	if not launchers.has(cell): return false
+	var units: int = 1 if kind.is_empty() else ammo_units(kind)
+	return units > 0 and (launchers[cell]["ammo"] as Array).size() + units <= capacity
 
 func receive(cell: Vector2i, kind: String) -> bool:
-	if not can_receive(cell, kind) or kind not in ["coal", "copper"]:
-		return false
+	if not can_receive(cell,kind) or ammo_units(kind) == 0: return false
 	var ammo: Array = launchers[cell]["ammo"]
-	ammo.append(kind)
+	for i in range(ammo_units(kind)): ammo.append(round_kind(kind))
 	changed.emit()
 	return true
+
+func focus(enemy: Node2D) -> void:
+	var previous: Node2D = focused_enemy.get_ref() if focused_enemy != null else null
+	if is_instance_valid(previous):
+		previous.focused = false
+		previous.queue_redraw()
+	focused_enemy = weakref(enemy)
+	enemy.focused = true
+	enemy.queue_redraw()
+
+func in_range(cell: Vector2i, target_position: Vector2) -> bool:
+	return target_position.y >= ENGAGEMENT_TOP and grid.get_cell_rect(cell).get_center().distance_squared_to(target_position) <= RANGE * RANGE
 
 func advance(delta: float) -> void:
 	var visual_changed: bool = false
@@ -96,6 +118,9 @@ func advance(delta: float) -> void:
 		if float(shots[i]["time"]) <= 0.0:
 			shots.remove_at(i)
 			visual_changed = true
+	if world.get("cycle").defeated or (world.get("cycle").is_night and world.get("zombie_manager").retreat_started):
+		if visual_changed: changed.emit()
+		return
 	for key in launchers:
 		var cell: Vector2i = key
 		if not is_active_position(cell): continue
@@ -111,10 +136,14 @@ func advance(delta: float) -> void:
 			if not candidate is Node2D or not is_instance_valid(candidate):
 				continue
 			var target: Node2D = candidate as Node2D
-			var distance: float = center.distance_squared_to(world.to_local(target.global_position))
-			if distance < distance_squared:
+			var local_target: Vector2 = world.to_local(target.global_position)
+			var distance: float = center.distance_squared_to(local_target)
+			if in_range(cell,local_target) and distance < distance_squared:
 				nearest = target
 				distance_squared = distance
+		var priority: Node2D = focused_enemy.get_ref() if focused_enemy != null else null
+		if is_instance_valid(priority) and priority.is_in_group("zombies") and in_range(cell,world.to_local(priority.global_position)):
+			nearest = priority
 		if nearest == null:
 			continue
 		var target_position: Vector2 = world.to_local(nearest.global_position)
@@ -133,4 +162,4 @@ func advance(delta: float) -> void:
 		changed.emit()
 
 func ammo_damage(kind: String) -> float:
-	return (2.0 if kind.begins_with("copper") else 1.0) * mining.material_units(kind) * damage_multiplier
+	return float({"coal":1,"copper":2,"iron":3,"gold":4}.get(round_kind(kind),1)) * damage_multiplier

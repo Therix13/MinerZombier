@@ -42,7 +42,19 @@ func _ready() -> void:
 	cycle.refresh_tutorial()
 	on_step_changed()
 
+func retire() -> void:
+	if is_queued_for_deletion(): return
+	pointer.queue_free()
+	var barrier: Node = game.get_node_or_null("TutorialBarrier")
+	if barrier != null: barrier.queue_free()
+	set_process(false)
+	hide()
+	queue_free()
+
 func on_step_changed() -> void:
+	if cycle.day > 1:
+		retire()
+		return
 	targets_dirty = true
 	if not cycle.is_tutorial_active():
 		queue_redraw()

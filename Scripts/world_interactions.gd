@@ -495,7 +495,11 @@ func _input(event: InputEvent) -> void:
 	if not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_LEFT or event.pressed or not game.get("holding_object"):
 		return
 	if not game.get("dragging_object") and event.position.distance_to(game.get("drag_start_position")) < 8.0:
-		if game.get("held_object_type") in ["blueprint", "drill", "compactor", "furnace", "launcher", "saw"] and phase_allows():
+		if game.get("held_object_type") == "drill":
+			clear_drag()
+			get_viewport().set_input_as_handled()
+			return
+		if game.get("held_object_type") in ["blueprint", "compactor", "furnace", "launcher", "saw"] and phase_allows():
 			var tool_kind: String = game.get("held_object_type")
 			var at: Vector2i = game.get("held_object_cell")
 			clear_drag()

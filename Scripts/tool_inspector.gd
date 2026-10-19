@@ -76,6 +76,9 @@ func is_open() -> bool:
 	return overlay != null and overlay.visible
 
 func open_tool(tool_kind: String, at: Vector2i) -> void:
+	if tool_kind == "drill":
+		close_inspector()
+		return
 	if get_tree().paused: return
 	kind = tool_kind
 	cell = at
@@ -141,7 +144,7 @@ func refresh() -> void:
 			if level == 1: status.text += " · Oxidado"
 			if not game.get("launchers").is_active_position(cell): status.text += " · Fuera de defensa"
 			if level == 1: status.text += "\nFusiona dos Nv. 1 (máx. 5 pepitas entre ambos)."
-		"drill": status.text = "Taladro"
+		"drill": status.text = ""
 	if withdrawal_blocked: status.text += " · Sin espacio libre."
 	var signature: String = var_to_str(items)
 	if signature == last_contents: return

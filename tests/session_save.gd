@@ -154,7 +154,8 @@ func run_checks() -> void:
 	game.zombie_manager.start_wave(3)
 	var enemy: Node2D = get_nodes_in_group("zombies")[0]
 	enemy.position += Vector2(30,90)
-	enemy.health = 2.0
+	enemy.configure("armored")
+	enemy.health = 1.25
 	enemy.limbs.erase("left_arm")
 	enemy.attack_timer = 1.3
 	game.zombie_manager.spawn_timer = 2.75
@@ -162,7 +163,7 @@ func run_checks() -> void:
 	check(saves.save_game() and saves.restore_snapshot(saves.read_save()),"A mid-wave game can be saved and loaded")
 	check(game.cycle.is_night and game.zombie_manager.active_wave and is_equal_approx(game.zombie_manager.spawn_timer,2.75),"The horde resumes its existing spawn schedule")
 	var resumed: Node2D = get_nodes_in_group("zombies")[0]
-	check(resumed.position == night["enemies"][0]["position"] and resumed.health == 2.0 and "left_arm" not in resumed.limbs,"Damaged zombies retain their positions, health and missing limbs")
+	check(resumed.position == night["enemies"][0]["position"] and resumed.health == 1.25 and "left_arm" not in resumed.limbs,"Damaged zombies retain their positions, health and missing limbs")
 	var before: float = game.zombie_manager.base_health
 	resumed.base_attacked.emit(1.0)
 	check(game.zombie_manager.base_health == before-1,"Restored enemies still damage the base through their signals")

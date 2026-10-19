@@ -30,6 +30,8 @@ var copper_cell := TUTORIAL_COPPER_CELL
 var furnace_cell := TUTORIAL_FURNACE_CELL
 var refreshing_tutorial: bool = false
 
+const DAY_DURATION: float = 300.0
+var day_remaining: float = DAY_DURATION
 var day: int = 1
 var is_night: bool = false
 var defeated: bool = false
@@ -117,8 +119,8 @@ func next_vein_cell() -> Vector2i:
 
 func needs_ammo_vein() -> bool:
 	if not launcher_ready() or launcher_full() or ammo_vein() != Vector2i(-999,-999): return false
-	for material: String in ["coal","copper"]:
-		if not mining.items_for(material).is_empty(): return false
+	for kind: String in mining.ORE_KINDS:
+		if launchers.ammo_units(kind) > 0 and not mining.items_for(kind).is_empty(): return false
 	return true
 
 func tutorial_mining_cell() -> Vector2i:
@@ -340,7 +342,8 @@ func tutorial_text() -> String:
 		if needs_ammo_vein(): return "Reúne 100 de oro para una veta de carbón Nv. 1." if needs_tutorial_income() else "Compra una veta de carbón Nv. 1 para munición."
 		if needs_tutorial_income(): return "Reúne 500 de oro para el lanzapepitas."
 		if launcher_blueprint_cell() != Vector2i(-999,-999): return "Entrega un lingote de cobre Nv. 3 y uno Nv. 1."
-		if launcher_ready(): return "Llena el lanzapepitas con 5 pepitas Nv. 1."
+		if launcher_ready(): return "Carga el lanzapepitas con 5 disparos.
+Cada nivel de pepita aporta más munición."
 		if not launchers.launchers.is_empty(): return "Mueve tu lanzapepitas a una plataforma."
 		return "Coloca el lanzapepitas Nv. 1 en una plataforma."
 	if tutorial_step == 14: return "Pulsa INICIAR NOCHE."
@@ -436,8 +439,9 @@ func ammo_targets() -> Array[Vector2i]:
 		if launchers.is_active_position(cell) and launchers.can_receive(cell):
 			weapon = cell
 			break
-	for material: String in ["coal","copper"]:
-		for cell: Vector2i in mining.items_for(material): return [cell,weapon]
+	for kind: String in mining.ORE_KINDS:
+		if not launchers.can_receive(weapon,kind): continue
+		for cell: Vector2i in mining.items_for(kind): return [cell,weapon]
 	var vein: Vector2i = ammo_vein()
 	if vein == Vector2i(-999,-999): return [next_vein_cell()]
 	var data: Dictionary = mining.veins_for(mining.vein_at(vein))[vein]
@@ -486,11 +490,19 @@ func can_start_night() -> bool:
 	if is_tutorial_active() and (tutorial_step < 14 or not launcher_full()): return false
 	return not is_night and not defeated and not launchers.launchers.is_empty() and has_ammo()
 
-func start_night() -> bool:
-	if not can_start_night() or (day == 1 and not barrier_broken):
+func advance_day(delta: float) -> bool:
+	if is_night or defeated or is_tutorial_active(): return false
+	# The first night still follows the player's tutorial/cinematic start.
+	if day == 1: return false
+	day_remaining = maxf(0,day_remaining - maxf(0,delta))
+	return day_remaining <= 0
+
+func start_night(automatic: bool = false) -> bool:
+	if (not can_start_night() and not (automatic and day > 1 and not is_night and not defeated)) or (day == 1 and not barrier_broken):
 		return false
 	if is_tutorial_active(): tutorial_step = TUTORIAL_LAST_STEP
 	is_night = true
+	day_remaining = 0.0
 	changed.emit()
 	return true
 
@@ -499,6 +511,9 @@ func complete_night() -> void:
 		return
 	is_night = false
 	day += 1
+	tutorial_skipped = true
+	tutorial_step = TUTORIAL_LAST_STEP
+	day_remaining = DAY_DURATION
 	changed.emit()
 
 func lose_night() -> void:

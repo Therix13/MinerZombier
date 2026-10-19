@@ -11,9 +11,9 @@ const SESSION_ACTION: StringName = &"mine_defense_session_action"
 const SKIP_START: StringName = &"mine_defense_skip_start_screen"
 const INTRO_KEY: StringName = &"mine_defense_intro_seen"
 const AUTOSAVE_SECONDS := 15.0
-const CYCLE_FIELDS := ["day", "is_night", "defeated", "tutorial_step", "fusion_taught", "vein_fusion_taught", "barrier_broken", "fusion_sold", "copper_ingot_sold", "copper_ingot_created", "copper_ingot_3_created", "level3_sold", "level4_sold", "coal_sold", "expansion_bonus_granted", "free_launcher_available", "tutorial_skipped", "funded_steps", "coal_cell", "copper_cell", "furnace_cell"]
-const WAVE_FIELDS := ["spawn_timer", "spawn_from_left", "spawn_count", "wave_total", "wave_day", "active_wave", "base_health", "cleared_time"]
-const ENEMY_FIELDS := ["position", "destination", "health", "max_health", "walking_time", "attacking", "attack_timer", "limbs"]
+const CYCLE_FIELDS := ["day_remaining", "day", "is_night", "defeated", "tutorial_step", "fusion_taught", "vein_fusion_taught", "barrier_broken", "fusion_sold", "copper_ingot_sold", "copper_ingot_created", "copper_ingot_3_created", "level3_sold", "level4_sold", "coal_sold", "expansion_bonus_granted", "free_launcher_available", "tutorial_skipped", "funded_steps", "coal_cell", "copper_cell", "furnace_cell"]
+const WAVE_FIELDS := ["spawn_timer", "spawn_from_left", "spawn_count", "wave_total", "wave_day", "active_wave", "base_health", "cleared_time", "wave_elapsed", "retreat_started"]
+const ENEMY_FIELDS := ["position", "destination", "health", "max_health", "walking_time", "attacking", "attack_timer", "limbs", "archetype", "armor", "phase", "ability_timer", "charge_used", "retreating"]
 const CAMERA_FIELDS := ["mine_position", "mine_zoom", "combat_mine_active", "combat_mine_position", "combat_mine_zoom", "defense_view"]
 
 var game: Node2D
@@ -153,7 +153,7 @@ func snapshot() -> Dictionary:
 	camera_data["position"] = game.camera.position
 	camera_data["zoom"] = game.camera.zoom.x
 	return {
-		"version": VERSION, "tutorial_revision": TUTORIAL_REVISION, "material_revision": 2, "compactor_revision": 2, "saved_at": int(Time.get_unix_time_from_system()),
+		"version": VERSION, "tutorial_revision": TUTORIAL_REVISION, "material_revision": 2, "compactor_revision": 2, "combat_revision": 2, "saved_at": int(Time.get_unix_time_from_system()),
 		"coins": game.economy.coins, "developer_mode": game.economy.developer_mode,
 		"grid": {"width": game.grid.cave_width, "height": game.grid.cave_height, "platforms": not game.grid.defense_tiles.is_empty()},
 		"veins": veins, "resources": game.mining.nugget_stores().duplicate(true),
@@ -166,7 +166,7 @@ func snapshot() -> Dictionary:
 		"blueprints": game.get_node("Construction").plans.duplicate(true),
 		"progression": {"unlocked": game.progression.unlocked.duplicate(true), "created_resources": game.progression.created_resources.duplicate(true), "completed_veins": game.progression.completed_veins.duplicate(true)},
 		"cycle": properties(game.cycle, CYCLE_FIELDS), "wave": properties(game.zombie_manager, WAVE_FIELDS),
-		"enemies": enemies, "camera": camera_data, "victory": game.night_victory_overlay.visible,
+		"enemies": enemies, "acid_shots":game.zombie_manager.acid_shots.duplicate(true), "acid_pools":game.zombie_manager.acid_pools.duplicate(true), "camera": camera_data, "victory": game.night_victory_overlay.visible,
 		"notices": game.shop.notice_item_ids.duplicate(),
 	}
 
@@ -259,7 +259,7 @@ func migrate_materials(data: Dictionary) -> Dictionary:
 	return migrate_compactors(result)
 
 func migrate_compactors(data: Dictionary) -> Dictionary:
-	if data.get("compactor_revision",1) != 1: return data
+	if data.get("compactor_revision",1) != 1: return migrate_combat(data)
 	var result: Dictionary = data.duplicate(true)
 	if result.get("compactors") is Dictionary:
 		var manager: Node = game.get_node("Compactors")
@@ -273,6 +273,30 @@ func migrate_compactors(data: Dictionary) -> Dictionary:
 			machine["elapsed"] = minf(float(machine.get("elapsed",0)),manager.process_time(machine)) if machine["points"] >= manager.REQUIRED_POINTS else 0.0
 			machine.erase("count")
 	result["compactor_revision"] = 2
+	return migrate_combat(result)
+
+func migrate_combat(data: Dictionary) -> Dictionary:
+	if data.get("combat_revision",1) != 1: return data
+	var result: Dictionary = data.duplicate(true)
+	if result.get("cycle") is Dictionary:
+		result["cycle"]["day_remaining"] = 0.0 if result["cycle"].get("is_night",false) else 300.0
+	if result.get("wave") is Dictionary:
+		var wave: Dictionary = result["wave"]
+		wave["wave_elapsed"] = minf(114.0,float(wave.get("spawn_count",0)) * 5.0) if wave.get("active_wave",false) else 0.0
+		wave["retreat_started"] = false
+		if wave.get("active_wave",false): wave["wave_total"] = maxi(int(wave.get("spawn_count",0)),mini(40,6 + (int(wave.get("wave_day",1)) - 1) * 2))
+	if result.get("enemies") is Array:
+		for enemy: Variant in result["enemies"]:
+			if not enemy is Dictionary: continue
+			enemy["archetype"] = "walker"
+			enemy["armor"] = 0.0
+			enemy["phase"] = "advance"
+			enemy["ability_timer"] = 0.0
+			enemy["charge_used"] = false
+			enemy["retreating"] = false
+	result["acid_shots"] = []
+	result["acid_pools"] = []
+	result["combat_revision"] = 2
 	return result
 
 func restore_snapshot(data: Dictionary) -> bool:
@@ -328,13 +352,16 @@ func restore_snapshot(data: Dictionary) -> bool:
 	for saved: Dictionary in data["enemies"]:
 		var enemy: Node2D = game.zombie_manager.ZombieScript.new()
 		enemy.setup(saved["position"],saved["destination"],saved["max_health"])
+		enemy.configure(saved["archetype"])
 		for key: String in ENEMY_FIELDS:
 			if key == "limbs": enemy.limbs.assign(saved[key])
 			else: enemy.set(key,saved[key])
 		enemy.z_index = 20
-		enemy.base_attacked.connect(game.zombie_manager._on_base_attacked)
-		enemy.defeated.connect(game.zombie_manager.zombie_defeated.emit)
+		game.zombie_manager.connect_zombie(enemy)
 		game.zombie_manager.add_child(enemy)
+		if game.cycle.defeated: enemy.set_process(false)
+	game.zombie_manager.acid_shots.assign(data["acid_shots"])
+	game.zombie_manager.acid_pools.assign(data["acid_pools"])
 	game.economy.coins = data["coins"]
 	game.economy.developer_mode = data["developer_mode"]
 	game.progression.developer_mode = data["developer_mode"]
@@ -350,8 +377,10 @@ func restore_snapshot(data: Dictionary) -> bool:
 	game.shop.set_view_mode(controller.defense_view)
 	game.camera.force_update_scroll()
 	# Do not replay tutorial focus or cinematic when loading an existing game.
-	game.get_node("TutorialGuide").last_step = game.cycle.tutorial_step
-	game.get_node("TutorialGuide").last_state.clear()
+	var guide: Node = game.get_node_or_null("TutorialGuide")
+	if guide != null:
+		guide.last_step = game.cycle.tutorial_step
+		guide.last_state.clear()
 	game.cycle.changed.emit()
 	game.economy.money_changed.emit(game.economy.coins)
 	var notices: Array[String] = []
@@ -382,6 +411,7 @@ func dictionary_keys(data: Dictionary, names: Array) -> bool:
 
 func valid_snapshot(data: Dictionary) -> bool:
 	data = migrate_materials(data)
+	if not data.get("combat_revision") is int or data.get("combat_revision") != 2: return false
 	if not data.get("compactor_revision") is int or data.get("compactor_revision") != 2: return false
 	if not data.get("material_revision") is int or data.get("material_revision") != 2: return false
 	if not data.get("tutorial_revision",1) is int or data.get("tutorial_revision",1) not in [1,2,TUTORIAL_REVISION]: return false
@@ -412,7 +442,7 @@ func valid_snapshot(data: Dictionary) -> bool:
 		if not launcher is Dictionary or not launcher.get("level",1) is int or launcher.get("level",1) not in [1,2]: return false
 		if not launcher is Dictionary or not number(launcher.get("cooldown"),0,4) or not number(launcher.get("angle"),-100,100) or not launcher.get("ammo") is Array or launcher["ammo"].size() > 5: return false
 		for kind: Variant in launcher["ammo"]:
-			if kind not in ["coal","copper"]: return false
+			if kind not in ["coal","copper","iron","gold"]: return false
 	for key: String in ["compactors","furnaces","saws","blueprints"]:
 		for machine: Variant in data[key].values():
 			if not machine is Dictionary or not number(machine.get("direction"),0,3): return false
@@ -424,7 +454,7 @@ func valid_snapshot(data: Dictionary) -> bool:
 				if machine.has("ammo"):
 					if machine["item"] != "launcher_2" or not machine["ammo"] is Array or machine["ammo"].size() > 5: return false
 					for ammo: Variant in machine["ammo"]:
-						if ammo not in ["coal","copper"]: return false
+						if ammo not in ["coal","copper","iron","gold"]: return false
 				continue
 			if not number(machine.get("elapsed"),0,4): return false
 			if key == "compactors":
@@ -456,9 +486,9 @@ func valid_snapshot(data: Dictionary) -> bool:
 	var cycle: Dictionary = data["cycle"]
 	for key: String in CYCLE_FIELDS:
 		if key not in ["copper_ingot_created","copper_ingot_3_created"] and not cycle.has(key): return false
-	if not number(cycle["day"],1,1e6) or not number(cycle["tutorial_step"],0,16 if data.get("tutorial_revision",1) == 2 else game.cycle.TUTORIAL_LAST_STEP) or not number(cycle["coal_sold"],0,1e12) or not cycle["funded_steps"] is Dictionary: return false
+	if not number(cycle["day_remaining"],0,300) or not number(cycle["day"],1,1e6) or not number(cycle["tutorial_step"],0,16 if data.get("tutorial_revision",1) == 2 else game.cycle.TUTORIAL_LAST_STEP) or not number(cycle["coal_sold"],0,1e12) or not cycle["funded_steps"] is Dictionary: return false
 	for key: String in CYCLE_FIELDS:
-		if key in ["day","tutorial_step","coal_sold","funded_steps"] or (key in ["copper_ingot_created","copper_ingot_3_created"] and not cycle.has(key)): continue
+		if key in ["day_remaining","day","tutorial_step","coal_sold","funded_steps"] or (key in ["copper_ingot_created","copper_ingot_3_created"] and not cycle.has(key)): continue
 		if key.ends_with("_cell"):
 			if not cycle[key] is Vector2i: return false
 		elif not cycle[key] is bool: return false
@@ -467,17 +497,26 @@ func valid_snapshot(data: Dictionary) -> bool:
 	var wave: Dictionary = data["wave"]
 	for key: String in WAVE_FIELDS:
 		if not wave.has(key): return false
-	if not number(wave["base_health"],0,100) or not number(wave["wave_day"],1,1e6) or not number(wave["wave_total"],0,12) or not number(wave["spawn_count"],0,wave["wave_total"]): return false
+	if not number(wave["base_health"],0,100) or not number(wave["wave_day"],1,1e6) or not number(wave["wave_total"],0,40) or not number(wave["spawn_count"],0,wave["wave_total"]): return false
 	if not wave["active_wave"] is bool or not wave["spawn_from_left"] is bool or not number(wave["spawn_timer"],-1e6,1e6) or not number(wave["cleared_time"],0,3): return false
-	if not data.get("enemies") is Array or data["enemies"].size() > 12: return false
+	if not number(wave["wave_elapsed"],0,120) or not wave["retreat_started"] is bool: return false
+	if not data.get("enemies") is Array or data["enemies"].size() > 24: return false
 	for enemy: Variant in data["enemies"]:
 		if not enemy is Dictionary: return false
 		for key: String in ENEMY_FIELDS:
 			if not enemy.has(key): return false
 		if not enemy["position"] is Vector2 or not enemy["position"].is_finite() or not enemy["destination"] is Vector2 or not enemy["destination"].is_finite(): return false
 		if not number(enemy["max_health"],0.5,1e9) or not number(enemy["health"],0.001,enemy["max_health"]) or not number(enemy["walking_time"],0,1e12) or not number(enemy["attack_timer"],-1e6,1e6) or not enemy["attacking"] is bool or not enemy["limbs"] is Array: return false
+		if enemy["archetype"] not in ZombieScript.TYPES or enemy["phase"] not in ["advance","windup","charge","exposed","retreat"]: return false
+		if not number(enemy["armor"],0,10) or not number(enemy["ability_timer"],0,6) or not enemy["charge_used"] is bool or not enemy["retreating"] is bool: return false
 		for limb: Variant in enemy["limbs"]:
 			if limb not in ["left_arm","right_arm","left_leg","right_leg"]: return false
+	if not data.get("acid_shots") is Array or data["acid_shots"].size() > 32 or not data.get("acid_pools") is Array or data["acid_pools"].size() > 8: return false
+	for shot: Variant in data["acid_shots"]:
+		if not shot is Dictionary or not shot.get("from") is Vector2 or not shot["from"].is_finite() or not shot.get("to") is Vector2 or not shot["to"].is_finite(): return false
+		if not number(shot.get("duration"),0.1,3) or not number(shot.get("age"),0,shot["duration"]) or not number(shot.get("damage"),0,10): return false
+	for pool: Variant in data["acid_pools"]:
+		if not pool is Dictionary or not pool.get("position") is Vector2 or not pool["position"].is_finite() or not number(pool.get("remaining"),0,4) or not number(pool.get("tick"),0,1): return false
 	for key: String in CAMERA_FIELDS + ["position","zoom"]:
 		if not data["camera"].has(key): return false
 		var value: Variant = data["camera"][key]
