@@ -29,7 +29,7 @@ func run_checks() -> void:
 	game.cycle.barrier_broken = true
 	game.cycle.is_night = true
 	manager.start_wave(1)
-	check(manager.wave_total == 6 and manager.remaining_time() == 120,"First horde has a fixed two-minute duration")
+	check(manager.wave_total == 24 and manager.remaining_time() == 120,"Larger first horde retains a two-minute clock")
 	clear_enemies()
 	manager._process(3)
 	check(manager.active_wave and game.cycle.day == 1,"An early empty battlefield does not skip the rest of the timed horde")

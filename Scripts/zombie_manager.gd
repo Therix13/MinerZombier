@@ -7,7 +7,10 @@ signal zombie_defeated
 
 const ZombieScript = preload("res://Scripts/zombie.gd")
 const SPAWN_INTERVAL: float = 5.0
-const MAX_ZOMBIES: int = 24
+const MAX_ZOMBIES: int = 64
+const FIRST_WAVE_ZOMBIES: int = 24
+const EXTRA_ZOMBIES_PER_DAY: int = 8
+const MAX_WAVE_ZOMBIES: int = 160
 const HORDE_DURATION: float = 120.0
 const SPAWN_WINDOW: float = 90.0
 const SPAWN_DISTANCE: float = 225.0
@@ -39,6 +42,9 @@ func living_zombies() -> Array[Node]:
 
 func spawn_interval() -> float:
 	return SPAWN_WINDOW / float(maxi(1,wave_total - 1))
+
+func wave_size(day: int) -> int:
+	return mini(MAX_WAVE_ZOMBIES,FIRST_WAVE_ZOMBIES + maxi(0,day - 1) * EXTRA_ZOMBIES_PER_DAY)
 
 func archetype_for(day: int, index: int, total: int) -> String:
 	if day >= 5 and day % 5 == 0 and (index == 0 or (day >= 10 and index % 12 == 0)): return "plague"
@@ -73,7 +79,7 @@ func setup(grid_manager: RefCounted) -> void:
 func start_wave(day: int) -> void:
 	if active_wave or grid == null: return
 	wave_day = day
-	wave_total = mini(40,6 + (day - 1) * 2)
+	wave_total = wave_size(day)
 	spawn_count = 0
 	spawn_from_left = true
 	wave_elapsed = 0.0
@@ -112,6 +118,7 @@ func connect_zombie(zombie: Node) -> void:
 
 func spawn_zombie() -> void:
 	if not active_wave or spawn_count >= wave_total: return
+	if living_zombies().size() >= MAX_ZOMBIES: return
 	var center_x: float = grid.get_cell_rect(grid.sale_cell).get_center().x
 	var side: float = -1.0 if spawn_from_left else 1.0
 	var lane: float = float(spawn_count % 3) * 30.0

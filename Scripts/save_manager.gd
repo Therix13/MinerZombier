@@ -341,7 +341,7 @@ func migrate_combat(data: Dictionary) -> Dictionary:
 		var wave: Dictionary = result["wave"]
 		wave["wave_elapsed"] = minf(114.0,float(wave.get("spawn_count",0)) * 5.0) if wave.get("active_wave",false) else 0.0
 		wave["retreat_started"] = false
-		if wave.get("active_wave",false): wave["wave_total"] = maxi(int(wave.get("spawn_count",0)),mini(40,6 + (int(wave.get("wave_day",1)) - 1) * 2))
+		if wave.get("active_wave",false): wave["wave_total"] = maxi(int(wave.get("spawn_count",0)),game.zombie_manager.wave_size(int(wave.get("wave_day",1))))
 	if result.get("enemies") is Array:
 		for enemy: Variant in result["enemies"]:
 			if not enemy is Dictionary: continue
@@ -565,10 +565,10 @@ func valid_snapshot(data: Dictionary) -> bool:
 	var wave: Dictionary = data["wave"]
 	for key: String in WAVE_FIELDS:
 		if not wave.has(key): return false
-	if not number(wave["base_health"],0,100) or not number(wave["wave_day"],1,1e6) or not number(wave["wave_total"],0,40) or not number(wave["spawn_count"],0,wave["wave_total"]): return false
+	if not number(wave["base_health"],0,100) or not number(wave["wave_day"],1,1e6) or not number(wave["wave_total"],0,game.zombie_manager.MAX_WAVE_ZOMBIES) or not number(wave["spawn_count"],0,wave["wave_total"]): return false
 	if not wave["active_wave"] is bool or not wave["spawn_from_left"] is bool or not number(wave["spawn_timer"],-1e6,1e6) or not number(wave["cleared_time"],0,3): return false
 	if not number(wave["wave_elapsed"],0,120) or not wave["retreat_started"] is bool: return false
-	if not data.get("enemies") is Array or data["enemies"].size() > 24: return false
+	if not data.get("enemies") is Array or data["enemies"].size() > game.zombie_manager.MAX_ZOMBIES: return false
 	for enemy: Variant in data["enemies"]:
 		if not enemy is Dictionary: return false
 		for key: String in ENEMY_FIELDS:
