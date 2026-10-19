@@ -10,7 +10,6 @@ const DEFAULT_PATH := "user://savegame.dat"
 const SESSION_ACTION: StringName = &"mine_defense_session_action"
 const SKIP_START: StringName = &"mine_defense_skip_start_screen"
 const INTRO_KEY: StringName = &"mine_defense_intro_seen"
-const AUTOSAVE_SECONDS := 15.0
 const CYCLE_FIELDS := ["day_remaining", "day", "is_night", "defeated", "tutorial_step", "fusion_taught", "vein_fusion_taught", "barrier_broken", "fusion_sold", "copper_ingot_sold", "copper_ingot_created", "copper_ingot_3_created", "level3_sold", "level4_sold", "coal_sold", "expansion_bonus_granted", "free_launcher_available", "tutorial_skipped", "funded_steps", "coal_cell", "copper_cell", "furnace_cell"]
 const WAVE_FIELDS := ["spawn_timer", "spawn_from_left", "spawn_count", "wave_total", "wave_day", "active_wave", "base_health", "cleared_time", "wave_elapsed", "retreat_started"]
 const ENEMY_FIELDS := ["position", "destination", "health", "max_health", "walking_time", "attacking", "attack_timer", "limbs", "archetype", "armor", "phase", "ability_timer", "charge_used", "retreating"]
@@ -22,12 +21,11 @@ var playing := false
 var restoring := false
 var loaded_game := false
 var test_mode := false
-var timer: Timer
 var start_screen: CanvasLayer
 var last_message := ""
-var urgent_pending := false
-var last_cycle_state: Array = []
 var day_checkpoint: Dictionary = {}
+var pending_days: Dictionary = {}
+var archive_id: String = "legacy"
 var reload_hint_seen: bool = false
 
 func _ready() -> void:
@@ -35,11 +33,6 @@ func _ready() -> void:
 	path = str(Engine.get_meta(&"mine_defense_save_path", path))
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	get_tree().auto_accept_quit = false
-	timer = Timer.new()
-	timer.wait_time = AUTOSAVE_SECONDS
-	timer.process_mode = Node.PROCESS_MODE_PAUSABLE
-	timer.timeout.connect(save_game)
-	add_child(timer)
 	status_changed.connect(func(message: String, _success: bool): game.display_settings.save_status.text = message)
 	game.cycle.changed.connect(update_day_checkpoint)
 	initialize.call_deferred()
@@ -55,26 +48,20 @@ func initialize() -> void:
 	Engine.remove_meta(SESSION_ACTION)
 	if action == "new":
 		playing = true
+		archive_id = "%x_%x" % [Time.get_ticks_usec(),randi()]
 		get_tree().paused = false
 		Engine.remove_meta(INTRO_KEY)
 		capture_day_start()
-		save_game()
-		timer.start()
 		game.display_settings.ask_auto_click(game.shop.ensure_intro)
-	elif action == "continue":
-		var data: Dictionary = read_save()
+	elif action == "continue" or action.begins_with("day:"):
+		var data: Dictionary = read_selection(action)
 		if not data.is_empty() and restore_snapshot(data):
 			playing = true
 			get_tree().paused = false
-			timer.start()
 		else:
 			show_start_screen()
 	else:
 		show_start_screen()
-	last_cycle_state = cycle_signature()
-	game.cycle.changed.connect(schedule_save)
-	game.progression.items_unlocked.connect(func(_items: Array[String]): queue_save())
-	game.get_node("Construction").completed.connect(func(_cell: Vector2i): queue_save())
 
 func update_day_checkpoint() -> void:
 	if restoring or game.cycle.is_night or game.cycle.defeated: return
@@ -108,6 +95,7 @@ func dawn_snapshot(data: Dictionary) -> Dictionary:
 func capture_day_start() -> void:
 	if restoring or game.cycle.is_night or game.cycle.defeated: return
 	day_checkpoint = dawn_snapshot(snapshot(false))
+	pending_days[game.cycle.day] = day_checkpoint.duplicate(true)
 
 func retry_day() -> bool:
 	if not game.cycle.defeated: return false
@@ -122,30 +110,14 @@ func retry_day() -> bool:
 		barrier.destruction = 0.0
 		barrier.present()
 	game.phase_clock.update_clock()
-	if not test_mode: save_game()
 	return true
 
-func cycle_signature() -> Array:
-	return [game.cycle.day,game.cycle.is_night,game.cycle.defeated,game.cycle.tutorial_step]
-
-func schedule_save() -> void:
-	var state: Array = cycle_signature()
-	if state == last_cycle_state: return
-	last_cycle_state = state
-	queue_save()
-
 func queue_save() -> void:
-	if not playing or restoring or test_mode or urgent_pending: return
-	urgent_pending = true
-	flush_urgent.call_deferred()
-
-func flush_urgent() -> void:
-	urgent_pending = false
-	if playing and not restoring: save_game()
+	# Milestones remain in memory until the player chooses Save and exit.
+	pass
 
 func show_start_screen() -> void:
 	playing = false
-	timer.stop()
 	game.camera_controller.dragging = false
 	if start_screen == null:
 		start_screen = StartScreenScript.new()
@@ -163,8 +135,9 @@ func return_to_start() -> bool:
 	return true
 
 func begin(action: String) -> void:
-	if action == "continue" and read_save().is_empty():
+	if action != "new" and read_selection(action).is_empty():
 		start_screen.refresh_save()
+		report("No se pudo cargar ese archivo.",false)
 		return
 	Engine.set_meta(SESSION_ACTION, action)
 	get_tree().paused = false
@@ -208,7 +181,7 @@ func snapshot(include_checkpoint: bool = true) -> Dictionary:
 	camera_data["zoom"] = game.camera.zoom.x
 	var result: Dictionary = {
 		"version": VERSION, "tutorial_revision": TUTORIAL_REVISION, "material_revision": 2, "compactor_revision": 2, "combat_revision": 2, "saved_at": int(Time.get_unix_time_from_system()),
-		"coins": game.economy.coins, "developer_mode": game.economy.developer_mode, "reload_hint_seen": reload_hint_seen,
+		"coins": game.economy.coins, "developer_mode": game.economy.developer_mode, "reload_hint_seen": reload_hint_seen, "archive_id": archive_id,
 		"grid": {"width": game.grid.cave_width, "height": game.grid.cave_height, "platforms": not game.grid.defense_tiles.is_empty()},
 		"veins": veins, "resources": game.mining.nugget_stores().duplicate(true),
 		"belts": game.conveyors.belts.duplicate(true), "junctions": game.conveyors.last_junction_entry.duplicate(true),
@@ -237,10 +210,24 @@ func save_game() -> bool:
 	if not playing or restoring: return false
 	var data: Dictionary = snapshot()
 	if not valid_snapshot(data):
+		report("No se pudo guardar el estado de la partida.",false)
+		return false
+	if not DirAccess.dir_exists_absolute(path.get_base_dir()) or DirAccess.make_dir_recursive_absolute(archive_directory(archive_id)) != OK:
+		report("No se pudo crear el archivo de días.",false)
+		return false
+	for day: int in pending_days:
+		if not write_snapshot(day_path(archive_id,day),pending_days[day]): return false
+	if not write_snapshot(path,data): return false
+	pending_days.clear()
+	report("Partida guardada.", true)
+	return true
+
+func write_snapshot(filename: String, data: Dictionary) -> bool:
+	if not valid_snapshot(data):
 		report("No se pudo guardar el estado de la partida.", false)
 		return false
 	var bytes: PackedByteArray = var_to_bytes(data)
-	var file := FileAccess.open(path + ".tmp", FileAccess.WRITE)
+	var file := FileAccess.open(filename + ".tmp", FileAccess.WRITE)
 	if file == null:
 		report("No se pudo guardar. Revisa el espacio disponible.", false)
 		return false
@@ -251,24 +238,23 @@ func save_game() -> bool:
 	file.flush()
 	var write_error: Error = file.get_error()
 	file.close()
-	if write_error != OK or read_file(path + ".tmp").is_empty():
+	if write_error != OK or read_file(filename + ".tmp").is_empty():
 		report("No se pudo completar el guardado.", false)
 		return false
-	if FileAccess.file_exists(path):
-		if not read_file(path).is_empty():
-			if FileAccess.file_exists(path + ".bak"): DirAccess.remove_absolute(path + ".bak")
-			if DirAccess.rename_absolute(path, path + ".bak") != OK:
+	if FileAccess.file_exists(filename):
+		if not read_file(filename).is_empty():
+			if FileAccess.file_exists(filename + ".bak"): DirAccess.remove_absolute(filename + ".bak")
+			if DirAccess.rename_absolute(filename, filename + ".bak") != OK:
 				report("No se pudo actualizar el guardado.", false)
 				return false
 		else:
-			if DirAccess.remove_absolute(path) != OK:
+			if DirAccess.remove_absolute(filename) != OK:
 				report("No se pudo actualizar el guardado.", false)
 				return false
-	if DirAccess.rename_absolute(path + ".tmp", path) != OK:
+	if DirAccess.rename_absolute(filename + ".tmp", filename) != OK:
 		# A complete prior save remains available through the backup.
 		report("No se pudo finalizar el guardado.", false)
 		return false
-	report("Partida guardada.", true)
 	return true
 
 func read_file(filename: String) -> Dictionary:
@@ -289,6 +275,65 @@ func read_file(filename: String) -> Dictionary:
 func read_save() -> Dictionary:
 	var data: Dictionary = read_file(path)
 	return read_file(path + ".bak") if data.is_empty() else data
+
+func valid_archive_id(value: Variant) -> bool:
+	if not value is String or value.is_empty() or value.length() > 64: return false
+	for character: String in value:
+		if character not in "abcdefghijklmnopqrstuvwxyz0123456789_": return false
+	return true
+
+func archive_directory(id: String) -> String:
+	return path + ".days/" + id
+
+func day_path(id: String, day: int) -> String:
+	return archive_directory(id).path_join("day_%06d.dat" % day)
+
+func read_day(id: String, day: int) -> Dictionary:
+	if not valid_archive_id(id) or day < 1 or day > 1000000: return {}
+	var data: Dictionary = read_file(day_path(id,day))
+	if data.is_empty(): data = read_file(day_path(id,day) + ".bak")
+	if data.is_empty() or data.get("archive_id","legacy") != id or data["cycle"]["day"] != day or data["cycle"]["is_night"] or data["cycle"]["defeated"]: return {}
+	return data
+
+func read_selection(action: String) -> Dictionary:
+	var latest: Dictionary = read_save()
+	if action == "continue" or latest.is_empty(): return latest if action == "continue" else {}
+	if not action.begins_with("day:"): return {}
+	var selected: String = action.trim_prefix("day:")
+	if not selected.is_valid_int(): return {}
+	var day: int = selected.to_int()
+	var data: Dictionary = read_day(str(latest.get("archive_id","legacy")),day)
+	if not data.is_empty(): return data
+	# Existing saves already contain their current morning, even before archiving.
+	var checkpoint: Dictionary = latest.get("day_checkpoint",{})
+	return checkpoint.duplicate(true) if not checkpoint.is_empty() and checkpoint["cycle"]["day"] == day else {}
+
+func list_saves() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var latest: Dictionary = read_save()
+	if latest.is_empty(): return result
+	result.append({"action":"continue","day":latest["cycle"]["day"],"coins":latest["coins"],"night":latest["cycle"]["is_night"],"saved_at":latest["saved_at"]})
+	var id: String = latest.get("archive_id","legacy")
+	var days: Dictionary = {}
+	var directory := DirAccess.open(archive_directory(id))
+	if directory != null:
+		for filename: String in directory.get_files():
+			if not filename.begins_with("day_"): continue
+			var name: String = filename.trim_suffix(".bak")
+			if not name.ends_with(".dat"): continue
+			var number_text: String = name.trim_prefix("day_").trim_suffix(".dat")
+			if number_text.is_valid_int(): days[number_text.to_int()] = true
+	if latest.has("day_checkpoint"): days[latest["day_checkpoint"]["cycle"]["day"]] = true
+	var ordered: Array = days.keys()
+	ordered.sort()
+	ordered.reverse()
+	for day: int in ordered:
+		var data: Dictionary = read_day(id,day)
+		if data.is_empty() and latest.has("day_checkpoint") and latest["day_checkpoint"]["cycle"]["day"] == day:
+			data = latest["day_checkpoint"]
+		if data.is_empty(): continue
+		result.append({"action":"day:%d" % day,"day":day,"coins":data["coins"],"night":false,"saved_at":data["saved_at"]})
+	return result
 
 func renamed_material(value: Variant) -> Variant:
 	if value is String: return value.replace("brass","copper")
@@ -455,6 +500,11 @@ func restore_snapshot(data: Dictionary) -> bool:
 	game.zombie_manager.queue_redraw()
 	game.redraw_world()
 	day_checkpoint = data["day_checkpoint"].duplicate(true) if data.has("day_checkpoint") else dawn_snapshot(snapshot(false))
+	var restored_id: String = data.get("archive_id","legacy")
+	if restored_id != archive_id: pending_days.clear()
+	archive_id = restored_id
+	day_checkpoint["archive_id"] = archive_id
+	pending_days[game.cycle.day] = day_checkpoint.duplicate(true)
 	restoring = false
 	return true
 
@@ -478,6 +528,7 @@ func dictionary_keys(data: Dictionary, names: Array) -> bool:
 
 func valid_snapshot(data: Dictionary) -> bool:
 	data = migrate_materials(data)
+	if not valid_archive_id(data.get("archive_id","legacy")): return false
 	if not data.get("reload_hint_seen",false) is bool: return false
 	if not data.get("combat_revision") is int or data.get("combat_revision") != 2: return false
 	if not data.get("compactor_revision") is int or data.get("compactor_revision") != 2: return false

@@ -1,0 +1,95 @@
+extends "res://tests/session_save.gd"
+
+func run_checks() -> void:
+	root.show()
+	game = load("res://main.tscn").instantiate()
+	root.add_child(game)
+	current_scene = game
+	await wait_new_scene(-1)
+	var old_id: int = game.get_instance_id()
+	await click(saves.start_screen.new_button)
+	await wait_new_scene(old_id)
+	await click(game.display_settings.auto_click_decline)
+	if game.get_node_or_null("IntroCinematic") != null: game.get_node("IntroCinematic").finish()
+	game.set_process(false)
+	game.cycle.skip_tutorial()
+	game.economy.coins = 222
+	game.mining.place_vein(Vector2i(14,0),1,"coal")
+	game.cycle.is_night = true
+	game.cycle.complete_night()
+	game.economy.coins = 333
+	game.cycle.is_night = true
+	game.cycle.complete_night()
+	game.economy.coins = 999
+	game.cycle.day_remaining = 123
+	await settle()
+	check(not FileAccess.file_exists(TEST_PATH) and saves.pending_days.size() == 3,"Three days remain in memory until the explicit save")
+	game.display_settings.open_menu()
+	await settle()
+	check(game.display_settings.save_button.text == "GUARDAR Y SALIR","Pause exposes the new Save and exit action")
+	await click(game.display_settings.save_button)
+	check(paused and not saves.playing and saves.start_screen.visible,"Save and exit pauses play and returns to the title")
+	check(saves.read_save()["coins"] == 999 and saves.read_save()["cycle"]["day_remaining"] == 123,"The latest slot preserves the exact mid-day state")
+	var id: String = saves.archive_id
+	check(saves.read_day(id,1)["coins"] == 100 and saves.read_day(id,2)["coins"] == 222 and saves.read_day(id,3)["coins"] == 333,"Separate day files preserve each morning independently")
+	check(saves.list_saves().size() == 4,"Catalog includes the latest save plus all three mornings")
+	await click(saves.start_screen.continue_button)
+	await settle()
+	check(saves.start_screen.load_page.visible and saves.start_screen.file_buttons.size() == 4,"Load game displays a selectable block for every saved file")
+	var first_card: Button = saves.start_screen.file_buttons["continue"]
+	var row: HBoxContainer = first_card.get_child(0)
+	var title: Label = row.get_child(1).get_child(0)
+	check(title.get_line_count() == 1 and first_card.get_global_rect().encloses(row.get_child(0).get_global_rect()),"File cards keep their titles on one line and icons inside the button")
+	if DisplayServer.get_name() != "headless":
+		root.get_texture().get_image().save_png("/tmp/day-archive-selector.png")
+	old_id = game.get_instance_id()
+	await click(saves.start_screen.file_buttons["day:2"])
+	await wait_new_scene(old_id)
+	game.set_process(false)
+	game.display_settings.open_menu()
+	check(saves.loaded_game and game.cycle.day == 2 and game.economy.coins == 222,"Clicking an older day loads that day's economy")
+	check(not game.cycle.is_night and game.cycle.day_remaining > 299 and game.cycle.day_remaining <= 300 and game.mining.coal_veins.size() == 1,"An archived day starts at 06:00 with its original mine")
+	check(saves.archive_id == id and saves.read_day(id,3)["coins"] == 333,"Loading an earlier day does not delete later archives")
+	game.economy.coins = 444
+	await click(game.display_settings.save_button)
+	check(saves.read_save()["coins"] == 444 and saves.read_save()["cycle"]["day"] == 2,"Saving after rewind replaces only the latest continuation")
+	check(saves.list_saves().size() == 4 and saves.read_day(id,2)["coins"] == 222,"Rewinding preserves the original morning and the complete day catalog")
+	await click(saves.start_screen.continue_button)
+	await settle()
+	old_id = game.get_instance_id()
+	await click(saves.start_screen.file_buttons["continue"])
+	await wait_new_scene(old_id)
+	game.set_process(false)
+	game.display_settings.open_menu()
+	check(game.economy.coins == 444 and game.cycle.day == 2,"Latest save resumes the rewound timeline instead of always loading the highest day")
+	var archive: Dictionary = saves.read_day(id,3)
+	check(saves.write_snapshot(saves.day_path(id,3),archive),"Day archives use the same atomic backup writer as the main save")
+	var damaged := FileAccess.open(saves.day_path(id,3),FileAccess.WRITE)
+	damaged.store_string("interrupted day file")
+	damaged.close()
+	check(saves.read_day(id,3)["coins"] == 333,"A damaged day file recovers its own backup")
+	var invalid: Dictionary = saves.snapshot()
+	invalid["archive_id"] = "../outside"
+	check(not saves.valid_snapshot(invalid) and saves.read_selection("day:../3").is_empty(),"Archive identifiers and day selections cannot escape their directory")
+	var modern: Dictionary = saves.read_save()
+	var legacy: Dictionary = modern.duplicate(true)
+	legacy.erase("archive_id")
+	legacy["day_checkpoint"].erase("archive_id")
+	check(saves.write_snapshot(TEST_PATH,legacy) and saves.list_saves().size() == 2,"Existing saves without a day archive still list the current save and their embedded morning")
+	check(saves.read_selection("day:2")["coins"] == 222,"The morning embedded in an existing save remains selectable")
+	check(saves.write_snapshot(TEST_PATH,modern),"The modern campaign catalog can be restored after legacy compatibility checks")
+	var good_path: String = saves.path
+	saves.path = "user://missing-archive-parent/slot.dat"
+	check(not saves.return_to_start() and saves.playing and game.display_settings.menu_open,"A failed save keeps the player in the paused game")
+	saves.path = good_path
+	check(saves.return_to_start(),"A failed save can be retried without losing the game")
+	await click(saves.start_screen.new_button)
+	old_id = game.get_instance_id()
+	await click(saves.start_screen.confirmation.get_child(2))
+	await wait_new_scene(old_id)
+	await click(game.display_settings.auto_click_decline)
+	if game.get_node_or_null("IntroCinematic") != null: game.get_node("IntroCinematic").finish()
+	check(saves.archive_id != id and saves.read_save()["coins"] == 444,"A new campaign uses a separate archive and does not overwrite the slot before saving")
+	check(saves.return_to_start() and saves.list_saves().size() == 2,"Saving the new campaign only lists its own current save and first morning")
+	print("RESULT: %d passed, %d failed; selectable daily archives" % [passed,failed])
+	quit(1 if failed else 0)

@@ -49,7 +49,7 @@ func run_checks() -> void:
 	await click(game.display_settings.auto_click_decline)
 	check(not game.display_settings.auto_click_prompt.visible and not game.display_settings.auto_click_enabled,"Manual mining choice closes the prompt")
 	check(saves.playing and game.economy.coins == 100 and game.cycle.tutorial_step == 0,"Nueva partida starts a fresh game with the normal initial gold and tutorial")
-	check(FileAccess.file_exists(TEST_PATH) and not saves.read_save().is_empty(),"A new game immediately creates a valid save")
+	check(not FileAccess.file_exists(TEST_PATH),"A new game waits for Save and exit before writing progress")
 	check(game.get_node_or_null("IntroCinematic") != null,"A fresh game retains the opening cinematic")
 	if game.get_node_or_null("IntroCinematic") != null: game.get_node("IntroCinematic").finish()
 	await settle()
@@ -57,11 +57,10 @@ func run_checks() -> void:
 	make_fixture()
 	check(saves.valid_snapshot(saves.snapshot()),"Every active factory and partial blueprint can be serialized")
 	await click(game.display_settings.save_button)
-	check(game.display_settings.save_status.text == "Partida guardada.","The pause-menu save button writes a save and confirms success")
+	check(game.display_settings.save_status.text == "Partida guardada.","Save and exit writes the save and confirms success")
 	original = saves.read_save()
 	check(original["coins"] == 4321 and original["grid"]["width"] == 7,"Saved money and mine expansion match the game")
-	check(FileAccess.file_exists(TEST_PATH+".bak"),"Saving again retains a prior complete backup")
-	await click(game.display_settings.title_button)
+	check(not FileAccess.file_exists(TEST_PATH+".bak"),"The first explicit save does not need a previous backup")
 	check(saves.start_screen.visible and paused and not saves.playing,"Pause can save and return to the main menu")
 	check(not saves.start_screen.continue_button.disabled and "4321" in saves.start_screen.summary.text,"Continuar summarizes the saved game")
 	await click(saves.start_screen.new_button)
@@ -70,6 +69,9 @@ func run_checks() -> void:
 	check(not saves.start_screen.confirmation.visible and saves.read_save()["coins"] == 4321,"Canceling a new game keeps the save intact")
 	old_id = game.get_instance_id()
 	await click(saves.start_screen.continue_button)
+	check(saves.start_screen.load_page.visible and saves.start_screen.file_buttons.has("continue"),"Load game opens a file selector before entering the game")
+	await settle()
+	await click(saves.start_screen.file_buttons["continue"])
 	await wait_new_scene(old_id)
 	game.display_settings.open_menu()
 	check(not game.display_settings.auto_click_prompt.visible,"Continuing a save does not repeat the new-game prompt")
@@ -179,11 +181,8 @@ func run_checks() -> void:
 	check(count[0] <= 1,"Repeated unchanged cycle signals do not cause save writes per frame")
 	var calls: int = count[0]
 	game.display_settings.close_menu()
-	saves.timer.wait_time = 0.1
-	saves.timer.start()
 	await create_timer(0.25).timeout
-	check(count[0] > calls,"The autosave timer writes automatically during play")
-	saves.timer.stop()
+	check(count[0] == calls,"Playing and milestone refreshes do not automatically overwrite a save")
 	# Victory can be resumed without paying or completing a night twice.
 	for zombie: Node in get_nodes_in_group("zombies"):
 		zombie.remove_from_group("zombies")
@@ -203,7 +202,7 @@ func run_checks() -> void:
 	if game.get_node_or_null("IntroCinematic") != null: game.get_node("IntroCinematic").finish()
 	await click(game.display_settings.auto_click_accept)
 	check(game.economy.coins == 100 and game.grid.cave_width == 3 and game.mining.coal_veins.is_empty() and game.progression.unlocked.is_empty(),"Confirming Nueva partida resets buildings, unlocks, money and cave size")
-	check(saves.read_save()["coins"] == 100 and saves.read_save()["cycle"]["day"] == 1,"The new slot contains the fresh game")
+	check(saves.return_to_start() and saves.read_save()["coins"] == 100 and saves.read_save()["cycle"]["day"] == 1,"Save and exit commits the fresh game to its own day archive")
 	print("RESULT: %d passed, %d failed; start screen and persistence" % [passed,failed])
 	quit(1 if failed else 0)
 
@@ -248,7 +247,7 @@ func make_fixture() -> void:
 	game.get_node("Construction").receive(Vector2i(18,2),"iron_ingot")
 	game.mining.items_for("coal_4")[Vector2i(15,4)] = 1
 	game.mining.items_for("gold_ingot_4")[Vector2i(18,4)] = 1
-	game.progression.unlocked = {"expansion":true,"copper":true,"iron":true,"furnace":true,"launcher":true,"straight":true}
+	game.progression.unlocked = {"expansion":true,"copper":true,"iron":true,"furnace":true,"launcher":true,"launcher_2":true,"straight":true}
 	game.progression.created_resources = {"coal_4":true,"copper_ingot_3":true}
 	game.progression.completed_veins = {"coal":true,"copper":true}
 	game.zombie_manager.base_health = 73

@@ -67,7 +67,7 @@ func run_checks() -> void:
 	await mouse_move(at)
 	await mouse_button(at,true)
 	await mouse_button(at,false)
-	check(not saves.read_save()["cycle"]["defeated"] and saves.read_save()["coins"] == 2588,"Retry immediately persists the restored morning instead of the defeat")
+	check(saves.read_save()["cycle"]["defeated"],"Retry waits for Save and exit before replacing the saved defeat")
 	check(game.cycle.day == 3 and not game.cycle.defeated and not game.cycle.is_night and game.cycle.day_remaining == 300,"The actual retry button starts the same day with five preparation minutes")
 	check(game.phase_clock.time_label.text == "06:00" and game.economy.coins == 2588 and wave.base_health == 72,"Retry restores 06:00, money and the health present at dawn")
 	check(game.mining.vein_level(Vector2i(14,0)) == 4 and game.mining.items_for("copper_ingot_3").get(Vector2i(15,1)) == 1,"Retry restores vein levels and resources spent during the day")
