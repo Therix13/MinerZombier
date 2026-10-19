@@ -103,9 +103,7 @@ func inventory() -> Dictionary:
 		"saw": return game.get_node("Saws").stored_items(cell)
 		"furnace": return game.get_node("Furnaces").stored_items(cell)
 		"launcher": items = game.get("launchers").launchers[cell]["ammo"]
-		"compactor":
-			var data: Dictionary = game.get_node("Compactors").machines[cell]
-			for index in range(int(data["count"])): items.append(data["kind"])
+		"compactor": return game.get_node("Compactors").stored_items(cell)
 	var result: Dictionary = {}
 	for item: String in items: result[item] = int(result.get(item, 0)) + 1
 	return result
@@ -135,8 +133,8 @@ func refresh() -> void:
 			if not str(data["input"]).is_empty(): status.text += " · %.1f / 4 s" % float(data["elapsed"])
 		"compactor":
 			var data: Dictionary = game.get_node("Compactors").machines[cell]
-			status.text = "Compactador"
-			if int(data["count"]) == 2: status.text += " · %.1f / 4 s" % float(data["elapsed"])
+			status.text = "Compactador · %d / 8 puntos" % int(data["points"])
+			if int(data["points"]) >= 8: status.text += "\n%.1f / %.0f s" % [float(data["elapsed"]),game.get_node("Compactors").process_time(data)]
 		"launcher":
 			var level: int = game.get("launchers").level_at(cell)
 			status.text = "Lanzapepitas · Nv. %d" % level
@@ -235,11 +233,7 @@ func withdraw(item: String) -> bool:
 		"furnace":
 			if not game.get_node("Furnaces").remove_material(cell, item): return false
 		"compactor":
-			var machine: Node = game.get_node("Compactors")
-			machine.machines[cell]["count"] = int(machine.machines[cell]["count"]) - 1
-			machine.machines[cell]["elapsed"] = 0.0
-			if int(machine.machines[cell]["count"]) == 0: machine.machines[cell]["kind"] = ""
-			machine.changed.emit()
+			if not game.get_node("Compactors").remove_material(cell,item): return false
 		"launcher":
 			var ammo: Array = game.get("launchers").launchers[cell]["ammo"]
 			ammo.remove_at(ammo.find(item))

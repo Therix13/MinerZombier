@@ -188,7 +188,7 @@ func _process(delta: float) -> void:
 		machine_beat = beat
 		for cell: Vector2i in game.get_node("Compactors").machines:
 			var data: Dictionary = game.get_node("Compactors").machines[cell]
-			if int(data["count"]) == 2 and float(data["elapsed"]) < 4: request_sound("press")
+			if game.get_node("Compactors").is_compacting(data): request_sound("press")
 		for cell: Vector2i in game.get_node("Furnaces").machines:
 			if game.get_node("Furnaces").machines[cell].get("burning", false): request_sound("fire")
 	for kind: String in pending:
@@ -203,7 +203,7 @@ func _process(delta: float) -> void:
 	var animated_machinery: bool = not game.get("conveyors").belts.is_empty() or not game.get("drills").drills.is_empty()
 	if not animated_machinery:
 		for machine: Dictionary in game.get_node("Compactors").machines.values():
-			if int(machine["count"]) == 2 and float(machine["elapsed"]) < 4: animated_machinery = true; break
+			if game.get_node("Compactors").is_compacting(machine): animated_machinery = true; break
 	if not animated_machinery:
 		for machine: Dictionary in game.get_node("Furnaces").machines.values():
 			if machine.get("burning",false): animated_machinery = true; break
@@ -250,9 +250,9 @@ func _draw() -> void:
 	for cell: Vector2i in game.get_node("Compactors").machines:
 		if hidden_for_drag(cell): continue
 		var data: Dictionary = game.get_node("Compactors").machines[cell]
-		if int(data["count"]) != 2 or float(data["elapsed"]) >= 4: continue
+		if not game.get_node("Compactors").is_compacting(data): continue
 		var center: Vector2 = grid.get_cell_rect(cell).get_center()
-		var gap: float = 6 - 3 * cos(clock / BEAT * TAU)
+		var gap: float = 6 - 3 * cos(clock / BEAT * TAU * (4.0 / game.get_node("Compactors").process_time(data)))
 		for sign_value in [-1, 1]: draw_rect(Rect2(center + Vector2(-12, gap * sign_value - 1), Vector2(24, 3)), Color("#e2bd70"))
 	for cell: Vector2i in game.get_node("Furnaces").machines:
 		if hidden_for_drag(cell): continue

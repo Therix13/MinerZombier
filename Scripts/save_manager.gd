@@ -5,7 +5,7 @@ signal status_changed(message: String, success: bool)
 const StartScreenScript = preload("res://Scripts/start_screen.gd")
 const ZombieScript = preload("res://Scripts/zombie.gd")
 const VERSION := 1
-const TUTORIAL_REVISION := 2
+const TUTORIAL_REVISION := 3
 const DEFAULT_PATH := "user://savegame.dat"
 const SESSION_ACTION: StringName = &"mine_defense_session_action"
 const SKIP_START: StringName = &"mine_defense_skip_start_screen"
@@ -153,7 +153,7 @@ func snapshot() -> Dictionary:
 	camera_data["position"] = game.camera.position
 	camera_data["zoom"] = game.camera.zoom.x
 	return {
-		"version": VERSION, "tutorial_revision": TUTORIAL_REVISION, "material_revision": 2, "saved_at": int(Time.get_unix_time_from_system()),
+		"version": VERSION, "tutorial_revision": TUTORIAL_REVISION, "material_revision": 2, "compactor_revision": 2, "saved_at": int(Time.get_unix_time_from_system()),
 		"coins": game.economy.coins, "developer_mode": game.economy.developer_mode,
 		"grid": {"width": game.grid.cave_width, "height": game.grid.cave_height, "platforms": not game.grid.defense_tiles.is_empty()},
 		"veins": veins, "resources": game.mining.nugget_stores().duplicate(true),
@@ -246,7 +246,7 @@ func renamed_material(value: Variant) -> Variant:
 	return value
 
 func migrate_materials(data: Dictionary) -> Dictionary:
-	if data.get("material_revision",1) != 1: return data
+	if data.get("material_revision",1) != 1: return migrate_compactors(data)
 	var result: Dictionary = renamed_material(data)
 	# Previously built copper weapons retain their finished tier-two version.
 	if result.get("launchers") is Dictionary:
@@ -256,6 +256,23 @@ func migrate_materials(data: Dictionary) -> Dictionary:
 		for plan: Variant in result["blueprints"].values():
 			if plan is Dictionary and plan.get("item") == "launcher": plan["item"] = "launcher_2"
 	result["material_revision"] = 2
+	return migrate_compactors(result)
+
+func migrate_compactors(data: Dictionary) -> Dictionary:
+	if data.get("compactor_revision",1) != 1: return data
+	var result: Dictionary = data.duplicate(true)
+	if result.get("compactors") is Dictionary:
+		var manager: Node = game.get_node("Compactors")
+		for machine: Variant in result["compactors"].values():
+			if not machine is Dictionary or machine.has("points"): continue
+			var kind: String = str(machine.get("kind",""))
+			var count: int = int(machine.get("count",0))
+			machine["inventory"] = {kind:count} if count > 0 else {}
+			machine["points"] = manager.input_points(kind) * count
+			machine["kind"] = manager.family(kind) if count > 0 else ""
+			machine["elapsed"] = minf(float(machine.get("elapsed",0)),manager.process_time(machine)) if machine["points"] >= manager.REQUIRED_POINTS else 0.0
+			machine.erase("count")
+	result["compactor_revision"] = 2
 	return result
 
 func restore_snapshot(data: Dictionary) -> bool:
@@ -295,11 +312,14 @@ func restore_snapshot(data: Dictionary) -> bool:
 	for key: String in CYCLE_FIELDS:
 		game.cycle.set(key,data["cycle"].get(key,tutorial_defaults.get(key,game.cycle.get(key))))
 	# Revision 2 inserts expansion between ingot fusion and the defense lessons.
-	if int(data.get("tutorial_revision",1)) < TUTORIAL_REVISION and game.cycle.tutorial_step >= 11:
+	if int(data.get("tutorial_revision",1)) < 2 and game.cycle.tutorial_step >= 11:
 		if game.cycle.day == 1 and not game.cycle.is_night and not game.cycle.tutorial_skipped and game.cycle.tutorial_step < 15 and game.grid.cave_width < 7:
 			game.cycle.tutorial_step = 11
 		else:
 			game.cycle.tutorial_step += 1
+	# Revision 3 merges the redundant weapon purchase lesson into ammunition.
+	if int(data.get("tutorial_revision",1)) < 3 and game.cycle.tutorial_step >= 14:
+		game.cycle.tutorial_step -= 1
 	for enemy: Node in get_tree().get_nodes_in_group("zombies"):
 		if game.is_ancestor_of(enemy):
 			enemy.remove_from_group("zombies")
@@ -362,8 +382,9 @@ func dictionary_keys(data: Dictionary, names: Array) -> bool:
 
 func valid_snapshot(data: Dictionary) -> bool:
 	data = migrate_materials(data)
+	if not data.get("compactor_revision") is int or data.get("compactor_revision") != 2: return false
 	if not data.get("material_revision") is int or data.get("material_revision") != 2: return false
-	if not data.get("tutorial_revision",1) is int or data.get("tutorial_revision",1) not in [1,TUTORIAL_REVISION]: return false
+	if not data.get("tutorial_revision",1) is int or data.get("tutorial_revision",1) not in [1,2,TUTORIAL_REVISION]: return false
 	if data.get("version") != VERSION or not number(data.get("saved_at"),0,1e12) or not number(data.get("coins"),0,1e12) or not data.get("developer_mode") is bool: return false
 	if not dictionary_keys(data,["grid","veins","resources","belts","junctions","drills","launchers","compactors","furnaces","saws","blueprints","progression","cycle","wave","camera"]): return false
 	var map: Dictionary = data["grid"]
@@ -407,7 +428,17 @@ func valid_snapshot(data: Dictionary) -> bool:
 				continue
 			if not number(machine.get("elapsed"),0,4): return false
 			if key == "compactors":
-				if machine.get("kind") not in [""] + game.mining.ORE_KINDS or not number(machine.get("count"),0,2): return false
+				var compactors: Node = game.get_node("Compactors")
+				if not machine.get("points") is int or not number(machine.get("points"),0,compactors.MAX_POINTS) or not machine.get("inventory") is Dictionary: return false
+				var points: int = 0
+				for item: Variant in machine["inventory"]:
+					if not item is String or compactors.input_points(item) == 0 or compactors.family(item) != machine.get("kind"): return false
+					var count: Variant = machine["inventory"][item]
+					if not count is int or not number(count,1,15): return false
+					points += compactors.input_points(item) * count
+				if points != machine["points"] or (points == 0 and machine.get("kind") != ""): return false
+				if points < 8 and machine["elapsed"] != 0.0: return false
+				if points >= 8 and machine["elapsed"] > compactors.process_time(machine): return false
 			else:
 				if machine.get("input") not in [""] + game.mining.ORE_KINDS or machine.get("output") not in [""] + game.mining.ORE_KINDS: return false
 				if key == "furnaces" and (not number(machine.get("fuel"),0,40) or not machine.get("burning") is bool): return false
@@ -425,7 +456,7 @@ func valid_snapshot(data: Dictionary) -> bool:
 	var cycle: Dictionary = data["cycle"]
 	for key: String in CYCLE_FIELDS:
 		if key not in ["copper_ingot_created","copper_ingot_3_created"] and not cycle.has(key): return false
-	if not number(cycle["day"],1,1e6) or not number(cycle["tutorial_step"],0,game.cycle.TUTORIAL_LAST_STEP) or not number(cycle["coal_sold"],0,1e12) or not cycle["funded_steps"] is Dictionary: return false
+	if not number(cycle["day"],1,1e6) or not number(cycle["tutorial_step"],0,16 if data.get("tutorial_revision",1) == 2 else game.cycle.TUTORIAL_LAST_STEP) or not number(cycle["coal_sold"],0,1e12) or not cycle["funded_steps"] is Dictionary: return false
 	for key: String in CYCLE_FIELDS:
 		if key in ["day","tutorial_step","coal_sold","funded_steps"] or (key in ["copper_ingot_created","copper_ingot_3_created"] and not cycle.has(key)): continue
 		if key.ends_with("_cell"):

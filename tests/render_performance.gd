@@ -27,7 +27,7 @@ func run_checks() -> void:
 	await settle()
 	check(renderer.ground_rebuilds == rebuilds + 1, "Expanding the base invalidates terrain exactly once")
 	var atlas: GDScript = load("res://Scripts/art_atlas.gd")
-	check(atlas.prepare() and atlas.KEYS.size() == 93 and atlas.regions.size() == 93, "All 93 original artwork states share one prepared atlas")
+	check(atlas.prepare() and atlas.KEYS.size() == 109 and atlas.regions.size() == 109, "All 109 artwork states share one prepared atlas")
 	var atlas_image: Image = atlas.texture.get_image()
 	for key: String in atlas.KEYS:
 		var region: Rect2 = atlas.regions[key]
@@ -45,8 +45,8 @@ func run_checks() -> void:
 		game.conveyors.place(Vector2i(13, row), 1)
 		game.conveyors.place(Vector2i(14, row), 1)
 		compactors.place(Vector2i(15, row), 1)
-		compactors.receive(Vector2i(15, row), "copper")
-		compactors.receive(Vector2i(15, row), "copper")
+		compactors.receive(Vector2i(15, row), "copper_3")
+		compactors.receive(Vector2i(15, row), "copper_3")
 		furnace.place(Vector2i(16, row), 1)
 		furnace.receive(Vector2i(16, row), "coal_4")
 		furnace.receive(Vector2i(16, row), "copper_4")

@@ -121,7 +121,7 @@ func run_checks() -> void:
 	Engine.max_fps = 0
 	cycle = game.cycle
 	grid = game.grid
-	check(cycle.TUTORIAL_DISPLAY_STEPS == 16 and game.economy.coins == 100,"Sixteen lessons start with exactly 100 gold")
+	check(cycle.TUTORIAL_DISPLAY_STEPS == 15 and game.economy.coins == 100,"Fifteen lessons start with exactly 100 gold")
 	check(not game.get_node("WorldInteractions").select_item("copper"),"Copper stays locked until a level-four coal vein is created")
 	await purchase_route("VETAS","coal")
 	await click_cell(cycle.coal_cell)
@@ -181,9 +181,9 @@ func run_checks() -> void:
 	await fund_goal(500)
 	await purchase_route("DEFENSA","launcher")
 	await click_cell(grid.defense_cell("left"))
-	check(cycle.tutorial_step == 14 and cycle.launcher_ready() and not game.get_node("Construction").plans.has(grid.defense_cell("left")),"The 500-gold rusty launcher is immediately ready without materials")
-	await finish_workshop_step(14)
-	check(cycle.tutorial_step == 15 and cycle.launcher_full(),"Five real level-one nuggets fill its ammunition slots")
+	check(cycle.tutorial_step == 13 and cycle.launcher_ready() and not game.get_node("Construction").plans.has(grid.defense_cell("left")),"The 500-gold rusty launcher is immediately ready without materials")
+	await finish_workshop_step(13)
+	check(cycle.tutorial_step == 14 and cycle.launcher_full(),"Five real level-one nuggets fill its ammunition slots")
 	check(cycle.is_tutorial_active() and not cycle.is_night and shop.cycle_action.visible,"The final lesson waits for the player to start night one")
 	await action_button()
 	await settle()

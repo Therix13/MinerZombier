@@ -45,7 +45,7 @@ func run_checks() -> void:
 	check(saves.restore_snapshot(legacy) and not game.cycle.is_tutorial_active(), "Completed legacy tutorials stay completed")
 	var updated: Dictionary = saves.snapshot()
 	updated["cycle"]["tutorial_step"] = 12
-	check(updated["tutorial_revision"] == 2 and saves.restore_snapshot(updated) and game.cycle.tutorial_step == 12, "New saves keep their exact lesson on reload")
+	check(updated["tutorial_revision"] == 3 and saves.restore_snapshot(updated) and game.cycle.tutorial_step == 12, "New saves keep their exact lesson on reload")
 	updated["tutorial_revision"] = 999
 	check(not saves.valid_snapshot(updated), "Unknown tutorial revisions are rejected")
 	print("Expansion tutorial saves: %d passed, %d failed" % [passed,failed])

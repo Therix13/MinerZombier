@@ -16,11 +16,11 @@ const TUTORIAL_TITLES := [
 	"Una veta de nivel 3", "Una veta de nivel 4", "El siguiente mineral",
 	"Tu primera veta de cobre", "Construye un horno", "Enciende el horno",
 	"Tu primer lingote", "Lingotes hasta nivel 3", "Compra la expansión", "Compra las defensas",
-	"Construye un lanzapepitas", "Carga la munición", "Comienza la primera noche",
+	"Carga la munición", "Comienza la primera noche",
 	"¡Tutorial completado!",
 ]
-const TUTORIAL_LAST_STEP: int = 16
-const TUTORIAL_DISPLAY_STEPS: int = 16
+const TUTORIAL_LAST_STEP: int = 15
+const TUTORIAL_DISPLAY_STEPS: int = 15
 
 # A budget stays earned while the player places its batch of veins.
 var funded_steps: Dictionary = {}
@@ -116,7 +116,10 @@ func next_vein_cell() -> Vector2i:
 	return Vector2i(-999,-999)
 
 func needs_ammo_vein() -> bool:
-	return false
+	if not launcher_ready() or launcher_full() or ammo_vein() != Vector2i(-999,-999): return false
+	for material: String in ["coal","copper"]:
+		if not mining.items_for(material).is_empty(): return false
+	return true
 
 func tutorial_mining_cell() -> Vector2i:
 	return coal_cell
@@ -191,8 +194,8 @@ func tutorial_purchase_price() -> int:
 	if tutorial_step == 11: return 0 if grid.cave_width >= 7 else economy.EXPANSION_PRICE
 	if tutorial_step == 12: return 0 if platforms_ready() else economy.DEFENSE_TILE_PRICE
 	if tutorial_step == 13:
-		return 0 if launcher_ready() or launcher_blueprint_cell() != Vector2i(-999,-999) else economy.LAUNCHER_PRICE
-	if tutorial_step == 14 and ammo_vein() == Vector2i(-999,-999): return economy.COAL_VEIN_PRICE
+		if launchers.launchers.is_empty() and launcher_blueprint_cell() == Vector2i(-999,-999): return economy.LAUNCHER_PRICE
+		if needs_ammo_vein(): return economy.COAL_VEIN_PRICE
 	return 0
 
 func needs_tutorial_income() -> bool:
@@ -277,8 +280,7 @@ func refresh_tutorial() -> void:
 			10: completed = copper_ingot_3_created
 			11: completed = grid.cave_width >= 7
 			12: completed = platforms_ready()
-			13: completed = launcher_ready()
-			14: completed = launcher_full()
+			13: completed = launcher_full()
 		if not completed: break
 		tutorial_step += 1
 	refreshing_tutorial = false
@@ -335,12 +337,13 @@ func tutorial_text() -> String:
 	if tutorial_step == 12:
 		return "Reúne 1000 de oro para las plataformas." if needs_tutorial_income() else "Compra las plataformas de defensa."
 	if tutorial_step == 13:
+		if needs_ammo_vein(): return "Reúne 100 de oro para una veta de carbón Nv. 1." if needs_tutorial_income() else "Compra una veta de carbón Nv. 1 para munición."
 		if needs_tutorial_income(): return "Reúne 500 de oro para el lanzapepitas."
 		if launcher_blueprint_cell() != Vector2i(-999,-999): return "Entrega un lingote de cobre Nv. 3 y uno Nv. 1."
-		if not launchers.launchers.is_empty(): return "Mueve el lanzapepitas a una plataforma."
+		if launcher_ready(): return "Llena el lanzapepitas con 5 pepitas Nv. 1."
+		if not launchers.launchers.is_empty(): return "Mueve tu lanzapepitas a una plataforma."
 		return "Coloca el lanzapepitas Nv. 1 en una plataforma."
-	if tutorial_step == 14: return "Llena el lanzapepitas con 5 pepitas Nv. 1."
-	if tutorial_step == 15: return "Pulsa INICIAR NOCHE."
+	if tutorial_step == 14: return "Pulsa INICIAR NOCHE."
 	return "¡Tutorial completado!"
 
 func income_instruction() -> String:
@@ -399,10 +402,10 @@ func workshop_targets() -> Array[Vector2i]:
 		if plan != Vector2i(-999,-999):
 			var delivered: Dictionary = mining.construction.plans[plan]["delivered"]
 			return ingot_targets(3,plan) if int(delivered.get("copper_ingot_3",0)) < 1 else ingot_targets(1,plan)
+		if launcher_ready(): return ammo_targets()
 		for cell: Vector2i in launchers.launchers:
-			if not launchers.is_active_position(cell): return [cell,grid.defense_cell("left")]
+			return [cell,grid.defense_cell("left")]
 		return [grid.defense_cell("left")]
-	if tutorial_step == 14: return ammo_targets()
 	return []
 
 func launcher_ready() -> bool:
@@ -480,7 +483,7 @@ func needs_defense_warning() -> bool:
 	return day == 4 and not is_night and not defeated and launchers.launchers.size() < 2
 
 func can_start_night() -> bool:
-	if is_tutorial_active() and (tutorial_step < 15 or not launcher_full()): return false
+	if is_tutorial_active() and (tutorial_step < 14 or not launcher_full()): return false
 	return not is_night and not defeated and not launchers.launchers.is_empty() and has_ammo()
 
 func start_night() -> bool:

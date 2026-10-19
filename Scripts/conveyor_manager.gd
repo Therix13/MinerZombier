@@ -141,16 +141,8 @@ func tick() -> void:
 				transfers.append({"source": candidate["source"], "destination": destination, "kind": candidate["kind"]})
 			continue
 		if mining.occupied_by_compactor(destination):
-			var machine: Dictionary = mining.compactors.machines[destination]
-			var remaining: int = mining.compactors.INPUT_COUNT - int(machine["count"])
-			var material: String = machine["kind"]
-			# Each incoming belt may deliver on this tick, up to the batch capacity.
-			for candidate in candidates:
-				if remaining <= 0: break
-				if not material.is_empty() and candidate["kind"] != material: continue
-				material = candidate["kind"]
-				transfers.append({"source": candidate["source"], "destination": destination, "kind": material})
-				remaining -= 1
+			for candidate: Dictionary in mining.compactors.plan_inputs(destination,candidates):
+				transfers.append({"source":candidate["source"],"destination":destination,"kind":candidate["kind"]})
 			continue
 		var selected: Dictionary = candidates[0]
 		if belt_shape(destination) == JUNCTION:

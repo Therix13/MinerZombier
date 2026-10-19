@@ -575,7 +575,7 @@ func tutorial_purchase() -> Dictionary:
 		return {"category":"DEFENSA","item":"defense_platforms","instruction":"Compra las plataformas."}
 	if cycle.tutorial_step == 13 and not cycle.launcher_ready() and cycle.launcher_blueprint_cell() == Vector2i(-999,-999) and cycle.launchers.launchers.is_empty() and not game.get("placing_launcher"):
 		return {"category":"DEFENSA","item":"launcher","instruction":"Elige el lanzapepitas."}
-	if cycle.tutorial_step == 14 and cycle.ammo_vein() == Vector2i(-999,-999) and not game.get("placing_coal"):
+	if cycle.tutorial_step == 13 and cycle.needs_ammo_vein() and not game.get("placing_coal"):
 		return {"category":"VETAS","item":"coal","instruction":"Compra una veta de carbón Nv. 1 para munición."}
 	if cycle.tutorial_step == 6 and not game.get("placing_copper"):
 		return {"category":"VETAS","item":"copper","instruction":"Elige la veta de cobre."}
@@ -594,7 +594,7 @@ func tutorial_navigation_text() -> String:
 	return purchase["instruction"]
 
 func tutorial_ui_target() -> Control:
-	if cycle != null and cycle.is_tutorial_active() and cycle.tutorial_step == 15: return cycle_action
+	if cycle != null and cycle.is_tutorial_active() and cycle.tutorial_step == 14: return cycle_action
 	var purchase: Dictionary = tutorial_purchase()
 	if purchase.is_empty() or shop_animating: return null
 	if not shop_open: return shop_button
@@ -989,6 +989,7 @@ func refresh_item_buttons() -> void:
 		button.tooltip_text = item_buttons[item].get("name", item)
 		var construction: Node = get_parent().get_parent().get_node_or_null("Construction")
 		if construction != null and construction.has_recipe(item): button.tooltip_text += "\n" + construction.recipe_text(item)
+		if item == "compactor": button.tooltip_text += "\nAcumula 8 puntos para producir Nv. 4. Nv. 1/2/3/4: 1/2/4/8 puntos. Conserva el sobrante. Nv. 4: 1 s; otros: 4 s."
 		if item == "furnace": button.tooltip_text += "\nCarbón Nv. 1 / 2 / 3 / 4: aporta 1 / 3 / 8 / 20 de combustible. Capacidad: 40."
 		if item == "launcher": button.tooltip_text += "\nDispara solo en las plataformas de defensa. Munición: pepitas Nv. 1.\nFusiona dos Nv. 1 para crear el plano de Nv. 2. Sin materiales para Nv. 1."
 
@@ -1128,7 +1129,7 @@ class CompactorArt extends "res://Scripts/compactor_manager.gd":
 		set_process_unhandled_input(false)
 
 	func _draw() -> void:
-		draw_machine(Vector2.ZERO, {"direction": 0, "kind": "", "count": 0})
+		draw_machine(Vector2.ZERO, {"direction": 0, "kind": "", "points": 0, "inventory": {}})
 
 class ItemArt extends "res://Scripts/world_renderer.gd":
 	var kind := "coal"

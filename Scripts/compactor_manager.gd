@@ -6,7 +6,9 @@ var rasterizing: bool = false
 signal changed
 
 const PRICE: int = 300
-const INPUT_COUNT: int = 2
+const REQUIRED_POINTS: int = 8
+const MAX_POINTS: int = 15
+const FAST_PROCESS_TIME: float = 1.0
 const PROCESS_TIME: float = 4.0
 const DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 
@@ -45,49 +47,104 @@ func can_place(cell: Vector2i) -> bool:
 
 func place(cell: Vector2i, output_direction: int) -> bool:
 	if not can_place(cell): return false
-	machines[cell] = {"direction": posmod(output_direction, 4), "kind": "", "count": 0, "elapsed": 0.0}
+	machines[cell] = {"direction": posmod(output_direction, 4), "kind": "", "points": 0, "inventory": {}, "elapsed": 0.0}
 	changed.emit()
 	return true
+
+func family(kind: String) -> String:
+	if kind not in mining.ORE_KINDS: return ""
+	var suffix: String = kind.get_slice("_",kind.get_slice_count("_") - 1)
+	return kind.trim_suffix("_" + suffix) if suffix.is_valid_int() else kind
+
+func input_points(kind: String) -> int:
+	return 0 if family(kind).is_empty() else 1 << (mining.ore_level(kind) - 1)
+
+func process_time(data: Dictionary) -> float:
+	return FAST_PROCESS_TIME if int(data.get("inventory",{}).get(str(data["kind"]) + "_4",0)) > 0 else PROCESS_TIME
+
+func is_compacting(data: Dictionary) -> bool:
+	return int(data["points"]) >= REQUIRED_POINTS and float(data["elapsed"]) < process_time(data)
+
+func accepts(data: Dictionary, kind: String) -> bool:
+	var material: String = family(kind)
+	return not material.is_empty() and int(data["points"]) < REQUIRED_POINTS and (data["kind"] == "" or data["kind"] == material)
 
 func can_receive(cell: Vector2i, kind: String) -> bool:
-	if not machines.has(cell) or mining.next_tier(kind).is_empty(): return false
-	var data: Dictionary = machines[cell]
-	return int(data["count"]) < INPUT_COUNT and (data["kind"] == "" or data["kind"] == kind)
+	return machines.has(cell) and accepts(machines[cell],kind)
 
 func receive(cell: Vector2i, kind: String) -> bool:
-	if not can_receive(cell, kind): return false
-	machines[cell]["kind"] = kind
-	machines[cell]["count"] = int(machines[cell]["count"]) + 1
-	if int(machines[cell]["count"]) == INPUT_COUNT: machines[cell]["elapsed"] = 0.0
+	if not can_receive(cell,kind): return false
+	var data: Dictionary = machines[cell]
+	data["kind"] = family(kind)
+	data["points"] = int(data["points"]) + input_points(kind)
+	data["inventory"][kind] = int(data["inventory"].get(kind,0)) + 1
 	changed.emit()
 	return true
+
+func plan_inputs(cell: Vector2i, candidates: Array) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var reserved: Dictionary = machines[cell].duplicate(true)
+	for candidate: Dictionary in candidates:
+		var kind: String = candidate["kind"]
+		if not accepts(reserved,kind): continue
+		result.append(candidate)
+		reserved["kind"] = family(kind)
+		reserved["points"] = int(reserved["points"]) + input_points(kind)
+	return result
+
+func stored_items(cell: Vector2i) -> Dictionary:
+	return machines[cell]["inventory"].duplicate()
+
+func remove_material(cell: Vector2i, kind: String) -> bool:
+	if not machines.has(cell): return false
+	var data: Dictionary = machines[cell]
+	if int(data["inventory"].get(kind,0)) <= 0: return false
+	data["inventory"][kind] -= 1
+	if data["inventory"][kind] == 0: data["inventory"].erase(kind)
+	data["points"] -= input_points(kind)
+	data["elapsed"] = 0.0
+	if data["points"] == 0: data["kind"] = ""
+	changed.emit()
+	return true
+
+func consume_cycle(data: Dictionary) -> void:
+	var remaining: int = REQUIRED_POINTS
+	for tier in range(4,0,-1):
+		var kind: String = str(data["kind"]) + ("_" + str(tier) if tier > 1 else "")
+		var units: int = 1 << (tier - 1)
+		var used: int = mini(int(data["inventory"].get(kind,0)),remaining / units)
+		if used == 0: continue
+		data["inventory"][kind] -= used
+		if data["inventory"][kind] == 0: data["inventory"].erase(kind)
+		remaining -= used * units
+	data["points"] -= REQUIRED_POINTS
+	data["elapsed"] = 0.0
+	if data["points"] == 0: data["kind"] = ""
 
 func process_outputs(delta: float = 0.0) -> void:
 	for cell: Vector2i in machines:
 		var data: Dictionary = machines[cell]
-		if int(data["count"]) != INPUT_COUNT: continue
-		data["elapsed"] = minf(PROCESS_TIME, float(data.get("elapsed", 0.0)) + maxf(delta, 0.0))
-		queue_redraw()
-		if float(data["elapsed"]) < PROCESS_TIME: continue
+		if int(data["points"]) < REQUIRED_POINTS: continue
+		var duration: float = process_time(data)
+		var previous_time: float = float(data["elapsed"])
+		data["elapsed"] = minf(duration,previous_time + maxf(delta,0.0))
+		if data["elapsed"] != previous_time: queue_redraw()
+		if float(data["elapsed"]) < duration: continue
 		var destination: Vector2i = cell + DIRECTIONS[int(data["direction"])]
-		var kind: String = mining.next_tier(str(data["kind"]))
+		var kind: String = str(data["kind"]) + "_4"
 		var launchers: RefCounted = game.get("launchers")
 		var belts: RefCounted = game.get("conveyors")
 		if destination == grid.sale_cell:
-			data["count"] = 0
-			data["kind"] = ""
+			consume_cycle(data)
 			mining.sale_completed.emit(kind)
-		elif launchers.can_receive(destination, kind):
-			if not launchers.receive(destination, kind): continue
-			data["count"] = 0
-			data["kind"] = ""
-		elif mining.can_move_nugget(destination) and (not belts.belts.has(destination) or belts.accepts_from(destination, cell)):
+		elif launchers.can_receive(destination,kind):
+			if not launchers.receive(destination,kind): continue
+			consume_cycle(data)
+		elif mining.can_move_nugget(destination) and (not belts.belts.has(destination) or belts.accepts_from(destination,cell)):
 			mining.items_for(kind)[destination] = 1
-			data["count"] = 0
-			data["kind"] = ""
+			consume_cycle(data)
 		else:
 			continue
-		data["elapsed"] = 0.0
 		mining.resource_created.emit(kind)
 		mining.fusion_completed.emit(kind)
 		mining.changed.emit()
@@ -139,7 +196,7 @@ func _draw() -> void:
 		draw_machine(grid.get_cell_rect(cell).get_center(), machines[cell])
 	if placing and not game.get("shop").shop_open and not game.get("shop").shop_animating:
 		var cell: Vector2i = grid.world_to_cell(game.get_local_mouse_position())
-		draw_machine(grid.get_cell_rect(cell).get_center(), {"direction": direction, "count": 0, "kind": ""})
+		draw_machine(grid.get_cell_rect(cell).get_center(), {"direction": direction, "points": 0, "inventory": {}, "kind": ""})
 		draw_rect(grid.get_cell_rect(cell).grow(-1), Color("#f0c777") if can_place(cell) else Color("#df7770"), false, 2)
 	if game.get("dragging_object") and game.get("held_object_type") == "compactor" and machines.has(game.get("held_object_cell")):
 		var data: Dictionary = machines[game.get("held_object_cell")].duplicate()
@@ -157,14 +214,15 @@ func draw_machine(center: Vector2, data: Dictionary) -> void:
 		draw_rect(Rect2(center + Vector2(-12, 6), Vector2(24, 5)), Color("#c2a064"))
 		draw_line(center + Vector2(-16, -9), center + Vector2(-16, 10), Color("#333c40"), 4)
 		draw_line(center + Vector2(16, -9), center + Vector2(16, 10), Color("#333c40"), 4)
-	var count: int = int(data["count"])
-	for index in range(INPUT_COUNT):
-		draw_circle(center + Vector2(-5 + index * 10, 16), 2, Color("#eac978") if index < count else Color("#303638"))
-	if count > 0:
-		draw_circle(center + Vector2(0, -1), 5, Color("#dbb36b") if str(data["kind"]).begins_with("copper") else Color("#29292d"))
-	if count == INPUT_COUNT:
-		draw_rect(Rect2(center + Vector2(-12, -3), Vector2(24, 4)), Color("#303638"))
-		draw_rect(Rect2(center + Vector2(-12, -3), Vector2(24 * clampf(float(data.get("elapsed", 0.0)) / PROCESS_TIME, 0, 1), 4)), Color("#eac978"))
+	var points: int = int(data.get("points",0))
+	draw_rect(Rect2(center + Vector2(-10,12),Vector2(20,8)),Color("#697377"))
+	for index in range(REQUIRED_POINTS):
+		draw_circle(center + Vector2(-14 + index * 4,16),1.3,Color("#eac978") if index < points else Color("#303638"))
+	if points > 0:
+		draw_circle(center + Vector2(0,-1),5,Color("#c77c48") if str(data["kind"]).begins_with("copper") else Color("#29292d"))
+	if points >= REQUIRED_POINTS:
+		draw_rect(Rect2(center + Vector2(-12,-3),Vector2(24,4)),Color("#303638"))
+		draw_rect(Rect2(center + Vector2(-12,-3),Vector2(24 * clampf(float(data["elapsed"]) / process_time(data),0,1),4)),Color("#eac978"))
 	if cached: return
 	var output := Vector2(DIRECTIONS[int(data["direction"])])
 	var tip := center + output * 21

@@ -145,9 +145,10 @@ func sell(kind: String, source: Vector2i) -> bool:
 	if kind == "launcher":
 		for ore: String in data["launcher"]["ammo"]:
 			data[ore] = int(data.get(ore, 0)) + 1
-	elif kind == "compactor" and int(data["compactor"]["count"]) > 0:
-		var ore: String = data["compactor"]["kind"]
-		data[ore] = int(data.get(ore, 0)) + int(data["compactor"]["count"])
+	elif kind == "compactor":
+		var contents: Dictionary = game.get_node("Compactors").stored_items(source)
+		for ore: String in contents:
+			data[ore] = int(data.get(ore,0)) + int(contents[ore])
 	if kind == "saw":
 		var contents: Dictionary = game.get_node("Saws").stored_items(source)
 		for ore: String in contents: data[ore] = int(data.get(ore,0)) + int(contents[ore])

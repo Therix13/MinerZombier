@@ -43,7 +43,7 @@ class CompactorPainter extends "res://Scripts/compactor_manager.gd":
 		for index in range(recipes.size()):
 			var parts: PackedStringArray = recipes[index].split(":")
 			if parts[0] != "compactor": continue
-			draw_machine(Vector2(index % 8 * 64 + 32, index / 8 * 64 + 32), {"count": 0, "kind": "", "direction": int(parts[1])})
+			draw_machine(Vector2(index % 8 * 64 + 32, index / 8 * 64 + 32), {"points": 0, "inventory": {}, "kind": "", "direction": int(parts[1])})
 func _initialize() -> void:
 	call_deferred("run")
 func run() -> void:
