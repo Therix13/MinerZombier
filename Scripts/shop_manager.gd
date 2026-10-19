@@ -199,6 +199,8 @@ func show_breach() -> void:
 	game.add_child(film)
 
 func ensure_intro() -> void:
+	var saves: Node = get_parent().get_parent().get_node_or_null("SaveGame")
+	if saves != null and not saves.playing: return
 	# Install from the shop so older scenes with a built-in main script work too.
 	if Engine.has_meta(IntroCinematicScript.SESSION_KEY):
 		return

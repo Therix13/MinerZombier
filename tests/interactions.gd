@@ -6,6 +6,7 @@ var game: Node2D
 var mover: Node
 
 func _initialize() -> void:
+	Engine.set_meta(&"mine_defense_skip_start_screen", true)
 	Engine.set_meta(&"mine_defense_intro_seen", true)
 	call_deferred("run_checks")
 

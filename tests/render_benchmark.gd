@@ -5,6 +5,7 @@ var game: Node2D
 var frames := 90
 var report: Dictionary = {}
 func _initialize() -> void:
+	Engine.set_meta(&"mine_defense_skip_start_screen", true)
 	Engine.set_meta(&"mine_defense_intro_seen", true)
 	Engine.max_fps = 0
 	call_deferred("run")

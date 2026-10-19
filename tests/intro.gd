@@ -3,6 +3,7 @@ extends "res://tests/building_controls.gd"
 const IntroScript = preload("res://Scripts/intro_cinematic.gd")
 
 func _initialize() -> void:
+	Engine.set_meta(&"mine_defense_skip_start_screen", true)
 	Engine.remove_meta(IntroScript.SESSION_KEY)
 	call_deferred("run_checks")
 
@@ -20,7 +21,7 @@ func run_checks() -> void:
 	intro.set_process(false)
 	check(paused and not game.get_node("CanvasLayer").visible,"Opening cinematic pauses simulation and hides the HUD")
 	check(Engine.has_meta(IntroScript.SESSION_KEY),"Opening is marked seen for this session")
-	check(game.economy.coins == 100 and game.progression.total_experience == 0 and game.grid.owned_tiles.size() == 9,"Opening grants no money, resources or buildings")
+	check(game.economy.coins == 100 and game.progression.created_resources.is_empty() and game.grid.owned_tiles.size() == 9,"Opening grants no money, resources or buildings")
 	check(intro.film.renderer.get_script() == preload("res://Scripts/world_renderer.gd") and intro.film.renderer.grid == game.grid,"Film renders the real current mine with the gameplay artwork")
 	intro.elapsed = 4
 	intro.present_frame()
@@ -59,7 +60,10 @@ func run_checks() -> void:
 	game.cycle.tutorial_step = game.cycle.TUTORIAL_LAST_STEP
 	game.cycle.changed.emit()
 	await settle()
-	check(game.has_node("BarrierBreach") and paused and not game.cycle.is_night,"Tutorial completion starts the second scene automatically")
+	check(not game.has_node("BarrierBreach") and not paused and not game.cycle.is_night,"Tutorial completion leaves the first night under player control")
+	await click_control(game.shop.cycle_action)
+	await settle()
+	check(game.has_node("BarrierBreach") and paused and not game.cycle.is_night,"Starting the first night plays the barrier-collapse cinematic")
 	var breach: CanvasLayer = game.get_node("BarrierBreach")
 	breach.set_process(false)
 	check(breach.film.renderer.launchers == game.launchers,"The collapse shows the actual player's defenses")

@@ -48,6 +48,8 @@ func on_step_changed() -> void:
 	queue_redraw()
 
 func focus_objective() -> void:
+	var saves: Node = game.get_node_or_null("SaveGame")
+	if saves != null and (saves.loaded_game or not saves.playing): return
 	if not cycle.is_tutorial_active():
 		return
 	var controller: RefCounted = game.get("camera_controller")

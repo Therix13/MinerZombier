@@ -20,6 +20,9 @@ var pause_page: VBoxContainer
 var settings_page: VBoxContainer
 var continue_button: Button
 var settings_button: Button
+var save_button: Button
+var title_button: Button
+var save_status: Label
 var quit_button: Button
 var apply_button: Button
 var back_button: Button
@@ -157,6 +160,23 @@ func build_interface() -> void:
 	settings_button = make_button("AJUSTES")
 	settings_button.pressed.connect(open_settings)
 	pause_page.add_child(settings_button)
+	save_button = make_button("GUARDAR PARTIDA")
+	save_button.pressed.connect(func():
+		var saves: Node = get_parent().get_node_or_null("SaveGame")
+		if saves != null: saves.save_game()
+	)
+	pause_page.add_child(save_button)
+	title_button = make_button("MENÚ PRINCIPAL")
+	title_button.pressed.connect(func():
+		var saves: Node = get_parent().get_node_or_null("SaveGame")
+		if saves != null: saves.return_to_start()
+	)
+	pause_page.add_child(title_button)
+	save_status = Label.new()
+	save_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	save_status.add_theme_font_size_override("font_size",14)
+	save_status.add_theme_color_override("font_color",Color("#bad4ab"))
+	pause_page.add_child(save_status)
 	quit_button = make_button("SALIR DEL JUEGO")
 	quit_button.pressed.connect(quit_game)
 	pause_page.add_child(quit_button)
@@ -262,7 +282,9 @@ func apply_selection() -> void:
 	apply_display()
 
 func quit_game() -> void:
-	get_tree().quit()
+	var saves: Node = get_parent().get_node_or_null("SaveGame")
+	if saves != null: saves.quit_game()
+	else: get_tree().quit()
 
 func toggle_pause_menu() -> void:
 	if not menu_open:
@@ -273,6 +295,7 @@ func toggle_pause_menu() -> void:
 		close_menu()
 
 func _process(_delta: float) -> void:
+	if start_screen_open(): return
 	# Input state still updates when a Control or another _input callback
 	# consumes ESC. Keep the shortcut working in that case, even when paused.
 	if Input.is_action_just_pressed(PAUSE_ACTION) and not pause_event_received:
@@ -284,7 +307,12 @@ func cancel_pending_action() -> bool:
 	var interactions: Node = get_parent().get_node_or_null("WorldInteractions")
 	return interactions != null and interactions.cancel_active()
 
+func start_screen_open() -> bool:
+	var saves: Node = get_parent().get_node_or_null("SaveGame")
+	return saves != null and not saves.playing
+
 func handle_key_event(event: InputEvent) -> bool:
+	if start_screen_open(): return false
 	if not event is InputEventKey or not event.pressed:
 		return false
 	if event.keycode == KEY_ESCAPE or event.physical_keycode == KEY_ESCAPE:

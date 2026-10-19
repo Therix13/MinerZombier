@@ -15,6 +15,8 @@ const CycleScript = preload("res://Scripts/day_night_manager.gd")
 const ProgressionScript = preload("res://Scripts/progression_manager.gd")
 const DisplaySettingsScript = preload("res://Scripts/display_settings.gd")
 
+const SaveScript = preload("res://Scripts/save_manager.gd")
+
 const DRAG_THRESHOLD := 8.0
 
 var grid: RefCounted
@@ -125,6 +127,9 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(update_display_layout)
 	update_display_layout()
 	redraw_world()
+	var saves := SaveScript.new()
+	saves.name = "SaveGame"
+	add_child(saves)
 
 func update_display_layout() -> void:
 	var factor: float = display_settings.interface_scale()
@@ -502,4 +507,4 @@ func on_base_destroyed() -> void:
 	cycle.lose_night()
 
 func restart_game() -> void:
-	get_tree().reload_current_scene()
+	get_node("SaveGame").begin("new")

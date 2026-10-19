@@ -7,6 +7,7 @@ var kills: int = 0
 var field: Node2D
 
 func _initialize() -> void:
+	Engine.set_meta(&"mine_defense_skip_start_screen", true)
 	call_deferred("run_checks")
 
 func check(condition: bool, description: String) -> void:
