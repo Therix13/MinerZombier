@@ -1,131 +1,65 @@
 extends RefCounted
 
 signal changed
-signal level_up(new_level: int)
-signal technology_unlocked(technology_id: String)
-signal research_unlocked(research_id: String)
+signal items_unlocked(items: Array[String])
 
-const BASE_LEVEL_EXPERIENCE: int = 500
-const LEVEL_EXPERIENCE_GROWTH: float = 2.0
-const POINTS_PER_LEVEL: int = 1
-const POINTS_PER_NIGHT: int = 0
-const ZOMBIE_EXPERIENCE: int = 25
-const SALE_EXPERIENCE := {"coal": 0, "coal_2": 0, "coal_3": 1, "coal_4": 2, "brass": 0, "brass_2": 0, "brass_3": 1, "brass_4": 2, "iron": 0, "iron_2": 0, "iron_3": 1, "iron_4": 2, "gold": 0, "gold_2": 0, "gold_3": 1, "gold_4": 2, "brass_ingot": 1, "brass_ingot_2": 2, "brass_ingot_3": 3, "brass_ingot_4": 5, "iron_ingot": 1, "iron_ingot_2": 2, "iron_ingot_3": 3, "iron_ingot_4": 5, "gold_ingot": 1, "gold_ingot_2": 2, "gold_ingot_3": 3, "gold_ingot_4": 5}
-const RESEARCHES := {
-	"gold": {"name": "Oro", "branch": "MINERÍA", "cost": 2, "level": 5, "requires": ["iron"], "description": "Desbloquea vetas de oro y sus lingotes."},
-	"saw": {"name": "Sierra", "branch": "PROCESAMIENTO", "cost": 1, "level": 3, "requires": ["furnace"], "description": "Corta una pepita o lingote de Nv. 2–4 en dos del nivel anterior."},
-	"iron": {"name": "Hierro", "branch": "MINERÍA", "cost": 1, "level": 4, "requires": ["furnace"], "description": "Desbloquea vetas de hierro y sus lingotes."},
-	"drill": {
-		"name": "Taladro", "branch": "MINERÍA", "cost": 1, "level": 3,
-		"requires": [], "description": "Desbloquea el taladro automático en la tienda.",
-	},
-	"brass": {
-		"name": "Latón", "branch": "MINERÍA", "cost": 1, "level": 2,
-		"requires": [], "description": "Desbloquea la veta de latón en la tienda.",
-	},
-	"straight_belt": {
-		"name": "Cinta transportadora", "branch": "LOGÍSTICA", "cost": 1, "level": 3,
-		"requires": [], "description": "Desbloquea la cinta recta en la tienda.",
-	},
-	"curved_belts": {
-		"name": "Cintas curvas", "branch": "LOGÍSTICA", "cost": 1, "level": 3,
-		"requires": ["straight_belt"], "description": "Desbloquea las cintas en L de ambas direcciones.",
-	},
-	"junction_belt": {
-		"name": "Unión en T", "branch": "LOGÍSTICA", "cost": 2, "level": 4,
-		"requires": ["curved_belts"], "description": "Desbloquea la cinta que reúne tres entradas.",
-	},
-	"compactor": {
-		"name": "Compactador", "branch": "PROCESAMIENTO", "cost": 1, "level": 3,
-		"requires": ["drill"], "description": "Fusiona 2 pepitas del mismo material y nivel. Hasta nivel 4.",
-	},
-	"furnace": {
-		"name": "Horno", "branch": "PROCESAMIENTO", "cost": 1, "level": 3,
-		"requires": ["drill"], "description": "Funde latón, hierro u oro de Nv. 4 en lingotes usando carbón de Nv. 4.",
-	},
-}
-const BASE_ITEMS := ["coal", "launcher", "defense_platforms"]
-const ITEM_RESEARCH := {"gold": "gold", "saw": "saw", "iron": "iron", "straight": "straight_belt", "drill": "drill", "brass": "brass", "corner": "curved_belts", "corner_right": "curved_belts", "corner_left": "curved_belts", "junction": "junction_belt", "compactor": "compactor", "furnace": "furnace"}
-# Older scenes can still refer to these names. They now resolve item unlocks.
-const TECHNOLOGIES := RESEARCHES
+const ConstructionScript = preload("res://Scripts/construction_manager.gd")
+const BASE_ITEMS := ["coal", "defense_platforms"]
+const NEXT_VEIN := {"coal":"brass", "brass":"iron", "iron":"gold"}
 
-var level: int = 1
-var experience: int = 0
-var total_experience: int = 0
-var research_points: int = 0
 var unlocked: Dictionary = {}
+var created_resources: Dictionary = {}
+var completed_veins: Dictionary = {}
+var mining: RefCounted
 var developer_mode: bool = false:
 	set(value):
 		if developer_mode == value: return
 		developer_mode = value
 		changed.emit()
 
-func experience_to_next_level() -> int:
-	return roundi(BASE_LEVEL_EXPERIENCE * pow(LEVEL_EXPERIENCE_GROWTH, level - 1))
+func setup(mining_manager: RefCounted) -> void:
+	mining = mining_manager
+	mining.resource_created.connect(record_resource)
+	mining.vein_fused.connect(record_vein)
 
-func add_experience(amount: int) -> void:
-	if amount <= 0:
-		return
-	experience += amount
-	total_experience += amount
-	var gained_levels: Array[int] = []
-	while experience >= experience_to_next_level():
-		experience -= experience_to_next_level()
-		level += 1
-		research_points += POINTS_PER_LEVEL
-		gained_levels.append(level)
+func dispose() -> void:
+	if mining != null:
+		mining.resource_created.disconnect(record_resource)
+		mining.vein_fused.disconnect(record_vein)
+	mining = null
+
+func is_item_unlocked(item: String) -> bool:
+	return item in BASE_ITEMS or unlocked.has(item) or (developer_mode and (item in NEXT_VEIN.values() or ConstructionScript.RECIPES.has(item)))
+
+func record_vein(cell: Vector2i) -> void:
+	if mining.vein_level(cell) != 4: return
+	var material: String = mining.vein_at(cell)
+	completed_veins[material] = true
+	if NEXT_VEIN.has(material):
+		var next_items: Array[String] = [str(NEXT_VEIN[material])]
+		unlock_items(next_items)
+
+func record_resource(kind: String) -> void:
+	created_resources[kind] = true
+	var available: Array[String] = []
+	for item: String in ConstructionScript.RECIPES:
+		if unlocked.has(item): continue
+		var recipe: Dictionary = ConstructionScript.RECIPES[item]
+		var highest: int = 0
+		for ingredient: String in recipe: highest = maxi(highest, mining.ore_level(ingredient))
+		for ingredient: String in recipe:
+			if mining.ore_level(ingredient) == highest and created_resources.has(ingredient):
+				available.append(item)
+				break
+	unlock_items(available)
+
+func unlock_items(items: Array[String]) -> void:
+	var fresh: Array[String] = []
+	for item: String in items:
+		if unlocked.has(item): continue
+		unlocked[item] = true
+		fresh.append(item)
+	if fresh.is_empty(): return
 	changed.emit()
-	for gained_level in gained_levels:
-		level_up.emit(gained_level)
-
-func award_sale(kind: String) -> void:
-	add_experience(int(SALE_EXPERIENCE.get(kind, 0)))
-
-func award_night() -> void:
-	if POINTS_PER_NIGHT == 0: return
-	research_points += POINTS_PER_NIGHT
-	changed.emit()
-
-func has_technology(technology_id: String) -> bool:
-	return has_research(technology_id)
-
-func has_research(research_id: String) -> bool:
-	return RESEARCHES.has(research_id) and (developer_mode or unlocked.has(research_id))
-
-func is_item_unlocked(item_id: String) -> bool:
-	return item_id in BASE_ITEMS or (ITEM_RESEARCH.has(item_id) and has_research(ITEM_RESEARCH[item_id]))
-
-func visible_researches(at_level: int = -1) -> Array[String]:
-	var result: Array[String] = []
-	var visible_level: int = level if at_level < 0 else at_level
-	for research_id: String in RESEARCHES:
-		if developer_mode or int(RESEARCHES[research_id]["level"]) <= visible_level: result.append(research_id)
-	return result
-
-func research_block_reason(technology_id: String) -> String:
-	if not RESEARCHES.has(technology_id):
-		return "Investigación desconocida."
-	if has_technology(technology_id):
-		return "Desbloqueado."
-	var data: Dictionary = RESEARCHES[technology_id]
-	if level < int(data["level"]):
-		return "Requiere nivel %d." % int(data["level"])
-	for prerequisite in data["requires"]:
-		if not has_technology(prerequisite):
-			return "Requiere %s." % RESEARCHES[prerequisite]["name"]
-	if research_points < int(data["cost"]):
-		return "Necesitas %d puntos de investigación." % int(data["cost"])
-	return ""
-
-func can_research(technology_id: String) -> bool:
-	return research_block_reason(technology_id).is_empty()
-
-func research(technology_id: String) -> bool:
-	if not can_research(technology_id):
-		return false
-	research_points -= int(RESEARCHES[technology_id]["cost"])
-	unlocked[technology_id] = true
-	research_unlocked.emit(technology_id)
-	technology_unlocked.emit(technology_id)
-	changed.emit()
-	return true
+	# DEV already exposes the full catalog; retain milestones without redundant notices.
+	if not developer_mode: items_unlocked.emit(fresh)

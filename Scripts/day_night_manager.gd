@@ -24,7 +24,6 @@ var funded_steps: Dictionary = {}
 var coal_cell := TUTORIAL_COAL_CELL
 var brass_cell := TUTORIAL_BRASS_CELL
 var furnace_cell := TUTORIAL_FURNACE_CELL
-var research_boosts: Dictionary = {}
 var refreshing_tutorial: bool = false
 
 var day: int = 1
@@ -41,9 +40,7 @@ var level4_sold: bool = false
 var coal_sold: int = 0
 var expansion_bonus_granted: bool = false
 var free_launcher_available: bool = false
-var research_tutorial_pending: bool = false
 var tutorial_skipped: bool = false
-var progression: RefCounted
 var grid: RefCounted
 var mining: RefCounted
 var conveyors: RefCounted
@@ -66,16 +63,7 @@ func setup(grid_manager: RefCounted, mining_manager: RefCounted, conveyor_manage
 	launchers.changed.connect(refresh_tutorial)
 	refresh_tutorial()
 
-func set_progression(player_progression: RefCounted) -> void:
-	if progression != null:
-		progression.research_unlocked.disconnect(_on_research_unlocked)
-	progression = player_progression
-	progression.research_unlocked.connect(_on_research_unlocked)
-
 func dispose() -> void:
-	if progression != null:
-		progression.research_unlocked.disconnect(_on_research_unlocked)
-	progression = null
 	if mining != null:
 		mining.changed.disconnect(refresh_tutorial)
 		mining.fusion_completed.disconnect(_on_fusion)
@@ -142,7 +130,7 @@ func _on_fusion(kind: String) -> void:
 	refresh_tutorial()
 
 func _on_money_changed(_amount: int) -> void:
-	# Finish the sale (including its EXP) before filling the missing EXP.
+	# Refresh after the sale has finished updating the wallet.
 	refresh_tutorial.call_deferred()
 
 func _on_sale(kind: String) -> void:
@@ -155,22 +143,15 @@ func _on_sale(kind: String) -> void:
 func is_tutorial_active() -> bool:
 	return not tutorial_skipped and tutorial_step < TUTORIAL_LAST_STEP and day == 1 and not is_night and not defeated
 
-func is_research_tutorial_active() -> bool:
-	return false
-
 func skip_tutorial() -> void:
 	if tutorial_skipped: return
 	tutorial_skipped = true
 	barrier_broken = true
 	tutorial_step = TUTORIAL_LAST_STEP
-	research_tutorial_pending = false
 	changed.emit()
 
 func is_guided_tutorial_active() -> bool:
-	return is_tutorial_active() or is_research_tutorial_active()
-
-func _on_research_unlocked(_research_id: String) -> void:
-	refresh_tutorial()
+	return is_tutorial_active()
 
 func tutorial_purchase_price() -> int:
 	if tutorial_step == 1: return 100
@@ -235,8 +216,9 @@ func ammo_damage() -> float:
 	return total
 
 func has_ammo() -> bool:
-	for launcher in launchers.launchers.values():
-		if not (launcher["ammo"] as Array).is_empty():
+	for cell: Vector2i in launchers.launchers:
+		var launcher: Dictionary = launchers.launchers[cell]
+		if launchers.is_active_position(cell) and not (launcher["ammo"] as Array).is_empty():
 			return true
 	return false
 
@@ -256,7 +238,6 @@ func refresh_tutorial() -> void:
 			4: completed = not mining.coal_veins.is_empty() and mining.vein_level(coal_cell) >= 4
 			5:
 				completed = economy.coins >= 500
-				if completed: grant_research_experience("brass")
 		if not completed: break
 		tutorial_step += 1
 	refreshing_tutorial = false
@@ -280,33 +261,11 @@ func sync_tutorial_cells() -> void:
 		for cell: Vector2i in mining.construction.plans:
 			if mining.construction.plans[cell]["item"] == "furnace": furnace_cell = cell
 
-func missing_researches(id: String, result: Array[String]) -> void:
-	if progression == null or progression.has_research(id) or result.has(id): return
-	for prerequisite: String in progression.RESEARCHES[id]["requires"]: missing_researches(prerequisite,result)
-	result.append(id)
-
-func research_to_learn() -> String:
-	return ""
-
-func grant_research_experience(id: String) -> void:
-	if progression == null or research_boosts.has(id): return
-	research_boosts[id] = true
-	var chain: Array[String] = []
-	missing_researches(id,chain)
-	var required_level: int = progression.level
-	var required_points: int = 0
-	for research_id: String in chain:
-		var data: Dictionary = progression.RESEARCHES[research_id]
-		required_level = maxi(required_level,int(data["level"]))
-		required_points += int(data["cost"])
-	while progression.level < required_level or progression.research_points < required_points:
-		progression.add_experience(progression.experience_to_next_level() - progression.experience)
-
 func tutorial_text() -> String:
 	match tutorial_step:
 		0: return "Compra una veta de carbón."
 		1: return "Puedes fusionar pepitas hasta Nv. 4.\nVéndelas hasta reunir 100 de oro."
-		5: return "Vende carbón Nv. 4 hasta reunir 500 de oro.\nAsí podrás investigar el latón."
+		5: return "Vende carbón Nv. 4 hasta reunir 500 de oro.\nCompra después una veta de latón."
 	if tutorial_step in [2,3,4]:
 		if needs_tutorial_income():
 			return "Vende carbón Nv. 4 hasta reunir %d de oro." % tutorial_purchase_price()
@@ -316,7 +275,7 @@ func tutorial_text() -> String:
 		if tutorial_step == 2: return "Compra otra veta de carbón.\nFusiona las dos para crear una Nv. 2."
 		var count: int = 2 if tutorial_step == 3 else 4
 		return "Coloca %d vetas manteniendo Shift.\nFusiónalas hasta Nv. %d." % [count,goal]
-	return "¡Tutorial completado!\nInvestiga la veta de latón."
+	return "¡Tutorial completado!\nYa puedes comprar la veta de latón."
 
 func income_instruction() -> String:
 	var targets: Array[Vector2i] = income_targets()
@@ -378,7 +337,7 @@ func needs_defense_warning() -> bool:
 	return day == 4 and not is_night and not defeated and launchers.launchers.size() < 2
 
 func can_start_night() -> bool:
-	return not is_night and not defeated and not is_research_tutorial_active() and not launchers.launchers.is_empty() and has_ammo()
+	return not is_night and not defeated and not launchers.launchers.is_empty() and has_ammo()
 
 func start_night() -> bool:
 	if not can_start_night() or (day == 1 and not barrier_broken):
@@ -392,10 +351,6 @@ func complete_night() -> void:
 		return
 	is_night = false
 	day += 1
-	if day == 2:
-		research_tutorial_pending = false
-	if progression != null:
-		progression.award_night()
 	changed.emit()
 
 func lose_night() -> void:

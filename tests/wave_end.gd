@@ -18,11 +18,13 @@ func run_checks() -> void:
 	game.launchers.receive(platform, "coal")
 	game.cycle.tutorial_step = game.cycle.TUTORIAL_LAST_STEP
 	game.cycle.barrier_broken = true
-	player.add_experience(player.experience_to_next_level() - player.ZOMBIE_EXPERIENCE)
 	game.start_night()
+	game.mining.items_for("coal_3")[Vector2i(14,1)] = 1
+	game.mining.items_for("coal_3")[Vector2i(15,1)] = 1
+	game.mining.fuse(Vector2i(14,1),Vector2i(15,1))
 	get_nodes_in_group("zombies")[0].take_damage(100)
 	await settle()
-	check(player.level == 2 and not shop.notice_research_ids.is_empty() and not shop.research_notice.visible and not shop.research_notice_backdrop.visible, "A combat level-up queues research without showing or timing its alert")
+	check(player.is_item_unlocked("furnace") and not shop.notice_item_ids.is_empty() and not shop.unlock_notice.visible and not shop.unlock_notice_backdrop.visible, "Crafting during combat queues the automatic unlock without showing or timing its alert")
 	manager._process(2.0)
 	check(game.cycle.is_night and manager.active_wave and manager.cleared_time == 0, "An empty battlefield does not end the night while more zombies are due")
 	manager.spawn_zombie()
@@ -39,17 +41,17 @@ func run_checks() -> void:
 	extra.take_damage(100)
 	manager._process(2.99)
 	await settle()
-	check(game.cycle.is_night and not shop.research_notice.visible and not game.night_victory_overlay.visible, "Research alerts and victory remain deferred throughout the full three-second delay")
+	check(game.cycle.is_night and not shop.unlock_notice.visible and not game.night_victory_overlay.visible, "Unlock alerts and victory remain deferred throughout the full three-second delay")
 	manager._process(0.01)
 	await settle()
 	check(game.cycle.day == 2 and not game.cycle.is_night and game.night_victory_overlay.visible and game.economy.coins == coins, "Exactly three clear seconds end the wave and display its victory without adding gold")
-	check(not shop.research_notice.visible and not shop.notice_research_ids.is_empty(), "Queued research waits behind the victory screen")
+	check(not shop.unlock_notice.visible and not shop.notice_item_ids.is_empty(), "Queued unlocks waits behind the victory screen")
 	var rewarded: int = game.economy.coins
 	manager._process(3.0)
 	check(game.economy.coins == rewarded and game.cycle.day == 2, "Repeated updates cannot repeat night rewards")
 	game.dismiss_night_victory_popup()
 	await settle()
-	check(shop.research_notice.visible and shop.research_notice_backdrop.visible and shop.research_notice_accept.visible, "After victory, queued research displays until acknowledged with Aceptar")
+	check(shop.unlock_notice.visible and shop.unlock_notice_backdrop.visible and shop.unlock_notice_accept.visible, "After victory, queued unlocks displays until acknowledged with Aceptar")
 	game.free()
 	await settle()
 	print("RESULT: ", passed, " passed; ", failed, " failed; wave end")

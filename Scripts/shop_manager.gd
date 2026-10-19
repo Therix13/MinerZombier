@@ -18,7 +18,6 @@ signal furnace_requested
 signal compactor_requested
 signal night_requested
 signal restart_requested
-signal technology_requested(technology_id: String)
 
 const DisplaySettingsScript = preload("res://Scripts/display_settings.gd")
 const TutorialGuideScript = preload("res://Scripts/tutorial_guide.gd")
@@ -32,25 +31,27 @@ const PANEL_WIDTH := 340.0
 const TOGGLE_SIZE := 58.0
 const MONEY_BOX_WIDTH := 148.0
 const ANIMATION_TIME := 0.3
-const CATEGORIES := ["EXPANSION", "VETAS", "HERRAMIENTAS", "AUTOMATIZACIÓN", "DEFENSA", "INVESTIGACIÓN"]
+const CATEGORIES := ["EXPANSION", "VETAS", "HERRAMIENTAS", "AUTOMATIZACIÓN", "DEFENSA"]
 const ITEM_CATEGORIES := {
 	"VETAS": ["coal", "brass", "iron", "gold"],
 	"HERRAMIENTAS": ["drill", "compactor", "furnace", "saw"],
 	"AUTOMATIZACIÓN": ["straight", "corner_right", "corner_left", "junction"],
 }
 const RESOURCE_LABELS := {"gold": "ORO · NIVEL 1", "gold_2": "ORO · NIVEL 2", "gold_3": "ORO · NIVEL 3", "gold_4": "ORO · NIVEL 4", "gold_ingot": "LINGOTE DE ORO · NIVEL 1", "gold_ingot_2": "LINGOTE DE ORO · NIVEL 2", "gold_ingot_3": "LINGOTE DE ORO · NIVEL 3", "gold_ingot_4": "LINGOTE DE ORO · NIVEL 4","iron": "HIERRO · NIVEL 1", "iron_2": "HIERRO · NIVEL 2", "iron_3": "HIERRO · NIVEL 3", "iron_4": "HIERRO · NIVEL 4", "iron_ingot": "LINGOTE DE HIERRO · NIVEL 1", "iron_ingot_2": "LINGOTE DE HIERRO · NIVEL 2", "iron_ingot_3": "LINGOTE DE HIERRO · NIVEL 3", "iron_ingot_4": "LINGOTE DE HIERRO · NIVEL 4", "coal": "CARBÓN · NIVEL 1", "brass": "LATÓN · NIVEL 1", "coal_2": "CARBÓN · NIVEL 2", "brass_2": "LATÓN · NIVEL 2", "coal_3": "CARBÓN · NIVEL 3", "brass_3": "LATÓN · NIVEL 3", "coal_4": "CARBÓN · NIVEL 4", "brass_4": "LATÓN · NIVEL 4", "brass_ingot": "LINGOTE DE LATÓN · NIVEL 1", "brass_ingot_2": "LINGOTE DE LATÓN · NIVEL 2", "brass_ingot_3": "LINGOTE DE LATÓN · NIVEL 3", "brass_ingot_4": "LINGOTE DE LATÓN · NIVEL 4"}
-const CATEGORY_ART := {"EXPANSION": "expansion", "VETAS": "coal", "HERRAMIENTAS": "drill", "AUTOMATIZACIÓN": "junction", "DEFENSA": "launcher", "INVESTIGACIÓN": "research", "RECURSOS": "resources"}
-const RESEARCH_VIEW := {
-	"saw": ["saw", "Sierra", "1 → 2"],
+const CATEGORY_ART := {"EXPANSION": "expansion", "VETAS": "coal", "HERRAMIENTAS": "drill", "AUTOMATIZACIÓN": "junction", "DEFENSA": "launcher", "RECURSOS": "resources"}
+const UNLOCK_VIEW := {
+	"brass": ["brass", "Latón", "Nueva veta"],
 	"iron": ["iron", "Hierro", "Nueva veta"],
 	"gold": ["gold", "Oro", "Nueva veta"],
-	"drill": ["drill", "Taladro", "Automático"],
-	"brass": ["ore", "Latón", "Nueva veta"],
-	"straight_belt": ["belt", "Cinta", "Transportadora"],
-	"curved_belts": ["curve", "Curvas", "Izquierda · derecha"],
-	"junction_belt": ["junction", "Unión en T", "3 entradas"],
-	"compactor": ["compactor", "Compactador", "2 → 1"],
-	"furnace": ["furnace", "Horno", "40 combustible"],
+	"saw": ["saw", "Sierra", "Nueva herramienta"],
+	"drill": ["drill", "Taladro", "Nueva herramienta"],
+	"compactor": ["compactor", "Compactador", "Nueva herramienta"],
+	"furnace": ["furnace", "Horno", "Nueva herramienta"],
+	"straight": ["straight", "Cinta", "Automatización"],
+	"corner_right": ["corner_right", "Curva derecha", "Automatización"],
+	"corner_left": ["corner_left", "Curva izquierda", "Automatización"],
+	"junction": ["junction", "Unión en T", "Automatización"],
+	"launcher": ["launcher", "Lanzapepitas", "Defensa de latón"],
 }
 
 var economy: RefCounted
@@ -80,32 +81,21 @@ var cycle_shift_hint: HBoxContainer
 var cycle_shift_key: PanelContainer
 var shift_key_style: StyleBoxFlat
 var progression: RefCounted
-var progression_panel: PanelContainer
-var level_label: Label
-var research_points_label: RichTextLabel
 var view_icon: ViewIcon
-var experience_bar: ProgressBar
-var research_summary: RichTextLabel
-var research_texture: Texture2D
-var research_buttons: Dictionary = {}
-var research_status: Dictionary = {}
-var research_details: Dictionary = {}
 var item_buttons: Dictionary = {}
 var resource_buttons: Dictionary = {}
 var item_grid: GridContainer
 var category_buttons: Dictionary = {}
 var purchase_buttons: Dictionary = {}
-var focused_tutorial_research: String = ""
 var fallback_display: CanvasLayer
-var known_research_level: int = 1
-var research_notice: PanelContainer
-var research_notice_backdrop: ColorRect
-var research_notice_label: Label
-var research_notice_accept: Button
-var research_notice_grid: GridContainer
-var research_notice_cards: Dictionary = {}
-var research_notice_tween: Tween
-var notice_research_ids: Array[String] = []
+var unlock_notice: PanelContainer
+var unlock_notice_backdrop: ColorRect
+var unlock_notice_label: Label
+var unlock_notice_accept: Button
+var unlock_notice_grid: GridContainer
+var unlock_notice_cards: Dictionary = {}
+var unlock_notice_tween: Tween
+var notice_item_ids: Array[String] = []
 
 func setup(economy_manager: RefCounted, grid_manager: RefCounted) -> void:
 	economy = economy_manager
@@ -228,17 +218,10 @@ func ensure_tutorial_guide() -> void:
 func set_progression(player_progression: RefCounted) -> void:
 	progression = player_progression
 	progression.developer_mode = economy.developer_mode
-	known_research_level = progression.level
-	cycle.set_progression(progression)
-	# Legacy scene scripts must also treat research solely as item unlocks.
-	var game: Node = get_parent().get_parent()
-	for connection in progression.technology_unlocked.get_connections():
-		var callback: Callable = connection["callable"]
-		if callback.get_object() == game and callback.get_method() == &"apply_technologies":
-			progression.technology_unlocked.disconnect(callback)
-	build_progression_panel()
-	build_research_notice()
+	progression.setup(get_parent().get_parent().get("mining"))
+	build_unlock_notice()
 	progression.changed.connect(update_progression)
+	progression.items_unlocked.connect(announce_unlocks)
 	update_progression()
 
 func _process(_delta: float) -> void:
@@ -246,7 +229,7 @@ func _process(_delta: float) -> void:
 		return
 	update_notice_visibility()
 	update_shift_hint()
-	# Preserve research locks even with older scenes that handle purchases themselves.
+	# Keep an unavailable selection out of the placement preview.
 	var game: Node = get_parent().get_parent()
 	var item: String = ""
 	if game.get("placing_coal"): item = "coal"
@@ -254,70 +237,16 @@ func _process(_delta: float) -> void:
 	elif game.get("placing_brass"): item = "brass"
 	elif game.get("placing_drill"): item = "drill"
 	elif game.get("placing_belt"): item = str(game.get("belt_shape"))
-	if not item.is_empty() and (not progression.is_item_unlocked(item) or (cycle != null and cycle.is_research_tutorial_active())):
+	if not item.is_empty() and not progression.is_item_unlocked(item):
 		game.cancel_placement()
 
-func build_progression_panel() -> void:
-	progression_panel = PanelContainer.new()
-	progression_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	progression_panel.offset_left = 20.0
-	progression_panel.offset_right = 220.0
-	progression_panel.offset_top = 20.0
-	progression_panel.offset_bottom = 58.0
-	progression_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	progression_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
-	add_child(progression_panel)
-	var column := VBoxContainer.new()
-	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	column.add_theme_constant_override("separation", 5)
-	progression_panel.add_child(column)
-	var row := HBoxContainer.new()
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_theme_constant_override("separation", 12)
-	column.add_child(row)
-	level_label = create_label("", 14, Color("#d6edb4"))
-	level_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	level_label.size_flags_horizontal = Control.SIZE_FILL
-	level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	level_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	level_label.add_theme_color_override("font_outline_color", Color("#152019"))
-	level_label.add_theme_constant_override("outline_size", 3)
-	row.add_child(level_label)
-	level_label.custom_minimum_size.y = 24
-	research_points_label = create_research_label("", 14, Color("#d6edb4"))
-	research_points_label.custom_minimum_size = Vector2(66, 24)
-	research_points_label.add_theme_color_override("font_outline_color", Color("#152019"))
-	research_points_label.add_theme_constant_override("outline_size", 3)
-	row.add_child(research_points_label)
-	experience_bar = ProgressBar.new()
-	experience_bar.custom_minimum_size.y = 6
-	experience_bar.show_percentage = false
-	experience_bar.mouse_filter = Control.MOUSE_FILTER_STOP
-	experience_bar.add_theme_stylebox_override("background", create_style("#18241d", "#18241d", 0, 3))
-	experience_bar.add_theme_stylebox_override("fill", create_style("#8db574", "#8db574", 0, 3))
-	column.add_child(experience_bar)
-
 func update_progression() -> void:
-	if progression == null:
-		return
-	level_label.text = "NIVEL %d" % progression.level
-	set_research_text(research_points_label, "{research} %d" % progression.research_points)
-	experience_bar.max_value = progression.experience_to_next_level()
-	experience_bar.value = progression.experience
-	experience_bar.tooltip_text = "EXP %d / %d\nZombi +%d · venta de carbón +%d · venta de latón +%d." % [progression.experience, progression.experience_to_next_level(), progression.ZOMBIE_EXPERIENCE, progression.SALE_EXPERIENCE["coal"], progression.SALE_EXPERIENCE["brass"]]
-	progression_panel.visible = true
-	if progression.level > known_research_level:
-		var old_ids: Array[String] = progression.visible_researches(known_research_level)
-		var new_ids: Array[String] = []
-		for research_id: String in progression.visible_researches():
-			if research_id not in old_ids and not progression.has_research(research_id): new_ids.append(research_id)
-		known_research_level = progression.level
-		announce_researches(new_ids)
-	if shop_open and shop_title.text == "INVESTIGACIÓN" and research_buttons.keys() != progression.visible_researches():
+	if progression == null: return
+	if shop_open and shop_title.text in ITEM_CATEGORIES and item_buttons.keys() != visible_shop_items(shop_title.text):
 		rebuild_catalog()
-	elif shop_open and shop_title.text in ITEM_CATEGORIES and item_buttons.keys() != visible_shop_items(shop_title.text):
-		rebuild_catalog()
-	refresh_research_buttons()
+	elif shop_open and shop_title.text == "DEFENSA":
+		var has_launcher: bool = purchase_buttons.has("launcher")
+		if has_launcher != progression.is_item_unlocked("launcher"): rebuild_catalog()
 	refresh_item_buttons()
 
 func visible_shop_items(category: String = "") -> Array[String]:
@@ -332,22 +261,22 @@ func rebuild_catalog() -> void:
 	open_category(shop_title.text)
 	shop_scroll.set_deferred("scroll_vertical", scroll)
 
-func build_research_notice() -> void:
-	research_notice_backdrop = ColorRect.new()
-	research_notice_backdrop.name = "ResearchNoticeBackdrop"
-	research_notice_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	research_notice_backdrop.color = Color(0, 0, 0, 0.65)
-	research_notice_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
-	research_notice_backdrop.z_index = 120
-	add_child(research_notice_backdrop)
+func build_unlock_notice() -> void:
+	unlock_notice_backdrop = ColorRect.new()
+	unlock_notice_backdrop.name = "UnlockNoticeBackdrop"
+	unlock_notice_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	unlock_notice_backdrop.color = Color(0, 0, 0, 0.65)
+	unlock_notice_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	unlock_notice_backdrop.z_index = 120
+	add_child(unlock_notice_backdrop)
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	research_notice_backdrop.add_child(center)
-	research_notice = PanelContainer.new()
-	research_notice.name = "NewResearchNotice"
-	research_notice.custom_minimum_size = Vector2(480, 0)
-	research_notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	unlock_notice_backdrop.add_child(center)
+	unlock_notice = PanelContainer.new()
+	unlock_notice.name = "NewUnlockNotice"
+	unlock_notice.custom_minimum_size = Vector2(480, 0)
+	unlock_notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := create_style("#192d26", "#d5b078", 2, 16)
 	style.content_margin_left = 24
 	style.content_margin_right = 24
@@ -355,12 +284,12 @@ func build_research_notice() -> void:
 	style.content_margin_bottom = 18
 	style.shadow_color = Color(0,0,0,0.4)
 	style.shadow_size = 14
-	research_notice.add_theme_stylebox_override("panel", style)
-	center.add_child(research_notice)
+	unlock_notice.add_theme_stylebox_override("panel", style)
+	center.add_child(unlock_notice)
 	var column := VBoxContainer.new()
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_theme_constant_override("separation", 16)
-	research_notice.add_child(column)
+	unlock_notice.add_child(column)
 	var header := HBoxContainer.new()
 	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	header.add_theme_constant_override("separation", 14)
@@ -369,69 +298,67 @@ func build_research_notice() -> void:
 	emblem.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	emblem.add_theme_stylebox_override("panel",create_style("#24443c","#547d6a",1,12))
 	header.add_child(emblem)
-	var flask := create_research_label("{research}",22)
-	flask.clear()
-	flask.push_paragraph(HORIZONTAL_ALIGNMENT_CENTER)
-	flask.add_image(research_texture,32,32)
-	flask.pop()
-	flask.custom_minimum_size = Vector2(40,40)
-	flask.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	emblem.add_child(flask)
+	var emblem_icon := create_label("✦", 30, Color("#ffe1a2"))
+	emblem_icon.custom_minimum_size = Vector2(40,40)
+	emblem_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	emblem_icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	emblem_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	emblem.add_child(emblem_icon)
 	var titles := VBoxContainer.new()
 	titles.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	titles.add_theme_constant_override("separation",3)
 	header.add_child(titles)
-	research_notice_label = create_label("Nuevas investigaciones",22,Color("#ffe1a2"))
-	research_notice_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	titles.add_child(research_notice_label)
+	unlock_notice_label = create_label("Nuevos desbloqueos",22,Color("#ffe1a2"))
+	unlock_notice_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	titles.add_child(unlock_notice_label)
 	var subtitle := create_label("Nuevas opciones para tu mina",13,Color("#a8c4b2"))
 	subtitle.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	titles.add_child(subtitle)
-	research_notice_grid = GridContainer.new()
-	research_notice_grid.columns = 2
-	research_notice_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	research_notice_grid.add_theme_constant_override("h_separation",10)
-	research_notice_grid.add_theme_constant_override("v_separation",10)
-	column.add_child(research_notice_grid)
-	var footer := create_label("Encuéntralas en el menú › Investigación",12,Color("#a8b8a5"))
+	unlock_notice_grid = GridContainer.new()
+	unlock_notice_grid.columns = 2
+	unlock_notice_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	unlock_notice_grid.add_theme_constant_override("h_separation",10)
+	unlock_notice_grid.add_theme_constant_override("v_separation",10)
+	column.add_child(unlock_notice_grid)
+	var footer := create_label("Disponibles en la tienda",12,Color("#a8b8a5"))
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	footer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(footer)
-	research_notice_accept = Button.new()
-	research_notice_accept.name = "AcceptResearchNotice"
-	research_notice_accept.text = "Aceptar"
-	research_notice_accept.custom_minimum_size.y = 44
-	research_notice_accept.add_theme_stylebox_override("normal",create_style("#684721","#d6b374",2,8))
-	research_notice_accept.add_theme_stylebox_override("hover",create_style("#805c30","#ffe1a2",2,8))
-	research_notice_accept.pressed.connect(accept_research_notice)
-	column.add_child(research_notice_accept)
-	research_notice.hide()
-	research_notice_backdrop.hide()
+	unlock_notice_accept = Button.new()
+	unlock_notice_accept.name = "AcceptUnlockNotice"
+	unlock_notice_accept.text = "Aceptar"
+	unlock_notice_accept.custom_minimum_size.y = 44
+	unlock_notice_accept.add_theme_stylebox_override("normal",create_style("#684721","#d6b374",2,8))
+	unlock_notice_accept.add_theme_stylebox_override("hover",create_style("#805c30","#ffe1a2",2,8))
+	unlock_notice_accept.pressed.connect(accept_unlock_notice)
+	column.add_child(unlock_notice_accept)
+	unlock_notice.hide()
+	unlock_notice_backdrop.hide()
 
-func accept_research_notice() -> void:
-	notice_research_ids.clear()
-	research_notice.hide()
-	research_notice_backdrop.hide()
+func accept_unlock_notice() -> void:
+	notice_item_ids.clear()
+	unlock_notice.hide()
+	unlock_notice_backdrop.hide()
 
 
-func announce_researches(research_ids: Array[String]) -> void:
-	if research_ids.is_empty(): return
-	for research_id: String in research_ids:
-		if research_id not in notice_research_ids: notice_research_ids.append(research_id)
+func announce_unlocks(item_ids: Array[String]) -> void:
+	if item_ids.is_empty(): return
+	for item_id: String in item_ids:
+		if item_id not in notice_item_ids: notice_item_ids.append(item_id)
 	rebuild_notice_cards()
-	research_notice.hide()
-	research_notice_backdrop.hide()
+	unlock_notice.hide()
+	unlock_notice_backdrop.hide()
 	update_notice_visibility()
 
 func rebuild_notice_cards() -> void:
-	research_notice_cards.clear()
-	for child in research_notice_grid.get_children():
-		research_notice_grid.remove_child(child)
+	unlock_notice_cards.clear()
+	for child in unlock_notice_grid.get_children():
+		unlock_notice_grid.remove_child(child)
 		child.queue_free()
-	for research_id: String in notice_research_ids:
+	for item_id: String in notice_item_ids:
 		var card := PanelContainer.new()
-		card.name = "Notice_" + research_id
+		card.name = "Notice_" + item_id
 		card.custom_minimum_size = Vector2(210,76)
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -442,7 +369,7 @@ func rebuild_notice_cards() -> void:
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_theme_constant_override("separation",10)
 		card.add_child(row)
-		var item: String = {"straight_belt":"straight","curved_belts":"corner_right","junction_belt":"junction"}.get(research_id,research_id)
+		var item: String = item_id
 		var art: Control = create_item_preview(item,Vector2(48,48))
 		art.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(art)
@@ -452,181 +379,29 @@ func rebuild_notice_cards() -> void:
 		labels.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		labels.add_theme_constant_override("separation",4)
 		row.add_child(labels)
-		var name_label := create_label(RESEARCH_VIEW[research_id][1],16,Color("#f4e6c9"))
+		var name_label := create_label(UNLOCK_VIEW[item_id][1],16,Color("#f4e6c9"))
 		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		labels.add_child(name_label)
-		var detail := create_label(RESEARCH_VIEW[research_id][2],11,Color("#9eb69b"))
+		var detail := create_label(UNLOCK_VIEW[item_id][2],11,Color("#9eb69b"))
 		detail.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		labels.add_child(detail)
-		research_notice_grid.add_child(card)
-		research_notice_cards[research_id] = card
+		unlock_notice_grid.add_child(card)
+		unlock_notice_cards[item_id] = card
 
 func update_notice_visibility() -> void:
-	if research_notice == null or notice_research_ids.is_empty(): return
+	if unlock_notice == null or notice_item_ids.is_empty(): return
 	var victory: Control = get_parent().get_parent().get("night_victory_overlay")
 	if (cycle != null and (cycle.is_night or cycle.defeated)) or (victory != null and victory.visible):
-		research_notice.hide()
-		research_notice_backdrop.hide()
-	elif not research_notice.visible:
-		research_notice.show()
-		research_notice_backdrop.show()
-		if research_notice_tween != null: research_notice_tween.kill()
-		research_notice_backdrop.modulate.a = 0
-		research_notice_tween = create_tween()
-		research_notice_tween.tween_property(research_notice_backdrop,"modulate:a",1.0,0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		research_notice_accept.grab_focus()
-
-func open_research() -> void:
-	if cycle != null and (cycle.is_night or cycle.defeated):
-		return
-	if not shop_open:
-		open_shop()
-	if shop_open:
-		open_category("INVESTIGACIÓN")
-
-func build_research_content() -> void:
-	if progression == null:
-		return
-	research_summary = create_research_label("", 17, Color("#d6edb4"))
-	research_summary.tooltip_text = "Subir de nivel otorga 1 punto de investigación. Superar noches no otorga puntos.\nEXP: zombi +%d · carbón vendido +%d · latón vendido +%d." % [progression.ZOMBIE_EXPERIENCE, progression.SALE_EXPERIENCE["coal"], progression.SALE_EXPERIENCE["brass"]]
-	shop_content.add_child(research_summary)
-	var previous_branch: String = ""
-	var row: HBoxContainer
-	var section: VBoxContainer
-	var branch_count: int = 0
-	for technology_id in progression.visible_researches():
-		var data: Dictionary = progression.RESEARCHES[technology_id]
-		var branch: String = data["branch"]
-		if branch != previous_branch:
-			section = VBoxContainer.new()
-			section.add_theme_constant_override("separation", 6)
-			shop_content.add_child(section)
-			section.add_child(create_label(branch, 13, Color("#c8ad79")))
-			row = HBoxContainer.new()
-			row.add_theme_constant_override("separation", 5)
-			section.add_child(row)
-			previous_branch = branch
-			branch_count = 0
-		elif branch_count % 2 == 0:
-			var down := create_label("↓", 15, Color("#a18a61"))
-			down.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			section.add_child(down)
-			row = HBoxContainer.new()
-			row.add_theme_constant_override("separation", 5)
-			section.add_child(row)
-		else:
-			var arrow := create_label("→", 19, Color("#a18a61"))
-			arrow.custom_minimum_size.x = 18
-			arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			row.add_child(arrow)
-		row.add_child(build_research_card(technology_id, data))
-		branch_count += 1
-	refresh_research_buttons()
-
-func build_research_card(technology_id: String, data: Dictionary) -> Button:
-	var view: Array = RESEARCH_VIEW[technology_id]
-	var button := Button.new()
-	button.name = "Research_" + technology_id
-	button.custom_minimum_size = Vector2(116, 86)
-	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.clip_contents = true
-	button.pressed.connect(technology_requested.emit.bind(technology_id))
-	research_buttons[technology_id] = button
-	var margin := MarginContainer.new()
-	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	button.add_child(margin)
-	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 8)
-	var column := VBoxContainer.new()
-	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	column.add_theme_constant_override("separation", 4)
-	margin.add_child(column)
-	var header := HBoxContainer.new()
-	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	column.add_child(header)
-	var icon := ItemPreview.new()
-	icon.kind = {"straight_belt": "straight", "curved_belts": "corner_right", "junction_belt": "junction"}.get(technology_id, technology_id)
-	icon.custom_minimum_size = Vector2(28, 28)
-	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	header.add_child(icon)
-	var rank := compact_research_label("", 13)
-	rank.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	rank.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	header.add_child(rank)
-	rank.hide()
-	var title := create_label(view[1], 13)
-	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(title)
-	var effect := compact_research_label(view[2], 11)
-	column.add_child(effect)
-	effect.hide()
-	var footer := HBoxContainer.new()
-	footer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	footer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	footer.alignment = BoxContainer.ALIGNMENT_END
-	column.add_child(footer)
-	var cost := create_research_label("%d {research}" % data["cost"], 12)
-	cost.custom_minimum_size = Vector2(48, 22)
-	cost.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	footer.add_child(cost)
-	var status := compact_research_label("", 11)
-	footer.add_child(status)
-	research_status[technology_id] = status
-	var state_icon := ResearchIcon.new()
-	state_icon.custom_minimum_size = Vector2(16, 16)
-	footer.add_child(state_icon)
-	research_details[technology_id] = {"icon": icon, "state_icon": state_icon, "title": title, "effect": effect, "cost": cost, "rank": rank}
-	return button
-
-func compact_research_label(text: String, font_size: int) -> Label:
-	var label := create_label(text, font_size)
-	label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	return label
-
-func refresh_research_buttons() -> void:
-	if progression == null:
-		return
-	if research_summary != null:
-		set_research_text(research_summary, "Nivel %d · %d {research}" % [progression.level, progression.research_points])
-	var blocked: bool = cycle != null and (cycle.is_night or cycle.defeated)
-	for technology_id in research_buttons:
-		var button: Button = research_buttons[technology_id]
-		var data: Dictionary = progression.RESEARCHES[technology_id]
-		var details: Dictionary = research_details[technology_id]
-		var researched: bool = progression.has_technology(technology_id)
-		button.disabled = researched or blocked or not progression.can_research(technology_id)
-		var available: bool = not button.disabled
-		var color := Color("#a9ca91") if researched else (Color("#f0cd91") if available else Color("#988b75"))
-		var background: String = "#263b2c" if researched else ("#443622" if available else "#2b261e")
-		var border: String = "#83aa6c" if researched else ("#d5b078" if available else "#584d3b")
-		button.add_theme_stylebox_override("normal", create_style(background, border, 2, 9))
-		button.add_theme_stylebox_override("disabled", create_style(background, border, 2, 9))
-		button.add_theme_stylebox_override("hover", create_style("#5b4729", "#f0d198", 2, 9))
-		button.add_theme_stylebox_override("pressed", create_style("#302b1f", "#e4c28a", 2, 9))
-		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if available else Control.CURSOR_ARROW
-		for name in ["title", "effect", "cost", "rank"]:
-			details[name].add_theme_color_override("default_color" if details[name] is RichTextLabel else "font_color", color)
-		details["icon"].tint = Color.WHITE if researched or available else Color(1, 1, 1, 0.5)
-		details["icon"].queue_redraw()
-		details["state_icon"].kind = "done" if researched else ("add" if available else "lock")
-		details["state_icon"].tint = color
-		details["state_icon"].queue_redraw()
-		var status: Label = research_status[technology_id]
-		status.text = "Nv. %d" % data["level"] if not researched and progression.level < int(data["level"]) else ""
-		status.add_theme_color_override("font_color", color)
-		var reason: String = progression.research_block_reason(technology_id)
-		if blocked and not researched:
-			reason = "Investiga durante el día."
-		button.tooltip_text = "%s\n%s\nNivel %d · Coste: %d de investigación" % [data["name"], data["description"], data["level"], data["cost"]]
-		for prerequisite in data["requires"]:
-			button.tooltip_text += "\nRequiere: %s" % progression.RESEARCHES[prerequisite]["name"]
-		button.tooltip_text += "\n" + ("Pulsa para investigar." if available else reason)
+		unlock_notice.hide()
+		unlock_notice_backdrop.hide()
+	elif not unlock_notice.visible:
+		unlock_notice.show()
+		unlock_notice_backdrop.show()
+		if unlock_notice_tween != null: unlock_notice_tween.kill()
+		unlock_notice_backdrop.modulate.a = 0
+		unlock_notice_tween = create_tween()
+		unlock_notice_tween.tween_property(unlock_notice_backdrop,"modulate:a",1.0,0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		unlock_notice_accept.grab_focus()
 
 func build_cycle_panel() -> void:
 	var panel := PanelContainer.new()
@@ -671,7 +446,7 @@ func build_cycle_panel() -> void:
 		cycle_steps.add_child(segment)
 	cycle_title = create_label("", 21, Color("#f1e6c9"))
 	column.add_child(cycle_title)
-	cycle_goal = create_research_label("", 14, Color("#bacbb7"))
+	cycle_goal = create_goal_label("", 14, Color("#bacbb7"))
 	cycle_goal.custom_minimum_size.y = 58
 	column.add_child(cycle_goal)
 	cycle_shift_hint = HBoxContainer.new()
@@ -756,11 +531,6 @@ func update_cycle() -> void:
 			cycle_action.text = "INICIAR NOCHE"
 		if not tutorial_purchase().is_empty():
 			cycle_goal.text += "\n" + tutorial_navigation_text()
-	elif cycle.is_research_tutorial_active():
-		cycle_heading.text = "INVESTIGACIÓN"
-		cycle_title.text = "Tu primer desbloqueo"
-		set_research_text(cycle_goal, "Tienes %d {research}. %s" % [progression.research_points, tutorial_navigation_text()])
-		cycle_action.hide()
 	elif cycle.defeated:
 		cycle_title.text = "Base destruida"
 		cycle_goal.text = "La entrada ha caído. Vuelve a empezar."
@@ -787,8 +557,6 @@ func update_cycle() -> void:
 	update_progression()
 
 func tutorial_purchase() -> Dictionary:
-	if cycle != null and cycle.is_research_tutorial_active():
-		return {"category": "INVESTIGACIÓN", "item": "research", "instruction": "Investiga la veta de latón." if progression.level == 2 else "Desbloquea un objeto a tu elección."}
 	if cycle == null or not cycle.is_tutorial_active(): return {}
 	if cycle.needs_tutorial_income(): return {}
 	var game: Node = get_parent().get_parent()
@@ -810,14 +578,6 @@ func tutorial_ui_target() -> Control:
 	if not shop_open: return shop_button
 	if shop_title.text != purchase["category"]:
 		return category_buttons.get(purchase["category"])
-	if str(purchase["item"]).begins_with("research:"):
-		var id: String = str(purchase["item"]).trim_prefix("research:")
-		var button: Control = research_buttons.get(id)
-		if button != null and focused_tutorial_research != id:
-			focused_tutorial_research = id
-			shop_scroll.call_deferred("ensure_control_visible",button)
-		return button
-	if purchase["item"] == "research": return research_summary
 	return purchase_buttons.get(purchase["item"])
 
 func tutorial_allows_item(_item: String) -> bool:
@@ -908,27 +668,15 @@ func create_item_preview(kind: String, minimum: Vector2 = Vector2(48, 48)) -> Co
 	preview.custom_minimum_size = minimum
 	return preview
 
-func create_research_label(value: String, font_size: int = 17, color: Color = Color("#f0e0c8")) -> RichTextLabel:
+func create_goal_label(value: String, font_size: int = 17, color: Color = Color("#f0e0c8")) -> RichTextLabel:
 	var label := RichTextLabel.new()
 	label.fit_content = true
 	label.scroll_active = false
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.add_theme_font_size_override("normal_font_size", font_size)
 	label.add_theme_color_override("default_color", color)
-	set_research_text(label, value)
+	label.text = value
 	return label
-
-func set_research_text(label: RichTextLabel, value: String) -> void:
-	label.clear()
-	var parts: PackedStringArray = value.split("{research}")
-	for index in range(parts.size()):
-		label.add_text(parts[index])
-		if index < parts.size() - 1:
-			if research_texture == null:
-				var picture := Image.new()
-				picture.load_svg_from_string('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M12 4h8v9l7 11q2 5-4 5H9q-6 0-4-5l7-11Z" fill="#c9eff9" fill-opacity=".25" stroke="#b5e6f5" stroke-width="2" stroke-linejoin="round"/><path d="m10 19-4 7q0 2 3 2h14q3 0 3-2l-4-7Z" fill="#279ee8"/><path d="M11 19q5-3 11 0" fill="none" stroke="#67d7ff" stroke-width="2"/><path d="M12 3h8v4h-8Z" fill="#b48248" stroke="#e0b779"/><path d="M13 9v5l-5 10" fill="none" stroke="#e9faff" stroke-width="1.5" stroke-linecap="round"/><circle cx="18" cy="23" r="1.5" fill="#b1efff"/><circle cx="13" cy="25" r="1" fill="#b1efff"/></svg>')
-				research_texture = ImageTexture.create_from_image(picture)
-			label.add_image(research_texture, 20, 20)
 
 func create_label(value: String, font_size: int = 17, color: Color = Color("#f0e0c8")) -> Label:
 	var label := Label.new()
@@ -1043,8 +791,8 @@ func build_interface() -> void:
 	view_button.anchor_right = 0.0
 	view_button.anchor_top = 0.0
 	view_button.anchor_bottom = 0.0
-	view_button.offset_left = 236.0
-	view_button.offset_right = 280.0
+	view_button.offset_left = 20.0
+	view_button.offset_right = 64.0
 	view_button.offset_top = 20.0
 	view_button.offset_bottom = 62.0
 	view_button.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -1083,8 +831,6 @@ func update_money(amount: int) -> void:
 		if shop_title.text == "RECURSOS":
 			if not economy.developer_mode: show_categories()
 			return
-		if shop_title.text == "INVESTIGACIÓN":
-			return
 		if shop_title.text in ITEM_CATEGORIES:
 			refresh_item_buttons()
 			return
@@ -1099,10 +845,6 @@ func clear_content() -> void:
 	resource_buttons.clear()
 	category_buttons.clear()
 	purchase_buttons.clear()
-	research_buttons.clear()
-	research_status.clear()
-	research_details.clear()
-	research_summary = null
 	for child in shop_content.get_children():
 		shop_content.remove_child(child)
 		child.queue_free()
@@ -1123,7 +865,7 @@ func show_categories() -> void:
 	if cycle != null: update_cycle()
 
 func open_category(category: String) -> void:
-	focused_tutorial_research = ""
+	if category not in CATEGORIES and category != "RECURSOS": return
 	if category == "RECURSOS" and not economy.developer_mode: return
 	if shop_animating:
 		return
@@ -1139,8 +881,6 @@ func open_category(category: String) -> void:
 				button.pressed.connect(interactions.select_resource.bind(kind))
 				resource_buttons[kind] = button
 				catalog_grid().add_child(button)
-		"INVESTIGACIÓN":
-			build_research_content()
 		"EXPANSION":
 			var button := create_art_button("expansion", "Ampliar a 7 × 5", economy.EXPANSION_PRICE)
 			if grid.cave_width >= 7:
@@ -1181,12 +921,7 @@ func open_category(category: String) -> void:
 			catalog_grid().add_child(platforms_button)
 			platforms_button.disabled = platforms_button.disabled or not tutorial_allows_item("defense_platforms")
 			purchase_buttons["defense_platforms"] = platforms_button
-			var launcher_button := create_art_button("launcher", "Lanzapepitas · Nv. 1\nMunición: pepitas de nivel 1.", economy.LAUNCHER_PRICE)
-			launcher_button.disabled = not economy.can_afford(economy.LAUNCHER_PRICE)
-			launcher_button.disabled = launcher_button.disabled or not tutorial_allows_item("launcher")
-			launcher_button.pressed.connect(request_item.bind("launcher", launcher_requested))
-			purchase_buttons["launcher"] = launcher_button
-			catalog_grid().add_child(launcher_button)
+			add_item_button("LANZAPEPITAS · 200", economy.LAUNCHER_PRICE, "launcher", launcher_requested)
 	if cycle != null: update_cycle()
 
 func add_item_button(text: String, price: int, item: String, request: Signal) -> void:
@@ -1218,8 +953,7 @@ func refresh_item_buttons() -> void:
 		button.tooltip_text = item_buttons[item].get("name", item)
 		var construction: Node = get_parent().get_parent().get_node_or_null("Construction")
 		if construction != null and construction.has_recipe(item): button.tooltip_text += "\n" + construction.recipe_text(item)
-		if not unlocked:
-			button.tooltip_text += "\nInvestigar: %s" % progression.RESEARCHES[progression.ITEM_RESEARCH[item]]["name"]
+		if item == "launcher": button.tooltip_text += "\nDispara solo en las plataformas de defensa. Munición: pepitas Nv. 1."
 
 func unlock_defense_platforms() -> void:
 	if not tutorial_allows_item("defense_platforms") or (cycle != null and not cycle.allows_action("unlock_defense")):
@@ -1242,7 +976,7 @@ func _input(event: InputEvent) -> void:
 	handle_outside_click(event)
 
 func handle_outside_click(event: InputEvent) -> bool:
-	if research_notice_backdrop != null and research_notice_backdrop.visible: return false
+	if unlock_notice_backdrop != null and unlock_notice_backdrop.visible: return false
 	if not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_LEFT: return false
 	if not event.pressed and outside_click_pending:
 		outside_click_pending = false
@@ -1316,70 +1050,6 @@ class ViewIcon extends Control:
 			draw_line(Vector2(0, -7), Vector2(0, 6), Color("#f2cf86"), 2, true)
 			draw_line(Vector2(-5, -1), Vector2(5, -1), Color("#f2cf86"), 2, true)
 
-class ResearchIcon extends Control:
-	var kind: String = "lock"
-	var tint := Color("#d5b078")
-
-	func _init() -> void:
-		mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	func _notification(what: int) -> void:
-		if what == NOTIFICATION_RESIZED:
-			queue_redraw()
-
-	func _draw() -> void:
-		var factor: float = minf(size.x, size.y) / 32.0
-		draw_set_transform((size - Vector2.ONE * 32.0 * factor) * 0.5, 0.0, Vector2.ONE * factor)
-		match kind:
-			"compactor":
-				draw_rect(Rect2(3, 3, 26, 26), tint, false, 2)
-				draw_rect(Rect2(8, 7, 16, 4), tint)
-				draw_rect(Rect2(8, 21, 16, 4), tint)
-				for index in range(4): draw_circle(Vector2(10 + (index % 2) * 10, 14 + (index / 2) * 4), 1.5, tint)
-			"ore":
-				draw_colored_polygon(PackedVector2Array([Vector2(3, 22), Vector2(8, 9), Vector2(21, 5), Vector2(29, 17), Vector2(23, 28), Vector2(9, 28)]), tint)
-				draw_line(Vector2(10, 12), Vector2(18, 9), Color("#352516"), 2, true)
-			"curve", "junction":
-				var lines := [PackedVector2Array([Vector2(5, 27), Vector2(5, 7), Vector2(27, 7)]), PackedVector2Array([Vector2(13, 27), Vector2(13, 15), Vector2(27, 15)])]
-				for points in lines:
-					draw_polyline(points, tint, 2.5, true)
-				if kind == "junction":
-					draw_line(Vector2(9, 11), Vector2(9, 1), tint, 5, true)
-			"pickaxe":
-				draw_line(Vector2(9, 27), Vector2(20, 9), tint, 3.5, true)
-				draw_polyline(PackedVector2Array([Vector2(5, 15), Vector2(13, 7), Vector2(23, 8), Vector2(28, 14)]), tint, 3.5, true)
-			"drill":
-				draw_rect(Rect2(7, 4, 18, 6), tint)
-				draw_rect(Rect2(11, 12, 10, 8), tint)
-				draw_colored_polygon(PackedVector2Array([Vector2(11, 22), Vector2(21, 22), Vector2(16, 30)]), tint)
-			"belt", "fast_belt":
-				draw_rect(Rect2(2, 9, 28, 15), tint, false, 2.0)
-				draw_circle(Vector2(7, 16.5), 2, tint)
-				draw_circle(Vector2(25, 16.5), 2, tint)
-				for offset in ([0, 6] if kind == "fast_belt" else [3]):
-					draw_polyline(PackedVector2Array([Vector2(10 + offset, 12), Vector2(15 + offset, 16.5), Vector2(10 + offset, 21)]), tint, 2, true)
-			"target":
-				draw_arc(Vector2(16, 16), 10, 0, TAU, 24, tint, 2, true)
-				draw_circle(Vector2(16, 16), 3, tint)
-				draw_line(Vector2(16, 1), Vector2(16, 8), tint, 2, true)
-				draw_line(Vector2(16, 24), Vector2(16, 31), tint, 2, true)
-				draw_line(Vector2(1, 16), Vector2(8, 16), tint, 2, true)
-				draw_line(Vector2(24, 16), Vector2(31, 16), tint, 2, true)
-			"ammo":
-				for x in [5, 13, 21]:
-					draw_rect(Rect2(x, 12, 5, 15), tint)
-					draw_colored_polygon(PackedVector2Array([Vector2(x, 10), Vector2(x + 5, 10), Vector2(x + 2.5, 4)]), tint)
-			"done":
-				draw_polyline(PackedVector2Array([Vector2(6, 16), Vector2(13, 23), Vector2(27, 8)]), tint, 3.5, true)
-			"add":
-				draw_line(Vector2(7, 16), Vector2(25, 16), tint, 3, true)
-				draw_line(Vector2(16, 7), Vector2(16, 25), tint, 3, true)
-			"lock":
-				draw_arc(Vector2(16, 13), 7, PI, TAU, 16, tint, 2.5, true)
-				draw_rect(Rect2(6, 13, 20, 15), tint, false, 2.5)
-				draw_line(Vector2(16, 18), Vector2(16, 23), tint, 2.5, true)
-
-# Isolated drawing nodes reuse the world artwork without joining its simulation.
 class ItemPreview extends Control:
 	var kind := "coal"
 	var tint := Color.WHITE:
@@ -1442,12 +1112,7 @@ class ItemArt extends "res://Scripts/world_renderer.gd":
 			"brass": draw_brass_vein(Vector2.ZERO, 1, 0, false)
 			"straight", "corner_right", "corner_left", "junction":
 				draw_conveyor(Vector2.ZERO, 0, false, kind)
-			"drill", "research":
-				draw_drill(Vector2.ZERO, 0, false)
-				if kind == "research":
-					draw_circle(Vector2(15, 15), 9, Color("#1a2b21"))
-					draw_line(Vector2(10, 15), Vector2(20, 15), Color("#ffdf9c"), 2)
-					draw_line(Vector2(15, 10), Vector2(15, 20), Color("#ffdf9c"), 2)
+			"drill": draw_drill(Vector2.ZERO, 0, false)
 			"launcher": draw_launcher(Vector2.ZERO, {"ammo": [], "angle": -PI * 0.5}, false)
 			"platform": draw_defense_platform(Rect2(-24, -24, 48, 48))
 			"resources":

@@ -38,9 +38,6 @@ func _ready() -> void:
 	on_step_changed()
 
 func on_step_changed() -> void:
-	if cycle.is_research_tutorial_active():
-		game.cancel_placement.call_deferred()
-		clear_interaction()
 	if not cycle.is_tutorial_active():
 		queue_redraw()
 		return

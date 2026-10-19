@@ -55,7 +55,7 @@ func can_hold(cell: Vector2i, data: Dictionary) -> bool:
 	for kind: String in game.get("mining").ORE_KINDS:
 		if data.has(kind): ore = true
 	if data.has("launcher"):
-		return grid.defense_tiles.has(cell) and not ore
+		return ((grid.is_valid_cell(cell) or grid.is_ammo_cell(cell)) or grid.defense_tiles.has(cell)) and not ore
 	if grid.is_defense_position(cell):
 		return data.is_empty()
 	if data.has("coal_vein") or data.has("brass_vein") or data.has("iron_vein") or data.has("gold_vein") or data.has("drill") or data.has("compactor") or data.has("furnace") or data.has("saw"):
@@ -66,7 +66,7 @@ func phase_allows(allow_transition: bool = false) -> bool:
 	var cycle: RefCounted = game.get("cycle")
 	var shop: Control = game.get("shop")
 	var victory: Control = game.get("night_victory_overlay")
-	return not get_tree().paused and (shop.research_notice_backdrop == null or not shop.research_notice_backdrop.visible) and not cycle.defeated and not shop.shop_open and not shop.shop_animating and (victory == null or not victory.visible) and (allow_transition or not game.get("camera_controller").transitioning)
+	return not get_tree().paused and (shop.unlock_notice_backdrop == null or not shop.unlock_notice_backdrop.visible) and not cycle.defeated and not shop.shop_open and not shop.shop_animating and (victory == null or not victory.visible) and (allow_transition or not game.get("camera_controller").transitioning)
 
 func toggle_night_view() -> void:
 	if not game.get("cycle").is_night or not phase_allows(true):

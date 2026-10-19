@@ -42,7 +42,6 @@ func run_checks() -> void:
 	game.mining.brass_level4_nuggets.clear()
 	put(a, {"coal_4": 1})
 	check(mover.drop("nugget", a, c) and furnace.machines[c]["fuel"] == 20 and not furnace.stored_items(c).has("coal_4"), "Level-four coal is consumed into twenty fuel, separately from the brass")
-	var xp: int = game.progression.total_experience
 	var cash: int = game.economy.coins
 	furnace.process_smelting(3.9)
 	check(furnace.machines[c]["fuel"] == 19 and furnace.machines[c]["output"] == "" and furnace.machines[c]["input"] == "brass_4", "One fuel starts a four-second batch; nothing finishes early")
@@ -50,7 +49,7 @@ func run_checks() -> void:
 	furnace.process_smelting(0.1)
 	check(furnace.machines[c]["input"] == "" and furnace.machines[c]["output"] == "brass_ingot" and furnace.machines[c]["fuel"] == 19, "One level-four nugget becomes exactly one level-one ingot")
 	furnace.process_smelting(100)
-	check(furnace.stored_items(c) == {"brass_ingot": 1} and furnace.machines[c]["fuel"] == 19 and game.progression.total_experience == xp and game.economy.coins == cash, "A blocked product neither duplicates nor burns extra fuel or grants rewards")
+	check(furnace.stored_items(c) == {"brass_ingot": 1} and furnace.machines[c]["fuel"] == 19 and game.economy.coins == cash, "A blocked product neither duplicates nor burns extra fuel or grants rewards")
 	await mouse_move(point(c))
 	await mouse_button(point(c), true)
 	await mouse_button(point(c), false)
@@ -104,8 +103,7 @@ func run_checks() -> void:
 		put(a, {kind: 1})
 		check(not mover.drop("nugget", a, platform) and game.mining.nugget_type(a) == kind, "Level-one weapons reject level-%d ingots without consuming them" % level)
 		cash = game.economy.coins
-		xp = game.progression.total_experience
-		check(mover.drop("nugget", a, game.grid.sale_cell) and game.economy.coins == cash + [150,400,1000,2500][level-1] and game.progression.total_experience == xp + [1,2,3,5][level-1], "Level-%d ingots sell with the correct value and input-equivalent EXP" % level)
+		check(mover.drop("nugget", a, game.grid.sale_cell) and game.economy.coins == cash + [150,400,1000,2500][level-1], "Level-%d ingots sell with the correct value" % level)
 		clear_items()
 	put(a, {"brass_2": 1})
 	put(b, {"brass_ingot": 1})
@@ -176,3 +174,7 @@ func run_checks() -> void:
 	game.queue_free()
 	await settle()
 	quit(0 if failed == 0 else 1)
+
+func clear_items() -> void:
+	super.clear_items()
+	game.shop.accept_unlock_notice()

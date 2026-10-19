@@ -86,6 +86,7 @@ func process_cutting(delta: float) -> void:
 			data["count"] = 2
 			data["pending"] = [true,true]
 			data["elapsed"] = 0.0
+			mining.resource_created.emit(str(data["output"]))
 			cut.emit(cell)
 			changed.emit()
 		if int(data["count"]) > 0: try_output(cell)

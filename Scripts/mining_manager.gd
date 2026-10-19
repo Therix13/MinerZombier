@@ -1,5 +1,6 @@
 extends RefCounted
 
+signal resource_created(kind: String)
 signal struck(cell: Vector2i)
 signal changed
 signal sale_completed(kind: String)
@@ -11,6 +12,7 @@ const BRASS_CLICKS := 7
 const ORE_KINDS := ["coal", "brass", "coal_2", "brass_2", "coal_3", "brass_3", "coal_4", "brass_4", "brass_ingot", "brass_ingot_2", "brass_ingot_3", "brass_ingot_4", "iron", "iron_2", "iron_3", "iron_4", "iron_ingot", "iron_ingot_2", "iron_ingot_3", "iron_ingot_4", "gold", "gold_2", "gold_3", "gold_4", "gold_ingot", "gold_ingot_2", "gold_ingot_3", "gold_ingot_4"]
 const DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 
+var launchers: RefCounted
 var drills: RefCounted
 var conveyors: RefCounted
 var compactors: Node2D
@@ -41,6 +43,7 @@ func setup(grid_manager: RefCounted) -> void:
 	drop_random.randomize()
 
 func dispose() -> void:
+	launchers = null
 	drills = null
 	conveyors = null
 	compactors = null
@@ -129,6 +132,7 @@ func fuse(source: Vector2i, destination: Vector2i) -> bool:
 	remove_one_nugget(destination, kind)
 	var result: String = next_tier(kind)
 	items_for(result)[destination] = 1
+	resource_created.emit(result)
 	fusion_completed.emit(result)
 	changed.emit()
 	return true
@@ -143,7 +147,7 @@ func occupied_by_saw(cell: Vector2i) -> bool:
 	return is_instance_valid(saws) and saws.machines.has(cell)
 
 func occupied_by_machine(cell: Vector2i) -> bool:
-	return occupied_by_saw(cell) or occupied_by_compactor(cell) or occupied_by_furnace(cell) or (is_instance_valid(construction) and construction.plans.has(cell))
+	return (launchers != null and launchers.launchers.has(cell)) or occupied_by_saw(cell) or occupied_by_compactor(cell) or occupied_by_furnace(cell) or (is_instance_valid(construction) and construction.plans.has(cell))
 
 func nugget_type(cell: Vector2i) -> String:
 	var inventories: Dictionary = nugget_stores()
@@ -186,6 +190,7 @@ func mine(cell: Vector2i) -> bool:
 		var tier: int = rolled_vein_level(level, drop_random.randf()) if level > 1 else 1
 		var dropped_kind: String = kind if tier == 1 else kind + "_" + str(tier)
 		items_for(dropped_kind)[destination] = 1
+		resource_created.emit(dropped_kind)
 		progress = 0
 	vein["progress"] = progress
 	dictionary[cell] = vein

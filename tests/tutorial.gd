@@ -120,7 +120,7 @@ func run_checks() -> void:
 	cycle = game.cycle
 	grid = game.grid
 	check(cycle.TUTORIAL_DISPLAY_STEPS == 6 and game.economy.coins == 100,"Six lessons start with exactly 100 gold")
-	check(not game.get_node("WorldInteractions").select_item("brass"),"Brass remains locked by normal research")
+	check(not game.get_node("WorldInteractions").select_item("brass"),"Brass stays locked until a level-four coal vein is created")
 	await purchase_route("VETAS","coal")
 	await click_cell(cycle.coal_cell)
 	check(cycle.tutorial_step == 1 and game.economy.coins == 0,"First purchase advances to nugget fusion without extra gold")
@@ -139,31 +139,12 @@ func run_checks() -> void:
 	await batch_coal(4)
 	await fuse_veins_to(4)
 	check(cycle.tutorial_step == 5 and game.economy.coins == 0,"Four additional veins produce a level-four vein")
-	check(game.progression.level == 1,"No early tutorial XP gift bypasses research")
+	check(game.progression.is_item_unlocked("brass"),"The level-four coal vein automatically unlocks brass before the final budget lesson")
+	await acknowledge_unlocks()
 	await fund_goal(500)
 	check(cycle.tutorial_step == 6 and not cycle.is_tutorial_active(),"Tutorial ends at 500 gold")
-	check(game.progression.level == 2 and game.progression.research_points == 1,"Final milestone awards only missing XP to research brass")
-	check(not game.progression.has_research("brass") and game.progression.visible_researches().has("brass"),"Brass becomes available for normal research")
+	check(game.progression.is_item_unlocked("brass") and game.economy.coins == 500,"Final milestone leaves 500 gold available to purchase brass without research")
 	check(not cycle.is_night and not cycle.barrier_broken and game.get_node_or_null("BarrierBreach") == null,"Completing this guide does not automatically start a night")
-	check(shop.research_notice.visible and shop.notice_research_ids.has("brass"),"New research announcement appears at the final milestone")
-	await create_timer(3.3).timeout
-	check(shop.research_notice.visible,"Research announcement persists beyond three seconds")
-	var old_progress: int = game.mining.coal_veins[cycle.coal_cell]["progress"]
-	await click_cell(cycle.coal_cell)
-	check(game.mining.coal_veins[cycle.coal_cell]["progress"] == old_progress,"Announcement blocks mining input behind it")
-	check(shop.research_notice.visible and not game.get_node("WorldInteractions").phase_allows(),"Clicking outside the announcement cannot dismiss it or interact with the mine")
-	await click_control(shop.research_notice_accept)
-	check(not shop.research_notice.visible and shop.notice_research_ids.is_empty(),"Aceptar closes and acknowledges the research announcement")
-	check(game.economy.coins == 500 and game.progression.experience == 0,"Final XP boost leaves 500 gold intact and stops at the required level")
-	# Research notices remain queued throughout a horde, then still require acceptance.
-	cycle.is_night = true
-	var queued: Array[String] = ["drill"]
-	shop.announce_researches(queued)
-	check(not shop.research_notice.visible,"Research notices remain hidden during a horde")
-	cycle.is_night = false
-	shop.update_notice_visibility()
-	check(shop.research_notice.visible,"Queued research appears once the horde ends")
-	await click_control(shop.research_notice_accept)
 	# Finishing early or skipping should not leave a pointer behind.
 	cycle.skip_tutorial()
 	await settle()
@@ -174,6 +155,7 @@ func run_checks() -> void:
 func fund_goal(goal: int) -> void:
 	var count := 0
 	while game.economy.coins < goal and count < 1500:
+		await acknowledge_unlocks()
 		var targets: Array[Vector2i] = cycle.income_targets()
 		if targets.size() == 1:
 			for strike in range(5): await click_cell(targets[0])
@@ -204,3 +186,7 @@ func fuse_veins_to(level: int) -> void:
 		await drag_cell(pair[0],pair[1])
 		count += 1
 	check(game.mining.vein_level(cycle.coal_cell) == level,"Actual vein fusion reaches level %d" % level)
+
+func acknowledge_unlocks() -> void:
+	if shop.unlock_notice.visible:
+		await click_control(shop.unlock_notice_accept)

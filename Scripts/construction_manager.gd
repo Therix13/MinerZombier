@@ -5,6 +5,7 @@ signal completed(cell: Vector2i)
 
 const ArtAtlas = preload("res://Scripts/art_atlas.gd")
 const RECIPES := {
+	"launcher": {"brass_ingot_3": 1, "brass_ingot": 1},
 	"saw": {"iron_3": 1, "iron": 1},
 	"furnace": {"coal_4": 2},
 	"straight": {"brass_3": 1},
@@ -66,7 +67,9 @@ func recipe_text(item: String) -> String:
 func cancel(cell: Vector2i) -> bool:
 	if not plans.has(cell) or game.get("cycle").is_night: return false
 	var data: Dictionary = plans[cell]
-	var free: Array[Vector2i] = [cell]
+	var free: Array[Vector2i] = []
+	# Defense platforms cannot hold the raw ingredients of a canceled blueprint.
+	if game.get("grid").is_valid_cell(cell) or game.get("grid").is_ammo_cell(cell): free.append(cell)
 	for at: Vector2i in game.get("grid").owned_tiles:
 		if at != cell and at != game.get("grid").sale_cell and mining.can_move_nugget(at): free.append(at)
 	var count: int = 0
@@ -97,7 +100,10 @@ func _draw() -> void:
 		var key: String = "%s:%d" % [item, direction]
 		if item == "furnace": key = "furnace:%d:0" % direction
 		elif item in ["straight", "corner_right", "corner_left", "junction"]: key = "belt:%s:%d" % [item,direction]
-		if item == "saw":
+		if item == "launcher":
+			game.get("renderer").draw_launcher_on(self, center, {"ammo": []}, true)
+			draw_rect(rect,Color("#4d9bde88"))
+		elif item == "saw":
 			preload("res://Scripts/saw_manager.gd").draw_machine(self,center,{"direction":direction})
 			draw_rect(rect,Color("#4d9bde88"))
 		elif ArtAtlas.prepare() and ArtAtlas.regions.has(key):

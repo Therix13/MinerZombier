@@ -136,7 +136,7 @@ func refresh() -> void:
 			var data: Dictionary = game.get_node("Compactors").machines[cell]
 			status.text = "Compactador"
 			if int(data["count"]) == 2: status.text += " · %.1f / 4 s" % float(data["elapsed"])
-		"launcher": status.text = "Lanzapepitas"
+		"launcher": status.text = "Lanzapepitas" if game.get("launchers").is_active_position(cell) else "Lanzapepitas · Fuera de defensa"
 		"drill": status.text = "Taladro"
 	if withdrawal_blocked: status.text += " · Sin espacio libre."
 	var signature: String = var_to_str(items)

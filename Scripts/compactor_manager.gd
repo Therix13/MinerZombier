@@ -39,7 +39,6 @@ func on_sale_completed(kind: String) -> void:
 	if kind not in mining.ORE_KINDS: return
 	var economy: RefCounted = game.get("economy")
 	economy.add(economy.sale_value(kind))
-	game.get("progression").award_sale(kind)
 
 func can_place(cell: Vector2i) -> bool:
 	return grid.owned_tiles.has(cell) and grid.is_valid_cell(cell) and not grid.is_defense_position(cell) and cell != grid.sale_cell and not mining.occupied_by_machine(cell) and mining.vein_at(cell) == "" and mining.nuggets_at(cell) == 0 and not game.get("drills").drills.has(cell) and not game.get("conveyors").belts.has(cell) and not game.get("launchers").launchers.has(cell)
@@ -89,6 +88,7 @@ func process_outputs(delta: float = 0.0) -> void:
 		else:
 			continue
 		data["elapsed"] = 0.0
+		mining.resource_created.emit(kind)
 		mining.fusion_completed.emit(kind)
 		mining.changed.emit()
 		changed.emit()

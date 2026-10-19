@@ -22,6 +22,7 @@ var damage_multiplier: float = DAMAGE_MULTIPLIER
 func setup(grid_manager: RefCounted, mining_manager: RefCounted, conveyor_manager: RefCounted, drill_manager: RefCounted, world_node: Node2D) -> void:
 	grid = grid_manager
 	mining = mining_manager
+	mining.launchers = self
 	conveyors = conveyor_manager
 	drills = drill_manager
 	world = world_node
@@ -35,23 +36,26 @@ func dispose() -> void:
 	shots.clear()
 
 func can_place(cell: Vector2i) -> bool:
-	return grid.defense_tiles.has(cell) and cell != grid.sale_cell and not launchers.has(cell) and not conveyors.belts.has(cell) and not drills.drills.has(cell) and mining.vein_at(cell) == "" and mining.nuggets_at(cell) == 0
+	return ((grid.owned_tiles.has(cell) and (grid.is_valid_cell(cell) or grid.is_ammo_cell(cell))) or grid.defense_tiles.has(cell)) and cell != grid.sale_cell and not launchers.has(cell) and not conveyors.belts.has(cell) and not drills.drills.has(cell) and not mining.occupied_by_machine(cell) and mining.vein_at(cell) == "" and mining.nuggets_at(cell) == 0
 
 func place(cell: Vector2i) -> bool:
-	if not grid.defense_tiles.has(cell) or not can_place(cell):
+	if not can_place(cell):
 		return false
 	launchers[cell] = {"ammo": [], "cooldown": 0.0, "angle": -PI * 0.5}
 	changed.emit()
 	return true
 
 func move(source: Vector2i, destination: Vector2i) -> bool:
-	if not launchers.has(source) or not grid.defense_tiles.has(destination) or (source != destination and not can_place(destination)):
+	if not launchers.has(source) or (source != destination and not can_place(destination)):
 		return false
 	var data: Dictionary = launchers[source]
 	launchers.erase(source)
 	launchers[destination] = data
 	changed.emit()
 	return true
+
+func is_active_position(cell: Vector2i) -> bool:
+	return grid.is_defense_position(cell) and grid.defense_tiles.has(cell)
 
 func can_receive(cell: Vector2i, kind: String = "") -> bool:
 	return (kind.is_empty() or kind in ["coal", "brass"]) and launchers.has(cell) and (launchers[cell]["ammo"] as Array).size() < capacity
@@ -73,6 +77,7 @@ func advance(delta: float) -> void:
 			visual_changed = true
 	for key in launchers:
 		var cell: Vector2i = key
+		if not is_active_position(cell): continue
 		var data: Dictionary = launchers[cell]
 		data["cooldown"] = maxf(0.0, float(data["cooldown"]) - delta)
 		var ammo: Array = data["ammo"]

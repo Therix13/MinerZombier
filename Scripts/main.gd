@@ -92,7 +92,6 @@ func _ready() -> void:
 	zombie_manager = ZombieManagerScript.new()
 	add_child(zombie_manager)
 	zombie_manager.setup(grid)
-	zombie_manager.zombie_defeated.connect(on_zombie_defeated)
 	cycle = CycleScript.new()
 	cycle.setup(grid, mining, conveyors, launchers, economy)
 	zombie_manager.wave_completed.connect(on_wave_completed)
@@ -107,7 +106,6 @@ func _ready() -> void:
 	shop.set_progression(progression)
 	shop.night_requested.connect(start_night)
 	shop.restart_requested.connect(restart_game)
-	shop.technology_requested.connect(research_technology)
 	shop.view_toggle_requested.connect(toggle_view)
 	shop.expansion_requested.connect(buy_expansion)
 	shop.coal_vein_requested.connect(buy_coal_vein)
@@ -140,7 +138,7 @@ func update_display_layout() -> void:
 func _exit_tree() -> void:
 	# RefCounted managers refer to each other. Break those cycles on scene
 	# changes and shutdown so restarting does not retain the previous game.
-	for manager in [cycle, mining, conveyors, drills, launchers]:
+	for manager in [cycle, progression, mining, conveyors, drills, launchers]:
 		if manager != null:
 			manager.dispose()
 
@@ -274,17 +272,6 @@ func cancel_placement() -> void:
 
 func on_sale_completed(kind: String) -> void:
 	economy.add(economy.BRASS_SELL_PRICE if kind == "brass" else economy.COAL_SELL_PRICE)
-	progression.award_sale(kind)
-
-func on_zombie_defeated() -> void:
-	progression.add_experience(progression.ZOMBIE_EXPERIENCE)
-
-func research_technology(technology_id: String) -> void:
-	if not cycle.allows_action("research"):
-		return
-	if cycle.is_night or cycle.defeated or (night_victory_overlay != null and night_victory_overlay.visible):
-		return
-	progression.research(technology_id)
 
 func _input(event: InputEvent) -> void:
 	# Handle pause before placement, victory dialogs, or gameplay shortcuts.

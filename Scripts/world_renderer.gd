@@ -101,7 +101,7 @@ func _draw() -> void:
 	if placing_belt and preview_allowed("belt") and grid.owned_tiles.has(hovered_cell) and conveyors.can_place(hovered_cell):
 		draw_conveyor(grid.get_cell_rect(hovered_cell).get_center(), placement_direction, true, placement_belt_shape)
 	if placing_launcher and (grid.is_valid_cell(hovered_cell) or grid.is_defense_position(hovered_cell)):
-		var launcher_valid: bool = preview_allowed("launcher") and grid.defense_tiles.has(hovered_cell) and launchers.can_place(hovered_cell)
+		var launcher_valid: bool = preview_allowed("launcher") and launchers.can_place(hovered_cell)
 		if launcher_valid:
 			draw_rect(grid.get_cell_rect(hovered_cell).grow(-1.0), Color("#ffe084"), false, 3.0)
 		else:
@@ -119,7 +119,7 @@ func _draw() -> void:
 		elif held_object_type == "belt":
 			valid = destination == held_object_cell or conveyors.can_place(destination)
 		elif held_object_type == "launcher":
-			valid = destination == held_object_cell or (grid.defense_tiles.has(destination) and launchers.can_place(destination))
+			valid = destination == held_object_cell or launchers.can_place(destination)
 		elif held_object_type == "nugget":
 			valid = mining.can_move_nugget(destination) or destination == grid.sale_cell or launchers.can_receive(destination)
 		if is_instance_valid(interactions):
@@ -505,27 +505,31 @@ func draw_brass_nugget(center: Vector2, amount: int) -> void:
 		draw_string(ThemeDB.fallback_font, center + Vector2(9, 17), str(amount), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#ffdb85"))
 
 func draw_launcher(center: Vector2, data: Dictionary, preview: bool) -> void:
-	var rect := Rect2(center - Vector2.ONE * grid.TILE_SIZE * 0.5, Vector2.ONE * grid.TILE_SIZE).grow(-3.0)
-	var color := Color("#6f7b52")
-	if preview:
-		color.a = 0.65
-	draw_rect(rect, Color("#282c21"))
-	draw_rect(rect.grow(-3.0), color)
-	draw_rect(rect, Color("#d0ab69"), false, 2.0)
-	var angle: float = float(data.get("angle", -PI * 0.5))
-	var direction := Vector2.RIGHT.rotated(angle)
-	draw_circle(center, 14.0, Color("#33412b"))
-	draw_circle(center, 10.0, Color("#b0bd7b"))
-	draw_line(center, center + direction * 19.0, Color("#44301d"), 11.0)
-	draw_line(center, center + direction * 19.0, Color("#c6a066"), 7.0)
-	draw_circle(center + direction * 18.0, 5.0, Color("#3b2d20"))
+	draw_launcher_on(self, center, data, preview)
+
+func draw_launcher_on(canvas: Node2D, center: Vector2, data: Dictionary, preview: bool) -> void:
+	var rect := Rect2(center - Vector2(21,21), Vector2(42,42))
+	var brass := Color("#bd843f")
+	if preview: brass.a = 0.65
+	canvas.draw_rect(rect, Color("#4d3423"))
+	canvas.draw_rect(rect.grow(-3), brass)
+	canvas.draw_rect(rect, Color("#efbc6c"), false, 2)
+	canvas.draw_line(rect.position + Vector2(3,3),rect.position + Vector2(38,3),Color("#ffda91"),2)
+	for bolt: Vector2 in [Vector2(-16,-16),Vector2(16,-16)]:
+		canvas.draw_circle(center + bolt, 2, Color("#ffe0a0"))
+	canvas.draw_circle(center, 14, Color("#634324"))
+	canvas.draw_circle(center, 11, Color("#e8ac58"))
+	canvas.draw_arc(center, 9, PI, TAU, 12, Color("#ffdb91"), 2)
+	var direction := Vector2.RIGHT.rotated(float(data.get("angle", -PI * 0.5)))
+	var muzzle: Vector2 = center + direction * 18
+	canvas.draw_line(center, muzzle, Color("#633f21"), 12)
+	canvas.draw_line(center, muzzle, brass, 8)
+	canvas.draw_line(center + direction.orthogonal()*2, muzzle + direction.orthogonal()*2, Color("#ffd08a"), 2)
+	canvas.draw_circle(muzzle, 5, Color("#e6b05c"))
+	canvas.draw_circle(muzzle, 3, Color("#3e2b20"))
 	var ammo: Array = data.get("ammo", [])
-	var slots: int = launchers.capacity
-	for i in range(slots):
-		var offset_x: float = 5.0 + float(i) * (rect.size.x - 10.0) / float(maxi(slots - 1, 1))
-		draw_circle(rect.position + Vector2(offset_x, rect.size.y - 5.0), 1.8, Color("#f5d17b") if i < ammo.size() else Color("#2f2b25"))
-		if i < ammo.size() and str(ammo[i]).ends_with("_2"):
-			draw_arc(rect.position + Vector2(offset_x, rect.size.y - 5.0), 3.0, 0, TAU, 10, Color("#ffe8aa"), 1)
+	for i in range(5):
+		canvas.draw_circle(center + Vector2(-14 + i*7,16), 1.8, Color("#ffe2a0") if i < ammo.size() else Color("#624527"))
 
 func draw_defense_platform(rect: Rect2) -> void:
 	if not rasterizing and rect.size == Vector2.ONE * 48 and ArtAtlas.paint(self, "platform", rect.get_center()): return

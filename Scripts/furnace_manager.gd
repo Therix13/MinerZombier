@@ -104,6 +104,7 @@ func process_smelting(delta: float) -> void:
 		if float(data["elapsed"]) < PROCESS_TIME: continue
 		data["output"] = str(data["input"]).get_slice("_", 0) + "_ingot"
 		data["input"] = ""
+		mining.resource_created.emit(str(data["output"]))
 		smelted.emit(cell)
 		data["elapsed"] = PROCESS_TIME
 		data["burning"] = false
