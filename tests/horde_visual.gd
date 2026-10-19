@@ -58,7 +58,7 @@ func run_checks() -> void:
 	await mouse_button(at,false)
 	check(boss.focused and game.launchers.focused_enemy.get_ref() == boss,"Clicking a live boss selects it as the priority target")
 	check(not game.shop.get_node("CyclePanel").visible and game.get_node_or_null("TutorialGuide") == null,"No tutorial window or logic remains in later hordes")
-	check(game.phase_clock.visible and "02:00" in game.phase_clock.time_label.text,"The compact night clock displays two minutes")
+	check(game.phase_clock.visible and "22:00" in game.phase_clock.time_label.text,"The compact night clock begins at 22:00")
 	check(manager.living_zombies().size() == 7,"All seven enemy types share the battlefield")
 	for enemy: Node2D in manager.living_zombies():
 		check(enemy.body_sprite.texture == preload("res://Scripts/zombie.gd").get_body_atlas(),"Special enemy reuses the shared body texture: " + enemy.archetype)

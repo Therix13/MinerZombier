@@ -2,12 +2,25 @@ extends Control
 
 var game: Node2D
 var time_label: Label
-var detail: Label
+var day_label: Label
+var phase_icon: PhaseIcon
 var action: Button
-var bar: ProgressBar
 var last_state: Array = []
 var speed_controls: HBoxContainer
 var night_speed: int = 1
+
+class PhaseIcon extends Control:
+	var night: bool = false
+	func _draw() -> void:
+		var center := size * 0.5
+		if night:
+			draw_circle(center,10,Color("#d1e2e6"))
+			draw_circle(center + Vector2(5,-4),9,Color("#192d26"))
+		else:
+			draw_circle(center,6,Color("#efc368"))
+			for i in range(8):
+				var ray := Vector2.RIGHT.rotated(i * TAU / 8)
+				draw_line(center + ray * 9,center + ray * 12,Color("#efc368"),2,true)
 
 class SpeedButton extends Button:
 	var multiplier: int = 1
@@ -29,34 +42,33 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var panel := PanelContainer.new()
 	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var style: StyleBoxFlat = game.shop.create_style("#192d26","#b98b50",2,10)
-	style.content_margin_left = 12
-	style.content_margin_right = 12
-	style.content_margin_top = 8
-	style.content_margin_bottom = 8
+	var style: StyleBoxFlat = game.shop.create_style("#192d26","#8f7952",1,8)
+	style.content_margin_left = 9
+	style.content_margin_right = 9
+	style.content_margin_top = 5
+	style.content_margin_bottom = 5
 	panel.add_theme_stylebox_override("panel",style)
 	add_child(panel)
-	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation",3)
-	panel.add_child(column)
-	time_label = game.shop.create_label("",17,Color("#f0d39a"))
-	time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(time_label)
-	bar = ProgressBar.new()
-	bar.custom_minimum_size.y = 5
-	bar.show_percentage = false
-	bar.add_theme_stylebox_override("background",game.shop.create_style("#304335","#304335",0,3))
-	bar.add_theme_stylebox_override("fill",game.shop.create_style("#d6ae67","#d6ae67",0,3))
-	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	column.add_child(bar)
-	detail = game.shop.create_label("",10,Color("#b6c9b0"))
-	detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	column.add_child(detail)
-	action = game.shop.create_button("Adelantar noche")
-	action.custom_minimum_size.y = 28
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation",8)
+	panel.add_child(row)
+	phase_icon = PhaseIcon.new()
+	phase_icon.custom_minimum_size = Vector2(26,26)
+	phase_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(phase_icon)
+	time_label = game.shop.create_label("06:00",19,Color("#f0d39a"))
+	time_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	time_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(time_label)
+	day_label = game.shop.create_label("",12,Color("#a7baa4"))
+	day_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	day_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(day_label)
+	action = game.shop.create_button("»")
+	action.custom_minimum_size = Vector2(28,26)
+	action.tooltip_text = "Adelantar hasta las 22:00"
 	action.pressed.connect(on_action)
-	column.add_child(action)
+	row.add_child(action)
 	build_speed_controls()
 	game.cycle.changed.connect(sync_speed)
 	update_layout()
@@ -102,7 +114,7 @@ func _exit_tree() -> void:
 
 func update_layout() -> void:
 	var logical: Vector2 = get_viewport().get_visible_rect().size / game.ui_layer.scale.x
-	size = Vector2(300,92 if game.cycle.is_night else 116)
+	size = Vector2(260 if game.cycle.defeated else 200,38)
 	position = Vector2((logical.x - size.x) * 0.5,16)
 	if speed_controls != null: speed_controls.position = Vector2(80,20) - position
 
@@ -120,25 +132,37 @@ func _process(_delta: float) -> void:
 	sync_speed()
 	update_clock()
 
+func clock_minutes() -> int:
+	if game.cycle.is_night:
+		var elapsed: float = clampf(game.zombie_manager.wave_elapsed,0.0,120.0)
+		return (22 * 60 + floori(elapsed / 120.0 * 8 * 60)) % (24 * 60)
+	var elapsed: float = 300.0 - clampf(game.cycle.day_remaining,0.0,300.0)
+	# The first day's tutorial is untimed and stays at sunrise until night begins.
+	if game.cycle.day == 1: elapsed = 0.0
+	return 6 * 60 + floori(elapsed / 300.0 * 16 * 60)
+
 func update_clock() -> void:
 	var cycle: RefCounted = game.cycle
-	visible = cycle.day > 1 or cycle.is_night or cycle.defeated
-	if not visible: return
-	var remaining: float = game.zombie_manager.remaining_time() if cycle.is_night else cycle.day_remaining
-	var seconds: int = ceili(remaining)
-	var signature: Array = [seconds,cycle.day,cycle.is_night,cycle.defeated,cycle.can_start_night(),game.zombie_manager.retreat_started]
+	visible = true
+	var minutes: int = clock_minutes()
+	var signature: Array = [minutes,cycle.day,cycle.is_night,cycle.defeated,cycle.can_start_night()]
 	if signature == last_state: return
 	last_state = signature
 	update_layout()
-	time_label.text = "%s %d · %02d:%02d" % ["HORDA" if cycle.is_night else "DÍA",cycle.day,seconds / 60,seconds % 60]
-	bar.max_value = 120 if cycle.is_night else 300
-	bar.value = remaining
-	detail.text = game.zombie_manager.announcement() + "\nClic en un zombi para priorizarlo" if cycle.is_night else "Gestiona la base · La noche comenzará automáticamente"
-	action.visible = not cycle.is_night
+	time_label.text = "%02d:%02d" % [minutes / 60,minutes % 60]
+	day_label.text = "Día %d" % cycle.day
+	phase_icon.night = cycle.is_night
+	phase_icon.queue_redraw()
+	tooltip_text = "Noche · 22:00–06:00 · 2 minutos\nClic en un zombi para priorizarlo" if cycle.is_night else "Día · 06:00–22:00 · 5 minutos"
+	if cycle.day == 1 and not cycle.is_night: tooltip_text = "Día 1 · Completa el tutorial para comenzar la primera noche"
+	action.text = "»"
+	action.tooltip_text = "Adelantar hasta las 22:00"
+	action.visible = not cycle.is_night and cycle.can_start_night()
 	action.disabled = not cycle.can_start_night()
 	if cycle.defeated:
-		time_label.text = "BASE DESTRUIDA"
-		detail.text = "La horda ha roto la entrada."
-		action.text = "Nueva partida"
+		time_label.text = "Base destruida"
+		day_label.text = ""
+		action.text = "↻"
+		action.tooltip_text = "Nueva partida"
 		action.visible = true
 		action.disabled = false

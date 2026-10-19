@@ -82,7 +82,7 @@ func toggle_night_view() -> void:
 func can_drop(kind: String, source: Vector2i, destination: Vector2i) -> bool:
 	if not phase_allows() or (not grid.owned_tiles.has(source) and not grid.defense_tiles.has(source)) or not has_kind(source, kind) or not game.get("cycle").allows_interaction(kind, source, destination, true):
 		return false
-	if destination == grid.sale_cell and kind != "nugget": return can_sell(kind, source)
+	if destination == grid.sale_cell: return kind == "nugget" or can_sell(kind, source)
 	if kind == "blueprint": return game.get_node("Construction").can_move(source,destination)
 	if kind == "launcher" and game.get("launchers").can_fuse(source,destination):
 		return not game.get("cycle").is_night
