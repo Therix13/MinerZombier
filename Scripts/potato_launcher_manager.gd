@@ -10,6 +10,7 @@ const UPGRADED_FIRE_INTERVAL: float = 2.0
 const RANGE: float = 300.0
 const ENGAGEMENT_TOP: float = -200.0
 const DAMAGE_MULTIPLIER: float = 0.5
+const UPGRADED_DAMAGE_MULTIPLIER: float = 1.0
 
 var grid: RefCounted
 var mining: RefCounted
@@ -158,7 +159,7 @@ func advance(delta: float) -> void:
 		data["angle"] = (target_position - center).angle()
 		var kind: String = str(ammo.pop_front())
 		data["cooldown"] = interval_at(cell)
-		var damage: float = ammo_damage(kind)
+		var damage: float = ammo_damage(kind, level_at(cell))
 		if nearest.has_method("take_damage"):
 			nearest.call("take_damage", damage)
 		elif nearest.has_method("apply_damage"):
@@ -169,5 +170,6 @@ func advance(delta: float) -> void:
 	if visual_changed:
 		changed.emit()
 
-func ammo_damage(kind: String) -> float:
-	return float({"coal":1,"copper":2,"iron":3,"gold":4}.get(round_kind(kind),1)) * damage_multiplier
+func ammo_damage(kind: String, level: int = 1) -> float:
+	var multiplier: float = UPGRADED_DAMAGE_MULTIPLIER if level == 2 else damage_multiplier
+	return float({"coal":1,"copper":2,"iron":3,"gold":4}.get(round_kind(kind),1)) * multiplier

@@ -66,11 +66,15 @@ func run_checks() -> void:
 	check(game.get_node("SaveGame").valid_snapshot(upgraded_save),"A full seven-round level-two launcher is valid for saving")
 	weapons.launchers[cell]["cooldown"] = 0.0
 	var before_hits: int = target.hits
+	var before_damage: float = target.total
 	weapons.advance(0.01)
 	weapons.advance(1.99)
 	check(target.hits == before_hits + 1,"Level two waits the full two seconds between shots")
 	weapons.advance(0.02)
 	check(target.hits == before_hits + 2 and weapons.launchers[cell]["ammo"].size() == 5,"Level two fires again after two seconds and spends one round")
+	check(is_equal_approx(target.total - before_damage, 2.0),"Two level-two coal shots deal one damage each")
+	for material: String in ["coal","copper","iron","gold"]:
+		check(is_equal_approx(weapons.ammo_damage(material,2),weapons.ammo_damage(material,1) * 2.0),"Level two doubles per-shot damage for " + material)
 	target.queue_free()
 	await settle()
 	check(game.get_node("SaveGame").restore_snapshot(upgraded_save) and weapons.launchers[cell]["ammo"].size() == 7,"Reload preserves all seven rounds")
