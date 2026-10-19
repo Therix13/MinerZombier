@@ -163,54 +163,17 @@ func _input(event: InputEvent) -> void:
 	game.get("shop").handle_outside_click(event)
 
 func targets() -> Array[Vector2i]:
-	if cycle.tutorial_step >= 5:
-		var targets: Array[Vector2i] = cycle.workshop_targets()
-		if not targets.is_empty(): return targets
-		match placing_kind():
-			"brass": return [cycle.brass_cell]
-			"furnace": return [cycle.furnace_cell]
-			"launcher": return [cycle.grid.defense_cell("left")]
-		return []
-	if cycle.advanced_vein_lesson() and not cycle.needs_tutorial_income():
-		var pair: Array[Vector2i] = cycle.vein_fusion_targets()
-		if not pair.is_empty(): return pair
-		var cells: Array[Vector2i] = []
-		if game.get("placing_coal"): cells.append(cycle.next_vein_cell())
-		return cells
-	if cycle.tutorial_step == 6:
-		if cycle.needs_tutorial_income(): return cycle.income_targets()
-		if cycle.needs_ammo_vein():
-			var cells: Array[Vector2i] = []
-			if game.get("placing_coal"): cells.append(cycle.TUTORIAL_NEW_VEIN_CELL)
-			return cells
-		if cycle.mining.nuggets_at(cycle.tutorial_output_cell()) > 0: return [cycle.tutorial_output_cell(),cycle.grid.defense_cell("left") if cycle.mining.nugget_type(cycle.tutorial_output_cell()) == "coal" else cycle.grid.sale_cell]
-		return [cycle.tutorial_mining_cell()]
-	if cycle.vein_lesson_active() and not cycle.needs_tutorial_income():
-		if cycle.mining.coal_veins.has(cycle.TUTORIAL_NEW_VEIN_CELL): return [cycle.TUTORIAL_NEW_VEIN_CELL,cycle.coal_cell]
-		var cells: Array[Vector2i] = []
-		if game.get("placing_coal"): cells.append(cycle.TUTORIAL_NEW_VEIN_CELL)
-		return cells
-	var result: Array[Vector2i] = []
-	if cycle.advanced_income(): return cycle.income_targets()
-	if cycle.tutorial_step == 2 or cycle.needs_tutorial_income():
-		if cycle.mining.nugget_type(cycle.TUTORIAL_FUSION_CELL) == "coal_2":
-			return [cycle.TUTORIAL_FUSION_CELL, cycle.grid.sale_cell]
-		if cycle.mining.nuggets_at(cycle.coal_output()) > 0:
-			return [cycle.coal_output(), cycle.TUTORIAL_FUSION_CELL]
-		return [cycle.coal_cell]
-	match cycle.tutorial_step:
-		0:
-			if game.get("placing_coal"): result.append(cycle.coal_cell)
-		1, 6:
-			if cycle.tutorial_step == 6 and cycle.mining.nugget_type(cycle.coal_output()) in ["coal_2", "coal_3", "coal_4"]:
-				return [cycle.coal_output(), cycle.grid.sale_cell]
-			if cycle.mining.nuggets_at(cycle.coal_output()) > 0:
-				return [cycle.coal_output(), cycle.grid.sale_cell if cycle.tutorial_step == 1 else cycle.grid.defense_cell("left")]
-			return [cycle.coal_cell]
-		5:
-			if game.get("placing_launcher"): result.append(cycle.grid.defense_cell("left"))
-		7: result.append(cycle.grid.defense_cell("left"))
-	return result
+	if not cycle.is_tutorial_active(): return []
+	if cycle.tutorial_step == 0:
+		var first: Array[Vector2i] = []
+		if game.get("placing_coal"): first.append(cycle.coal_cell)
+		return first
+	if cycle.tutorial_step in [1,5] or cycle.needs_tutorial_income(): return cycle.income_targets()
+	var pair: Array[Vector2i] = cycle.vein_fusion_targets()
+	if not pair.is_empty(): return pair
+	var placement: Array[Vector2i] = []
+	if game.get("placing_coal"): placement.append(cycle.next_vein_cell())
+	return placement
 
 func _draw() -> void:
 	if cycle == null or (not cycle.is_tutorial_active() and not resupply_active()):

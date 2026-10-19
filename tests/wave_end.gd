@@ -18,11 +18,11 @@ func run_checks() -> void:
 	game.launchers.receive(platform, "coal")
 	game.cycle.tutorial_step = game.cycle.TUTORIAL_LAST_STEP
 	game.cycle.barrier_broken = true
-	player.add_experience(49)
+	player.add_experience(player.experience_to_next_level() - player.ZOMBIE_EXPERIENCE)
 	game.start_night()
 	get_nodes_in_group("zombies")[0].take_damage(100)
 	await settle()
-	check(player.level == 2 and not shop.notice_research_ids.is_empty() and not shop.research_notice.visible and not shop.research_notice_backdrop.visible and shop.research_notice_timer.is_stopped(), "A combat level-up queues research without showing or timing its alert")
+	check(player.level == 2 and not shop.notice_research_ids.is_empty() and not shop.research_notice.visible and not shop.research_notice_backdrop.visible, "A combat level-up queues research without showing or timing its alert")
 	manager._process(2.0)
 	check(game.cycle.is_night and manager.active_wave and manager.cleared_time == 0, "An empty battlefield does not end the night while more zombies are due")
 	manager.spawn_zombie()
@@ -49,7 +49,7 @@ func run_checks() -> void:
 	check(game.economy.coins == rewarded and game.cycle.day == 2, "Repeated updates cannot repeat night rewards")
 	game.dismiss_night_victory_popup()
 	await settle()
-	check(shop.research_notice.visible and shop.research_notice_backdrop.visible and shop.research_notice_timer.time_left > 2.5, "After victory, queued research displays with its full three-second reading time")
+	check(shop.research_notice.visible and shop.research_notice_backdrop.visible and shop.research_notice_accept.visible, "After victory, queued research displays until acknowledged with Aceptar")
 	game.free()
 	await settle()
 	print("RESULT: ", passed, " passed; ", failed, " failed; wave end")

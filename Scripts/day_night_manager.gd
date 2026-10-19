@@ -11,21 +11,15 @@ const TUTORIAL_FUSION_CELL := Vector2i(15, 1)
 const TUTORIAL_BRASS_CELL := Vector2i(14, 2)
 const TUTORIAL_FURNACE_CELL := Vector2i(16, 1)
 const TUTORIAL_SALES_TARGET: int = 5
-const TUTORIAL_ACTIONS := [
-	["buy_coal", "place_coal"], ["mine_coal", "sell_coal"],
-	["mine_coal", "fuse", "sell_fused"], ["buy_coal", "place_coal", "fuse_veins"],
-	["buy_coal", "place_coal", "fuse_veins"], ["buy_brass", "place_brass"],
-	["buy_furnace", "place_furnace", "deliver"], ["smelt", "deliver", "fuse", "sell_fused"],
-	["unlock_defense"], ["buy_launcher", "place_launcher"], ["mine_brass", "load_ammo"], ["start_night"],
-]
 const TUTORIAL_TITLES := [
-	"Tu primera veta", "Del carbón a las monedas", "Fusiona y vende",
-	"Fusiona tus vetas", "Vetas hasta nivel 4", "Tu primera veta de latón",
-	"Construye tu horno", "Del latón al lingote", "Plataformas de defensa",
-	"Tu primer Lanzapepitas", "Carga la munición", "¡Todo listo!",
+	"Tu primera veta", "Pepitas hasta nivel 4", "Fusiona tus vetas",
+	"Una veta de nivel 3", "Una veta de nivel 4", "El siguiente mineral", "¡Tutorial completado!",
 ]
-const TUTORIAL_LAST_STEP: int = 11
-const TUTORIAL_DISPLAY_STEPS: int = 11
+const TUTORIAL_LAST_STEP: int = 6
+const TUTORIAL_DISPLAY_STEPS: int = 6
+
+# A budget stays earned while the player places its batch of veins.
+var funded_steps: Dictionary = {}
 
 var coal_cell := TUTORIAL_COAL_CELL
 var brass_cell := TUTORIAL_BRASS_CELL
@@ -62,6 +56,7 @@ func setup(grid_manager: RefCounted, mining_manager: RefCounted, conveyor_manage
 	conveyors = conveyor_manager
 	launchers = launcher_manager
 	economy = economy_manager
+	economy.money_changed.connect(_on_money_changed)
 	mining.changed.connect(refresh_tutorial)
 	mining.fusion_completed.connect(_on_fusion)
 	mining.vein_fused.connect(_on_vein_fused)
@@ -91,6 +86,8 @@ func dispose() -> void:
 		conveyors.sale_completed.disconnect(_on_sale)
 	if launchers != null:
 		launchers.changed.disconnect(refresh_tutorial)
+	if economy != null:
+		economy.money_changed.disconnect(_on_money_changed)
 	grid = null
 	mining = null
 	conveyors = null
@@ -98,13 +95,13 @@ func dispose() -> void:
 	economy = null
 
 func vein_lesson_active() -> bool:
-	return is_tutorial_active() and tutorial_step == 3 and not vein_fusion_taught
+	return is_tutorial_active() and tutorial_step == 2
 
 func advanced_vein_lesson() -> bool:
-	return is_tutorial_active() and tutorial_step == 4
+	return is_tutorial_active() and tutorial_step in [3,4]
 
 func target_vein_level() -> int:
-	return mini(4, mining.vein_level(coal_cell) + 1)
+	return {2:2,3:3,4:4}.get(tutorial_step,4)
 
 func vein_fusion_targets() -> Array[Vector2i]:
 	for tier in range(3,0,-1):
@@ -118,13 +115,15 @@ func vein_fusion_targets() -> Array[Vector2i]:
 func next_vein_cell() -> Vector2i:
 	for cell: Vector2i in [Vector2i(14,1),Vector2i(16,1),Vector2i(14,2),Vector2i(16,2),Vector2i(16,0),Vector2i(15,2)]:
 		if mining.can_place_vein(cell): return cell
+	for cell: Vector2i in grid.owned_tiles:
+		if mining.can_place_vein(cell): return cell
 	return Vector2i(-999,-999)
 
 func needs_ammo_vein() -> bool:
 	return false
 
 func tutorial_mining_cell() -> Vector2i:
-	return brass_cell if tutorial_step == 10 else coal_cell
+	return coal_cell
 
 func tutorial_output_cell() -> Vector2i:
 	var cell: Vector2i = tutorial_mining_cell()
@@ -142,14 +141,19 @@ func _on_fusion(kind: String) -> void:
 	if kind.begins_with("coal_") and "ingot" not in kind: fusion_taught = true
 	refresh_tutorial()
 
+func _on_money_changed(_amount: int) -> void:
+	# Finish the sale (including its EXP) before filling the missing EXP.
+	refresh_tutorial.call_deferred()
+
 func _on_sale(kind: String) -> void:
+	if kind == "coal_4": level4_sold = true
 	if kind.begins_with("coal_") and "ingot" not in kind: fusion_sold = true
 	if kind.begins_with("brass_ingot"): brass_ingot_sold = true
 	if kind.get_slice("_",0) == "coal" and "ingot" not in kind: coal_sold += 1
 	refresh_tutorial()
 
 func is_tutorial_active() -> bool:
-	return not tutorial_skipped and day == 1 and not is_night and not defeated
+	return not tutorial_skipped and tutorial_step < TUTORIAL_LAST_STEP and day == 1 and not is_night and not defeated
 
 func is_research_tutorial_active() -> bool:
 	return false
@@ -169,21 +173,19 @@ func _on_research_unlocked(_research_id: String) -> void:
 	refresh_tutorial()
 
 func tutorial_purchase_price() -> int:
-	if vein_lesson_active(): return 0 if mining.coal_veins.has(TUTORIAL_NEW_VEIN_CELL) else economy.COAL_VEIN_PRICE
-	if advanced_vein_lesson(): return 0 if not vein_fusion_targets().is_empty() else economy.COAL_VEIN_PRICE
-	match tutorial_step:
-		3: return economy.COAL_VEIN_PRICE
-		5: return economy.BRASS_VEIN_PRICE
-		6: return 0 if furnace_blueprint_exists() else 350
-		8: return economy.DEFENSE_TILE_PRICE
-		9: return economy.LAUNCHER_PRICE
+	if tutorial_step == 1: return 100
+	if tutorial_step == 5: return 500
+	if tutorial_step in [2,3,4]:
+		if not vein_fusion_targets().is_empty(): return 0
+		if not funded_steps.has(tutorial_step): return {2:100,3:200,4:400}[tutorial_step]
+		return economy.COAL_VEIN_PRICE
 	return 0
 
 func needs_tutorial_income() -> bool:
-	return is_tutorial_active() and tutorial_step in [3,4,5,6,8,9] and not economy.can_afford(tutorial_purchase_price())
+	return is_tutorial_active() and tutorial_step > 0 and not economy.can_afford(tutorial_purchase_price())
 
 func income_level() -> int:
-	return mini(4, mining.vein_level(coal_cell)) if tutorial_step >= 4 else 2
+	return 4
 
 func advanced_income() -> bool:
 	return needs_tutorial_income()
@@ -239,25 +241,22 @@ func has_ammo() -> bool:
 	return false
 
 func refresh_tutorial() -> void:
-	if refreshing_tutorial or tutorial_skipped or day != 1 or is_night or defeated: return
+	if mining == null or economy == null or refreshing_tutorial or tutorial_skipped or day != 1 or is_night or defeated: return
 	refreshing_tutorial = true
 	sync_tutorial_cells()
 	while tutorial_step < TUTORIAL_LAST_STEP:
-		if tutorial_step >= 5: grant_research_experience("brass")
-		if tutorial_step >= 6: grant_research_experience("furnace")
+		if tutorial_step in [2,3,4] and economy.coins >= int({2:100,3:200,4:400}[tutorial_step]):
+			funded_steps[tutorial_step] = true
 		var completed: bool = false
 		match tutorial_step:
 			0: completed = not mining.coal_veins.is_empty()
-			1: completed = coal_sold >= TUTORIAL_SALES_TARGET
-			2: completed = fusion_sold
-			3: completed = vein_fusion_taught or (not mining.coal_veins.is_empty() and mining.vein_level(coal_cell) >= 2)
+			1: completed = level4_sold and economy.coins >= 100
+			2: completed = not mining.coal_veins.is_empty() and mining.vein_level(coal_cell) >= 2
+			3: completed = not mining.coal_veins.is_empty() and mining.vein_level(coal_cell) >= 3
 			4: completed = not mining.coal_veins.is_empty() and mining.vein_level(coal_cell) >= 4
-			5: completed = not mining.brass_veins.is_empty()
-			6: completed = mining.furnaces != null and not mining.furnaces.machines.is_empty()
-			7: completed = brass_ingot_sold
-			8: completed = platforms_ready()
-			9: completed = not launchers.launchers.is_empty()
-			10: completed = ammo_damage() >= 2.0
+			5:
+				completed = economy.coins >= 500
+				if completed: grant_research_experience("brass")
 		if not completed: break
 		tutorial_step += 1
 	refreshing_tutorial = false
@@ -287,11 +286,7 @@ func missing_researches(id: String, result: Array[String]) -> void:
 	result.append(id)
 
 func research_to_learn() -> String:
-	var id: String = "brass" if tutorial_step == 5 else ("furnace" if tutorial_step == 6 else "")
-	if id.is_empty(): return ""
-	var chain: Array[String] = []
-	missing_researches(id,chain)
-	return "" if chain.is_empty() else chain[0]
+	return ""
 
 func grant_research_experience(id: String) -> void:
 	if progression == null or research_boosts.has(id): return
@@ -308,49 +303,37 @@ func grant_research_experience(id: String) -> void:
 		progression.add_experience(progression.experience_to_next_level() - progression.experience)
 
 func tutorial_text() -> String:
-	if tutorial_step >= 5: return workshop_text()
-	if advanced_vein_lesson():
+	if tutorial_step == 0:
+		return "Compra tu primera veta de carbón por 100 de oro y colócala en la cuadrícula."
+	if tutorial_step == 1:
+		return "Fusiona 2 pepitas iguales: Nv. 1 → 2 → 3 → 4. Vende las de Nv. 4 por 50 de oro hasta reunir 100. " + income_instruction()
+	if tutorial_step == 5:
+		return "Vende carbón Nv. 4 hasta reunir 500 de oro (%d / 500). Recibirás la EXP que falte para acceder a la investigación del latón. " % economy.coins + income_instruction()
+	if tutorial_step in [2,3,4]:
+		var budget: int = {2:100,3:200,4:400}[tutorial_step]
+		var count: int = {2:1,3:2,4:4}[tutorial_step]
 		var goal: int = target_vein_level()
-		if needs_tutorial_income(): return "Objetivo: veta Nv. %d. %s" % [goal, income_instruction()]
+		if needs_tutorial_income():
+			return "Vende pepitas de carbón Nv. 4 hasta reunir %d de oro. Comprarás %d vetas para crear una Nv. %d. " % [tutorial_purchase_price(),count,goal] + income_instruction()
 		var pair: Array[Vector2i] = vein_fusion_targets()
 		if not pair.is_empty():
 			var tier: int = mining.vein_level(pair[0])
-			var next_goal: String = "Así crearás la veta Nv. %d." % goal if tier+1 == goal else "Prepara otro par hasta tener 2 vetas Nv. %d para crear la de Nv. %d." % [goal-1,goal]
-			return "Arrastra la veta marcada sobre la otra: 2 vetas Nv. %d → 1 Nv. %d. %s" % [tier,tier+1,next_goal]
-		return "Para crear una veta Nv. %d necesitas 2 vetas Nv. %d. Compra vetas Nv. 1 y fusiona pares iguales; coloca la siguiente en la casilla dorada." % [goal,goal-1]
-	if needs_ammo_vein(): return "Compra una veta de Nv. 1 para producir munición básica." if not needs_tutorial_income() else "Vende pepitas para comprar una veta de Nv. 1: el arma solo acepta munición de Nv. 1."
-	if vein_lesson_active() and not needs_tutorial_income():
-		if mining.coal_veins.has(TUTORIAL_NEW_VEIN_CELL): return "Arrastra la segunda veta sobre la primera: 2 vetas del mismo material y nivel crean una superior. Puedes llegar hasta Nv. 4."
-		return "Compra otra veta de carbón y colócala en la casilla dorada para fusionar las minas."
-	if needs_tutorial_income(): return income_instruction()
-	match tutorial_step:
-		0: return "Compra y coloca una veta de carbón. Fusionando 2 pepitas del mismo material y nivel puedes llegar hasta Nv. 4."
-		1: return "Arrastra la pepita al cofre. Después aprenderás a fusionarlas hasta Nv. 4." if mining.nuggets_at(coal_output()) > 0 else "Primero extrae y vende 5 pepitas de carbón Nv. 1. Luego aprenderás a fusionarlas hasta Nv. 4."
-		2:
-			if mining.nugget_type(TUTORIAL_FUSION_CELL) == "coal_2":
-				return "Véndela en el cofre: vale %d monedas; una de Nv. 1 vale %d. Fusionando pares iguales puedes seguir hasta Nv. 4." % [economy.sale_value("coal_2"), economy.sale_value("coal")]
-			if mining.nuggets_at(coal_output()) > 0:
-				return "Arrástrala a la casilla dorada. Siempre se fusionan 2 pepitas del mismo material y nivel, hasta Nv. 4." if mining.nuggets_at(TUTORIAL_FUSION_CELL) == 0 else "Arrástrala sobre la otra: 2 de Nv. 1 crean 1 de Nv. 2. La misma regla se repite hasta Nv. 4."
-			return "2 pepitas del mismo material y nivel crean una del siguiente nivel, hasta Nv. 4. Ahora combina 2 de Nv. 1 para crear tu primera Nv. 2."
-		3: return "Compra una segunda veta de carbón y fusiónala con la primera."
-		4: return "Fusiona vetas del mismo nivel hasta obtener una veta de Nv. 4."
-		5: return "Compra las plataformas de defensa." if not platforms_ready() else "Compra el Lanzapepitas y colócalo en la plataforma dorada."
-		6:
-			if mining.nugget_type(tutorial_output_cell()) in ["coal_2", "coal_3", "coal_4"]: return "Vende la pepita de nivel alto en el cofre: el Lanzapepitas solo acepta Nv. 1."
-			return "Extrae y carga 4 pepitas de Nv. 1 en el Lanzapepitas."
-	return "¡Preparación lista! Inicia la primera noche."
+			return "Arrastra una veta marcada sobre la otra: 2 vetas Nv. %d → 1 Nv. %d. Continúa hasta una veta Nv. %d." % [tier,tier+1,goal]
+		if tutorial_step == 2: return "Compra otra veta de carbón por 100 de oro y fusiónala con tu primera veta para crear una Nv. 2."
+		return "Con %d de oro puedes comprar %d vetas. Mantén Shift al colocarlas para repetir; suéltalo para cancelar. Fusiona pares iguales hasta una veta Nv. %d." % [budget,count,goal]
+	return "¡Tutorial completado! Puedes investigar la veta de latón y continuar a tu ritmo."
 
 func income_instruction() -> String:
-	var level: int = income_level()
 	var targets: Array[Vector2i] = income_targets()
-	var purchase: String = {3:"otra veta (100 monedas)",4:"otra veta (100 monedas)",5:"la veta de latón (500 monedas)",6:"el horno (350 monedas)",8:"las plataformas (1000 monedas)",9:"el Lanzapepitas (200 monedas)"}.get(tutorial_step,"la siguiente compra")
 	if targets.size() == 2:
 		var kind: String = mining.nugget_type(targets[0])
-		var from_level: int = mining.ore_level(kind)
-		if targets[1] == grid.sale_cell: return "Vende la pepita Nv. %d en el cofre: vale %d monedas. Ahorra para %s." % [from_level,economy.sale_value(kind),purchase]
-		if mining.can_fuse(targets[0],targets[1]): return "Fusiona las pepitas marcadas: 2 de Nv. %d → 1 de Nv. %d. Vende desde Nv. %d para comprar %s." % [from_level,from_level+1,level,purchase]
-		return "Mueve la pepita a la casilla dorada. Fusiona hasta Nv. %d y vende para comprar %s." % [level,purchase]
-	return "Recomendación: fusiona carbón hasta Nv. %d y vende para comprar %s. También puedes vender pepitas sueltas para liberar espacio." % [level,purchase]
+		var tier: int = mining.ore_level(kind)
+		if targets[1] == grid.sale_cell:
+			if tier == 4: return "Vende la pepita Nv. 4 marcada: vale 50 de oro."
+			return "Puedes vender la pepita marcada para liberar espacio, o seguir fusionándola hasta Nv. 4."
+		if mining.can_fuse(targets[0],targets[1]): return "Fusiona las pepitas marcadas: Nv. %d → Nv. %d." % [tier,tier+1]
+		return "Mueve la pepita a la casilla marcada para despejar la salida y seguir fusionando."
+	return "Extrae carbón y fusiona pares hasta Nv. 4. Puedes vender pepitas sueltas para liberar espacio."
 
 func furnace_blueprint_exists() -> bool:
 	return mining.construction != null and mining.construction.plans.has(furnace_cell)
@@ -382,47 +365,10 @@ func park_resource(source: Vector2i) -> Array[Vector2i]:
 
 func workshop_targets() -> Array[Vector2i]:
 	if needs_tutorial_income(): return income_targets()
-	match tutorial_step:
-		5:
-			if mining.nuggets_at(brass_cell) > 0: return park_resource(brass_cell)
-		6:
-			if furnace_blueprint_exists(): return resource_targets("coal",4,furnace_cell)
-			if mining.nuggets_at(furnace_cell) > 0: return park_resource(furnace_cell)
-		7:
-			if mining.furnaces == null or not mining.furnaces.machines.has(furnace_cell):
-				return resource_targets("coal",4,furnace_cell) if furnace_blueprint_exists() else []
-			if not mining.items_for("brass_ingot").is_empty(): return [mining.items_for("brass_ingot").keys()[0],grid.sale_cell]
-			var data: Dictionary = mining.furnaces.machines[furnace_cell]
-			var out: Vector2i = furnace_cell + mining.DIRECTIONS[int(data["direction"])]
-			if not str(data["input"]).is_empty() or not str(data["output"]).is_empty():
-				if mining.nuggets_at(out) > 0: return park_resource(out)
-				return []
-			if int(data["fuel"]) == 0: return resource_targets("coal",4,furnace_cell)
-			return resource_targets("brass",4,furnace_cell)
-		10: return resource_targets("brass",1,grid.defense_cell("left"))
 	return []
 
 func workshop_text() -> String:
-	var research_id: String = research_to_learn()
-	if not research_id.is_empty(): return "Ya tienes la EXP para esta lección. En Investigación, desbloquea %s antes de comprar. Puedes vender o fusionar pepitas libremente." % progression.RESEARCHES[research_id]["name"]
-	if needs_tutorial_income(): return income_instruction()
-	match tutorial_step:
-		5: return "Compra la veta de latón por 500 monedas y colócala en la casilla dorada."
-		6:
-			if not furnace_blueprint_exists(): return "Compra el plano del horno y colócalo en la casilla dorada. Necesita 2 pepitas de carbón Nv. 4 para construirse."
-			var delivered: int = int(mining.construction.plans[furnace_cell]["delivered"].get("coal_4",0))
-			return "Entrega carbón Nv. 4 al plano: %d / 2. %s" % [delivered,resource_instruction(workshop_targets(),4)]
-		7:
-			if mining.furnaces == null or not mining.furnaces.machines.has(furnace_cell): return "Necesitas un horno para fundir el latón. Puedes reconstruirlo y reorganizar la mina libremente."
-			var data: Dictionary = mining.furnaces.machines[furnace_cell]
-			if not mining.items_for("brass_ingot").is_empty(): return "¡Tu primer lingote de latón! Véndelo en el cofre por 150 monedas."
-			if not str(data["input"]).is_empty() or not str(data["output"]).is_empty(): return "El horno tarda 4 segundos en fundir el latón. Deja libre su salida para que salga el lingote."
-			if int(data["fuel"]) == 0: return "Añade carbón Nv. 4 al horno: se consume y aporta 20 de combustible. " + resource_instruction(workshop_targets(),4)
-			return "Fusiona latón hasta Nv. 4 y entrégalo al horno. Puedes vender pepitas sueltas para liberar espacio o seguir fusionándolas. " + resource_instruction(workshop_targets(),4)
-		8: return "Compra las plataformas de defensa por 1000 monedas para colocar el Lanzapepitas."
-		9: return "Compra el Lanzapepitas por 200 monedas y colócalo en la plataforma dorada."
-		10: return "Extrae 2 pepitas de latón Nv. 1 y cárgalas en el Lanzapepitas. " + resource_instruction(workshop_targets(),1)
-	return "¡Todo listo! La cerca cede: comienza la noche 1."
+	return tutorial_text()
 
 func resource_instruction(targets: Array[Vector2i], tier: int) -> String:
 	if targets.size() == 1: return "Pulsa la veta marcada para extraer."
@@ -440,7 +386,7 @@ func can_start_night() -> bool:
 	return not is_night and not defeated and not is_research_tutorial_active() and not launchers.launchers.is_empty() and has_ammo()
 
 func start_night() -> bool:
-	if not can_start_night() or (is_tutorial_active() and not barrier_broken):
+	if not can_start_night() or (day == 1 and not barrier_broken):
 		return false
 	is_night = true
 	changed.emit()

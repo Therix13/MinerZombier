@@ -98,9 +98,8 @@ var known_research_level: int = 1
 var research_notice: PanelContainer
 var research_notice_backdrop: ColorRect
 var research_notice_label: Label
-var research_notice_timer: Timer
+var research_notice_accept: Button
 var research_notice_grid: GridContainer
-var research_notice_progress: ProgressBar
 var research_notice_cards: Dictionary = {}
 var research_notice_tween: Tween
 var notice_research_ids: Array[String] = []
@@ -186,12 +185,12 @@ func set_cycle(game_cycle: RefCounted) -> void:
 	ensure_intro.call_deferred()
 
 func queue_first_night() -> void:
-	if breach_queued or cycle == null or not cycle.is_tutorial_active() or not cycle.can_start_night(): return
+	if breach_queued or cycle == null or cycle.day != 1 or cycle.barrier_broken or not cycle.can_start_night(): return
 	breach_queued = true
 	show_breach.call_deferred()
 
 func show_breach() -> void:
-	if not cycle.is_tutorial_active() or not cycle.can_start_night():
+	if cycle.day != 1 or cycle.barrier_broken or not cycle.can_start_night():
 		breach_queued = false
 		return
 	var game: Node = get_parent().get_parent()
@@ -243,7 +242,6 @@ func _process(_delta: float) -> void:
 	if progression == null:
 		return
 	update_notice_visibility()
-	if research_notice.visible: research_notice_progress.value = research_notice_timer.time_left / research_notice_timer.wait_time
 	# Preserve research locks even with older scenes that handle purchases themselves.
 	var game: Node = get_parent().get_parent()
 	var item: String = ""
@@ -335,7 +333,7 @@ func build_research_notice() -> void:
 	research_notice_backdrop.name = "ResearchNoticeBackdrop"
 	research_notice_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	research_notice_backdrop.color = Color(0, 0, 0, 0.65)
-	research_notice_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	research_notice_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 	research_notice_backdrop.z_index = 120
 	add_child(research_notice_backdrop)
 	var center := CenterContainer.new()
@@ -396,31 +394,28 @@ func build_research_notice() -> void:
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	footer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(footer)
-	research_notice_progress = ProgressBar.new()
-	research_notice_progress.custom_minimum_size.y = 3
-	research_notice_progress.max_value = 1
-	research_notice_progress.show_percentage = false
-	research_notice_progress.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	research_notice_progress.add_theme_stylebox_override("background",create_style("#30493a","#30493a",0,2))
-	research_notice_progress.add_theme_stylebox_override("fill",create_style("#d6b374","#d6b374",0,2))
-	column.add_child(research_notice_progress)
+	research_notice_accept = Button.new()
+	research_notice_accept.name = "AcceptResearchNotice"
+	research_notice_accept.text = "Aceptar"
+	research_notice_accept.custom_minimum_size.y = 44
+	research_notice_accept.add_theme_stylebox_override("normal",create_style("#684721","#d6b374",2,8))
+	research_notice_accept.add_theme_stylebox_override("hover",create_style("#805c30","#ffe1a2",2,8))
+	research_notice_accept.pressed.connect(accept_research_notice)
+	column.add_child(research_notice_accept)
 	research_notice.hide()
 	research_notice_backdrop.hide()
-	research_notice_timer = Timer.new()
-	research_notice_timer.one_shot = true
-	research_notice_timer.wait_time = 3.0
-	research_notice_timer.timeout.connect(func() -> void:
-		research_notice.hide()
-		research_notice_backdrop.hide()
-		notice_research_ids.clear())
-	add_child(research_notice_timer)
+
+func accept_research_notice() -> void:
+	notice_research_ids.clear()
+	research_notice.hide()
+	research_notice_backdrop.hide()
+
 
 func announce_researches(research_ids: Array[String]) -> void:
 	if research_ids.is_empty(): return
 	for research_id: String in research_ids:
 		if research_id not in notice_research_ids: notice_research_ids.append(research_id)
 	rebuild_notice_cards()
-	research_notice_timer.stop()
 	research_notice.hide()
 	research_notice_backdrop.hide()
 	update_notice_visibility()
@@ -468,7 +463,6 @@ func update_notice_visibility() -> void:
 	if (cycle != null and (cycle.is_night or cycle.defeated)) or (victory != null and victory.visible):
 		research_notice.hide()
 		research_notice_backdrop.hide()
-		research_notice_timer.stop()
 	elif not research_notice.visible:
 		research_notice.show()
 		research_notice_backdrop.show()
@@ -476,8 +470,7 @@ func update_notice_visibility() -> void:
 		research_notice_backdrop.modulate.a = 0
 		research_notice_tween = create_tween()
 		research_notice_tween.tween_property(research_notice_backdrop,"modulate:a",1.0,0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		research_notice_progress.value = 1
-		research_notice_timer.start()
+		research_notice_accept.grab_focus()
 
 func open_research() -> void:
 	if cycle != null and (cycle.is_night or cycle.defeated):
@@ -696,7 +689,7 @@ func _on_cycle_action() -> void:
 		return
 	if cycle.defeated:
 		restart_requested.emit()
-	elif cycle.is_tutorial_active():
+	elif cycle.day == 1 and not cycle.barrier_broken:
 		if cycle.can_start_night():
 			queue_first_night()
 		update_cycle()
@@ -720,16 +713,6 @@ func update_cycle() -> void:
 		cycle_action.disabled = false
 		var game: Node = get_parent().get_parent()
 		cycle_action.hide()
-		match cycle.tutorial_step:
-			1:
-				cycle_action.show()
-				cycle_action.text = "CARBÓN VENDIDO · %d / %d" % [mini(cycle.coal_sold,cycle.TUTORIAL_SALES_TARGET),cycle.TUTORIAL_SALES_TARGET]
-				cycle_action.disabled = true
-			2:
-				cycle_action.show()
-				cycle_action.text = "Nv. 1 → 2 → 3 → 4"
-				cycle_action.disabled = true
-			cycle.TUTORIAL_LAST_STEP: queue_first_night()
 		if cycle.can_start_night() and cycle.tutorial_step != cycle.TUTORIAL_LAST_STEP:
 			cycle_action.show()
 			cycle_action.disabled = false
@@ -770,25 +753,10 @@ func tutorial_purchase() -> Dictionary:
 	if cycle != null and cycle.is_research_tutorial_active():
 		return {"category": "INVESTIGACIÓN", "item": "research", "instruction": "Investiga la veta de latón." if progression.level == 2 else "Desbloquea un objeto a tu elección."}
 	if cycle == null or not cycle.is_tutorial_active(): return {}
-	var research_id: String = cycle.research_to_learn()
-	if not research_id.is_empty(): return {"category":"INVESTIGACIÓN","item":"research:"+research_id,"instruction":"Investiga %s." % progression.RESEARCHES[research_id]["name"]}
 	if cycle.needs_tutorial_income(): return {}
 	var game: Node = get_parent().get_parent()
-	match cycle.tutorial_step:
-		0:
-			if not game.get("placing_coal"):
-				return {"category": "VETAS", "item": "coal", "instruction": "Compra la veta de carbón."}
-		3:
-			if not game.get("placing_coal") and not cycle.mining.coal_veins.has(cycle.TUTORIAL_NEW_VEIN_CELL): return {"category": "VETAS", "item": "coal", "instruction": "Compra otra veta de carbón para fusionarlas."}
-		4:
-			if cycle.vein_fusion_targets().is_empty() and not game.get("placing_coal"): return {"category":"VETAS","item":"coal","instruction":"Compra otra veta de carbón para seguir fusionando."}
-		5:
-			if not game.get("placing_brass") and cycle.workshop_targets().is_empty(): return {"category":"VETAS","item":"brass","instruction":"Compra la veta de latón."}
-		6:
-			if not cycle.furnace_blueprint_exists() and not game.get_node("WorldInteractions").placing_furnace and cycle.workshop_targets().is_empty(): return {"category":"HERRAMIENTAS","item":"furnace","instruction":"Compra el plano del horno."}
-		8: return {"category":"DEFENSA","item":"defense_platforms","instruction":"Compra las plataformas de defensa."}
-		9:
-			if not game.get("placing_launcher"): return {"category":"DEFENSA","item":"launcher","instruction":"Compra el Lanzapepitas."}
+	if cycle.tutorial_step in [0,2,3,4] and cycle.vein_fusion_targets().is_empty() and not game.get("placing_coal"):
+		return {"category":"VETAS","item":"coal","instruction":"Compra vetas de carbón. Mantén Shift para colocar varias."}
 	return {}
 
 func tutorial_navigation_text() -> String:
@@ -1237,6 +1205,7 @@ func _input(event: InputEvent) -> void:
 	handle_outside_click(event)
 
 func handle_outside_click(event: InputEvent) -> bool:
+	if research_notice_backdrop != null and research_notice_backdrop.visible: return false
 	if not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_LEFT: return false
 	if not event.pressed and outside_click_pending:
 		outside_click_pending = false

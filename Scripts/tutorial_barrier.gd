@@ -17,7 +17,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if live_game == null: return
-	visible = live_game.get("cycle").is_tutorial_active() and not live_game.get("cycle").barrier_broken
+	visible = live_game.get("cycle").day == 1 and not live_game.get("cycle").barrier_broken
 	if not visible: return
 	time += delta
 	present()

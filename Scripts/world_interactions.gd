@@ -66,7 +66,7 @@ func phase_allows(allow_transition: bool = false) -> bool:
 	var cycle: RefCounted = game.get("cycle")
 	var shop: Control = game.get("shop")
 	var victory: Control = game.get("night_victory_overlay")
-	return not get_tree().paused and not cycle.defeated and not shop.shop_open and not shop.shop_animating and (victory == null or not victory.visible) and (allow_transition or not game.get("camera_controller").transitioning)
+	return not get_tree().paused and (shop.research_notice_backdrop == null or not shop.research_notice_backdrop.visible) and not cycle.defeated and not shop.shop_open and not shop.shop_animating and (victory == null or not victory.visible) and (allow_transition or not game.get("camera_controller").transitioning)
 
 func toggle_night_view() -> void:
 	if not game.get("cycle").is_night or not phase_allows(true):
