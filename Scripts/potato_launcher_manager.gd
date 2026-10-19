@@ -129,7 +129,7 @@ func advance(delta: float) -> void:
 		if float(shots[i]["time"]) <= 0.0:
 			shots.remove_at(i)
 			visual_changed = true
-	if world.get("cycle").defeated or (world.get("cycle").is_night and world.get("zombie_manager").retreat_started):
+	if world.get("cycle").defeated:
 		if visual_changed: changed.emit()
 		return
 	for key in launchers:

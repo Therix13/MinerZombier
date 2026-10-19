@@ -9,7 +9,6 @@ const ZombieScript = preload("res://Scripts/zombie.gd")
 const SPAWN_INTERVAL: float = 5.0
 const MAX_ZOMBIES: int = 24
 const HORDE_DURATION: float = 120.0
-const RETREAT_TIME: float = 3.0
 const SPAWN_WINDOW: float = 90.0
 const SPAWN_DISTANCE: float = 225.0
 const SPAWN_HEIGHT: float = -590.0
@@ -55,7 +54,7 @@ func remaining_time() -> float:
 	return maxf(0,HORDE_DURATION - wave_elapsed)
 
 func announcement() -> String:
-	if retreat_started: return "Amanece · La horda se retira"
+	if wave_elapsed >= HORDE_DURATION: return "Elimina los zombis restantes para terminar la noche"
 	if wave_day >= 5 and wave_day % 5 == 0: return "Jefe: Rey de la Plaga · Ataca cuando baje el escudo"
 	if wave_day >= 3 and wave_day % 3 == 0: return "Minijefe: Demoledor · Vulnerable tras cargar"
 	if wave_day >= 6: return "Explosivos · Elimínalos antes de que detonen"
@@ -89,24 +88,17 @@ func start_wave(day: int) -> void:
 func _process(delta: float) -> void:
 	if not active_wave: return
 	wave_elapsed = minf(HORDE_DURATION,wave_elapsed + maxf(0,delta))
-	if wave_elapsed >= HORDE_DURATION - RETREAT_TIME:
-		if not retreat_started:
-			retreat_started = true
-			for enemy: Node in living_zombies(): enemy.begin_retreat()
-			acid_shots.clear()
-			acid_pools.clear()
-			queue_redraw()
-	else:
-		advance_acid(delta)
-		if not active_wave: return
-		spawn_timer -= delta
-		if spawn_count < wave_total and spawn_timer <= 0 and living_zombies().size() < MAX_ZOMBIES:
+	advance_acid(delta)
+	if not active_wave: return
+	if spawn_count < wave_total:
+		spawn_timer -= maxf(0,delta)
+		if spawn_timer <= 0 and living_zombies().size() < MAX_ZOMBIES:
 			spawn_timer += spawn_interval()
 			spawn_zombie()
 	if living_zombies().is_empty(): cleared_time = minf(WAVE_END_DELAY,cleared_time + delta)
 	else: cleared_time = 0.0
-	if wave_elapsed >= HORDE_DURATION:
-		for enemy: Node in living_zombies(): enemy.depart()
+	# Sunrise never removes living enemies. Finish only after the complete horde dies.
+	if wave_elapsed >= HORDE_DURATION and spawn_count >= wave_total and living_zombies().is_empty():
 		active_wave = false
 		acid_shots.clear()
 		acid_pools.clear()
@@ -119,7 +111,7 @@ func connect_zombie(zombie: Node) -> void:
 	zombie.acid_spit.connect(launch_acid)
 
 func spawn_zombie() -> void:
-	if not active_wave or retreat_started or spawn_count >= wave_total: return
+	if not active_wave or spawn_count >= wave_total: return
 	var center_x: float = grid.get_cell_rect(grid.sale_cell).get_center().x
 	var side: float = -1.0 if spawn_from_left else 1.0
 	var lane: float = float(spawn_count % 3) * 30.0
@@ -133,7 +125,7 @@ func spawn_zombie() -> void:
 	spawn_from_left = not spawn_from_left
 
 func launch_acid(origin: Vector2, damage: float, volley: int) -> void:
-	if not active_wave or retreat_started: return
+	if not active_wave: return
 	var target: Vector2 = grid.get_cell_rect(grid.sale_cell).get_center()
 	for i in range(volley):
 		if acid_shots.size() >= 32: break
@@ -163,7 +155,7 @@ func advance_acid(delta: float) -> void:
 	if visual: queue_redraw()
 
 func _on_base_attacked(damage: float) -> void:
-	if not active_wave or retreat_started or base_health <= 0.0:
+	if not active_wave or base_health <= 0.0:
 		return
 	base_health = maxf(0.0, base_health - damage)
 	base_health_changed.emit(base_health, BASE_MAX_HEALTH)

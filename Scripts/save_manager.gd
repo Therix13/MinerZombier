@@ -409,6 +409,8 @@ func restore_snapshot(data: Dictionary) -> bool:
 			enemy.remove_from_group("zombies")
 			enemy.queue_free()
 	for key: String in WAVE_FIELDS: game.zombie_manager.set(key,data["wave"][key])
+	# Legacy retreat flags no longer suppress combat after loading.
+	game.zombie_manager.retreat_started = false
 	for saved: Dictionary in data["enemies"]:
 		var enemy: Node2D = game.zombie_manager.ZombieScript.new()
 		enemy.setup(saved["position"],saved["destination"],saved["max_health"])
@@ -416,6 +418,10 @@ func restore_snapshot(data: Dictionary) -> bool:
 		for key: String in ENEMY_FIELDS:
 			if key == "limbs": enemy.limbs.assign(saved[key])
 			else: enemy.set(key,saved[key])
+		if enemy.retreating or enemy.phase == "retreat":
+			enemy.retreating = false
+			enemy.phase = "advance"
+			enemy.attacking = false
 		enemy.z_index = 20
 		game.zombie_manager.connect_zombie(enemy)
 		game.zombie_manager.add_child(enemy)

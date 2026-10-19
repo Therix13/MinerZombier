@@ -34,13 +34,17 @@ func run_checks() -> void:
 	manager._process(3)
 	check(manager.active_wave and game.cycle.day == 1,"An early empty battlefield does not skip the rest of the timed horde")
 	manager._process(114)
-	check(manager.retreat_started and manager.wave_elapsed == 117,"Last three seconds visibly end enemy attacks and spawning")
+	check(not manager.retreat_started and manager.wave_elapsed == 117,"The last three seconds no longer start a retreat")
 	var before: float = manager.base_health
 	manager._on_base_attacked(50)
-	check(manager.base_health == before,"Retreating enemies cannot attack after dawn begins")
+	check(manager.base_health == before - 50,"Enemy attacks still damage the base just before dawn")
 	manager._process(3)
+	check(manager.active_wave and game.cycle.is_night and not manager.living_zombies().is_empty(),"Living enemies keep combat active beyond the two-minute clock")
+	clear_enemies()
+	manager.spawn_count = manager.wave_total
+	manager._process(0)
 	await settle()
-	check(not game.cycle.is_night and game.cycle.day == 2 and game.cycle.day_remaining == 300,"Surviving two minutes starts a five-minute preparation day")
+	check(not game.cycle.is_night and game.cycle.day == 2 and game.cycle.day_remaining == 300,"Clearing the complete horde after two minutes starts a five-minute preparation day")
 	check(game.get_node_or_null("TutorialGuide") == null and not game.shop.get_node("CyclePanel").visible,"Tutorial logic, arrows and its window disappear permanently after night one")
 	check(not game.phase_clock.can_tick(),"Victory review preserves the full preparation budget")
 	game.dismiss_night_victory_popup()
@@ -66,6 +70,7 @@ func run_checks() -> void:
 	armored.take_damage(1)
 	check(armored.health == 1.5 and armored.armor == 0,"Breaking armor carries excess damage into health")
 	armored.depart()
+	before = manager.base_health
 	var brute: Node2D = enemy("brute")
 	brute._process(0.01)
 	check(brute.phase == "windup" and brute.position.y == -150,"Miniboss telegraphs its charge before moving")

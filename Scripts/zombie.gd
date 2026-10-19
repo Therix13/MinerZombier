@@ -56,12 +56,6 @@ func configure(kind: String) -> void:
 	if archetype == "brute": scale = Vector2.ONE * 1.35
 	elif archetype == "plague": scale = Vector2.ONE * 1.55
 
-func begin_retreat() -> void:
-	retreating = true
-	phase = "retreat"
-	attacking = false
-	queue_redraw()
-
 func depart() -> void:
 	remove_from_group("zombies")
 	set_process(false)
@@ -74,11 +68,6 @@ func _ready() -> void:
 	update_visual()
 
 func _process(delta: float) -> void:
-	if retreating:
-		position += Vector2(0,-140) * delta
-		walking_time += delta * 8
-		update_visual()
-		return
 	hit_flash = maxf(0,hit_flash - delta)
 	if phase == "windup":
 		ability_timer = maxf(0,ability_timer - delta)

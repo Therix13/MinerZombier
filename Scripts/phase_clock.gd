@@ -154,6 +154,7 @@ func update_clock() -> void:
 	phase_icon.night = cycle.is_night
 	phase_icon.queue_redraw()
 	tooltip_text = "Noche · 22:00–06:00 · 2 minutos\nClic en un zombi para priorizarlo" if cycle.is_night else "Día · 06:00–22:00 · 5 minutos"
+	if cycle.is_night and game.zombie_manager.wave_elapsed >= 120: tooltip_text = "Amanece · Elimina los zombis restantes para terminar la noche"
 	if cycle.day == 1 and not cycle.tutorial_skipped and not cycle.is_night: tooltip_text = "Día 1 · Completa el tutorial para comenzar la primera noche"
 	action.visible = cycle.defeated
 	action.disabled = not cycle.defeated
