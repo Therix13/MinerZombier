@@ -5,13 +5,14 @@ signal level_up(new_level: int)
 signal technology_unlocked(technology_id: String)
 signal research_unlocked(research_id: String)
 
-const BASE_LEVEL_EXPERIENCE: int = 50
-const LEVEL_EXPERIENCE_GROWTH: float = 1.6
+const BASE_LEVEL_EXPERIENCE: int = 500
+const LEVEL_EXPERIENCE_GROWTH: float = 2.0
 const POINTS_PER_LEVEL: int = 1
 const POINTS_PER_NIGHT: int = 0
 const ZOMBIE_EXPERIENCE: int = 25
-const SALE_EXPERIENCE := {"coal": 1, "brass": 2, "coal_2": 2, "brass_2": 4, "coal_3": 4, "brass_3": 8, "coal_4": 8, "brass_4": 16, "brass_ingot": 16, "brass_ingot_2": 32, "brass_ingot_3": 64, "brass_ingot_4": 128}
+const SALE_EXPERIENCE := {"coal": 0, "coal_2": 0, "coal_3": 1, "coal_4": 2, "brass": 0, "brass_2": 0, "brass_3": 1, "brass_4": 2, "iron": 0, "iron_2": 0, "iron_3": 1, "iron_4": 2, "gold": 0, "gold_2": 0, "gold_3": 1, "gold_4": 2, "brass_ingot": 1, "brass_ingot_2": 2, "brass_ingot_3": 3, "brass_ingot_4": 5, "iron_ingot": 1, "iron_ingot_2": 2, "iron_ingot_3": 3, "iron_ingot_4": 5, "gold_ingot": 1, "gold_ingot_2": 2, "gold_ingot_3": 3, "gold_ingot_4": 5}
 const RESEARCHES := {
+	"gold": {"name": "Oro", "branch": "MINERÍA", "cost": 2, "level": 5, "requires": ["iron"], "description": "Desbloquea vetas de oro y sus lingotes."},
 	"saw": {"name": "Sierra", "branch": "PROCESAMIENTO", "cost": 1, "level": 3, "requires": ["furnace"], "description": "Corta una pepita o lingote de Nv. 2–4 en dos del nivel anterior."},
 	"iron": {"name": "Hierro", "branch": "MINERÍA", "cost": 1, "level": 4, "requires": ["furnace"], "description": "Desbloquea vetas de hierro y sus lingotes."},
 	"drill": {
@@ -40,11 +41,11 @@ const RESEARCHES := {
 	},
 	"furnace": {
 		"name": "Horno", "branch": "PROCESAMIENTO", "cost": 1, "level": 3,
-		"requires": ["drill"], "description": "Funde latón o hierro de Nv. 4 en lingotes usando carbón de Nv. 4.",
+		"requires": ["drill"], "description": "Funde latón, hierro u oro de Nv. 4 en lingotes usando carbón de Nv. 4.",
 	},
 }
 const BASE_ITEMS := ["coal", "launcher", "defense_platforms"]
-const ITEM_RESEARCH := {"saw": "saw", "iron": "iron", "straight": "straight_belt", "drill": "drill", "brass": "brass", "corner": "curved_belts", "corner_right": "curved_belts", "corner_left": "curved_belts", "junction": "junction_belt", "compactor": "compactor", "furnace": "furnace"}
+const ITEM_RESEARCH := {"gold": "gold", "saw": "saw", "iron": "iron", "straight": "straight_belt", "drill": "drill", "brass": "brass", "corner": "curved_belts", "corner_right": "curved_belts", "corner_left": "curved_belts", "junction": "junction_belt", "compactor": "compactor", "furnace": "furnace"}
 # Older scenes can still refer to these names. They now resolve item unlocks.
 const TECHNOLOGIES := RESEARCHES
 
@@ -78,7 +79,7 @@ func add_experience(amount: int) -> void:
 		level_up.emit(gained_level)
 
 func award_sale(kind: String) -> void:
-	add_experience(int(SALE_EXPERIENCE.get(kind.replace("iron", "brass"), 0)))
+	add_experience(int(SALE_EXPERIENCE.get(kind, 0)))
 
 func award_night() -> void:
 	if POINTS_PER_NIGHT == 0: return

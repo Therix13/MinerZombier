@@ -8,7 +8,7 @@ const COAL_VEIN_PRICE := 100
 const CONVEYOR_PRICE := 50
 const DRILL_PRICE := 200
 const LAUNCHER_PRICE := 200
-const DEFENSE_TILE_PRICE := 100
+const DEFENSE_TILE_PRICE := 1000
 const COAL_SELL_PRICE := 3
 const BRASS_VEIN_PRICE := 500
 const BRASS_SELL_PRICE := 5
@@ -23,8 +23,11 @@ const NUGGET_SELL_PRICES := {
 	"iron": [10, 30, 75, 175],
 	"gold": [30, 75, 200, 500],
 }
-# Keep ingot prices independent of changes to nugget values.
-const INGOT_BASE_SELL_PRICES := {"coal": 135, "brass": 189, "iron": 243}
+const INGOT_SELL_PRICES := {
+	"brass": [150, 400, 1000, 2500],
+	"iron": [350, 1000, 2500, 7500],
+	"gold": [1000, 2500, 7500, 20000],
+}
 
 var coins: int = START_COINS
 var developer_mode: bool = false
@@ -34,7 +37,7 @@ func sale_value(kind: String) -> int:
 	var suffix: String = kind.get_slice("_", kind.get_slice_count("_") - 1)
 	var level: int = int(suffix) if suffix.is_valid_int() else 1
 	if "_ingot" in kind:
-		return int(INGOT_BASE_SELL_PRICES.get(material, 135)) * int(pow(3, level - 1))
+		return int(INGOT_SELL_PRICES.get(material, [135, 405, 1215, 3645])[clampi(level, 1, 4) - 1])
 	var prices: Array = NUGGET_SELL_PRICES.get(material, NUGGET_SELL_PRICES["coal"])
 	return int(prices[clampi(level, 1, 4) - 1])
 

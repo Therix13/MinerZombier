@@ -27,6 +27,8 @@ func _ready() -> void:
 	game.get("shop").add_child(pointer)
 	pointer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	cycle.changed.connect(on_step_changed)
+	game.get_node("Construction").changed.connect(cycle.refresh_tutorial)
+	game.get_node("Furnaces").changed.connect(cycle.refresh_tutorial)
 	get_viewport().size_changed.connect(focus_objective)
 	var barrier := preload("res://Scripts/tutorial_barrier.gd").new()
 	barrier.name = "TutorialBarrier"
@@ -97,29 +99,7 @@ func resupply_active() -> bool:
 	return resupply_step >= 0 and cycle.is_night and not cycle.defeated
 
 func update_resupply() -> void:
-	var previous: int = resupply_step
-	var controller: RefCounted = game.get("camera_controller")
-	if not cycle.is_night or cycle.defeated:
-		resupply_step = -1
-	elif resupply_step < 0 and not resupply_taught and not cycle.has_ammo():
-		var wave: Node = game.get("zombie_manager")
-		# The last killing shot should not start a lesson after victory.
-		if wave.active_wave and (wave.spawn_count < wave.wave_total or not get_tree().get_nodes_in_group("zombies").is_empty()):
-			resupply_taught = true
-			resupply_step = 0 if controller.defense_view else 1
-	if resupply_active() and not controller.transitioning:
-		if cycle.has_ammo():
-			resupply_step = -1 if controller.defense_view else 2
-		elif resupply_step == 0 and not controller.defense_view:
-			resupply_step = 1
-		elif resupply_step == 2:
-			resupply_step = 0 if controller.defense_view else 1
-	if previous != resupply_step or (resupply_active() and last_transitioning != controller.transitioning):
-		game.get("shop").update_cycle()
-		queue_redraw()
-	last_transitioning = controller.transitioning
-	if resupply_active():
-		queue_redraw()
+	resupply_step = -1
 
 func apply_resupply_card(shop: Control) -> void:
 	shop.cycle_heading.text = "APRENDE A RECARGAR"
@@ -159,6 +139,8 @@ func resupply_targets() -> Array[Vector2i]:
 	return result
 
 func placing_kind() -> String:
+	if game.get_node("WorldInteractions").placing_furnace: return "furnace"
+	if game.get("placing_brass"): return "brass"
 	if game.get("placing_coal"):
 		return "coal"
 	if game.get("placing_belt"):
@@ -216,9 +198,17 @@ func _input(event: InputEvent) -> void:
 	if not event.pressed or not cycle.allows_world_press(cell, placing_kind()):
 		get_viewport().set_input_as_handled()
 	elif not placing_kind().is_empty():
-		game.set("placement_direction", 1)
+		game.set("placement_direction", 0 if placing_kind() == "furnace" else 1)
 
 func targets() -> Array[Vector2i]:
+	if cycle.tutorial_step >= 5:
+		var targets: Array[Vector2i] = cycle.workshop_targets()
+		if not targets.is_empty(): return targets
+		match placing_kind():
+			"brass": return [cycle.TUTORIAL_BRASS_CELL]
+			"furnace": return [cycle.TUTORIAL_FURNACE_CELL]
+			"launcher": return [cycle.grid.defense_cell("left")]
+		return []
 	if cycle.advanced_vein_lesson() and not cycle.needs_tutorial_income():
 		var pair: Array[Vector2i] = cycle.vein_fusion_targets()
 		if not pair.is_empty(): return pair
@@ -269,13 +259,13 @@ func _draw() -> void:
 	for index in range(cells.size()):
 		var rect: Rect2 = cycle.grid.get_cell_rect(cells[index]).grow(-1.5)
 		var color := Color("#f0c777")
-		if cells.size() == 2 and index == 0 and (not lesson or (cycle.tutorial_step in [1, 2, 6] or cycle.needs_tutorial_income() or cycle.vein_lesson_active() or cycle.advanced_vein_lesson())):
+		if cells.size() == 2 and index == 0 and (not lesson or (cycle.tutorial_step in [1, 2] or cycle.tutorial_step >= 5 or cycle.needs_tutorial_income() or cycle.vein_lesson_active() or cycle.advanced_vein_lesson())):
 			color = Color("#b6d98e")
 		draw_rect(rect, Color(color, 0.12))
 		draw_rect(rect, Color(color, glow), false, 2.0)
-	if cells.size() == 1 and cycle.mining.vein_at(cells[0]) != "" and (not lesson or (cycle.tutorial_step in [1, 2, 6] or cycle.needs_tutorial_income() or cycle.vein_lesson_active() or cycle.advanced_vein_lesson())):
+	if cells.size() == 1 and cycle.mining.vein_at(cells[0]) != "" and (not lesson or (cycle.tutorial_step in [1, 2] or cycle.tutorial_step >= 5 or cycle.needs_tutorial_income() or cycle.vein_lesson_active() or cycle.advanced_vein_lesson())):
 		draw_mining_click(cells[0])
-	if cells.size() == 2 and (not lesson or (cycle.tutorial_step in [1, 2, 6] or cycle.needs_tutorial_income() or cycle.vein_lesson_active() or cycle.advanced_vein_lesson())):
+	if cells.size() == 2 and (not lesson or (cycle.tutorial_step in [1, 2] or cycle.tutorial_step >= 5 or cycle.needs_tutorial_income() or cycle.vein_lesson_active() or cycle.advanced_vein_lesson())):
 		var source: Vector2 = cycle.grid.get_cell_rect(cells[0]).get_center()
 		var destination: Vector2 = cycle.grid.get_cell_rect(cells[1]).get_center()
 		var direction: Vector2 = (destination - source).normalized()

@@ -34,15 +34,16 @@ const MONEY_BOX_WIDTH := 148.0
 const ANIMATION_TIME := 0.3
 const CATEGORIES := ["EXPANSION", "VETAS", "HERRAMIENTAS", "AUTOMATIZACIÓN", "DEFENSA", "INVESTIGACIÓN"]
 const ITEM_CATEGORIES := {
-	"VETAS": ["coal", "brass", "iron"],
+	"VETAS": ["coal", "brass", "iron", "gold"],
 	"HERRAMIENTAS": ["drill", "compactor", "furnace", "saw"],
 	"AUTOMATIZACIÓN": ["straight", "corner_right", "corner_left", "junction"],
 }
-const RESOURCE_LABELS := {"iron": "HIERRO · NIVEL 1", "iron_2": "HIERRO · NIVEL 2", "iron_3": "HIERRO · NIVEL 3", "iron_4": "HIERRO · NIVEL 4", "iron_ingot": "LINGOTE DE HIERRO · NIVEL 1", "iron_ingot_2": "LINGOTE DE HIERRO · NIVEL 2", "iron_ingot_3": "LINGOTE DE HIERRO · NIVEL 3", "iron_ingot_4": "LINGOTE DE HIERRO · NIVEL 4", "coal": "CARBÓN · NIVEL 1", "brass": "LATÓN · NIVEL 1", "coal_2": "CARBÓN · NIVEL 2", "brass_2": "LATÓN · NIVEL 2", "coal_3": "CARBÓN · NIVEL 3", "brass_3": "LATÓN · NIVEL 3", "coal_4": "CARBÓN · NIVEL 4", "brass_4": "LATÓN · NIVEL 4", "brass_ingot": "LINGOTE DE LATÓN · NIVEL 1", "brass_ingot_2": "LINGOTE DE LATÓN · NIVEL 2", "brass_ingot_3": "LINGOTE DE LATÓN · NIVEL 3", "brass_ingot_4": "LINGOTE DE LATÓN · NIVEL 4"}
+const RESOURCE_LABELS := {"gold": "ORO · NIVEL 1", "gold_2": "ORO · NIVEL 2", "gold_3": "ORO · NIVEL 3", "gold_4": "ORO · NIVEL 4", "gold_ingot": "LINGOTE DE ORO · NIVEL 1", "gold_ingot_2": "LINGOTE DE ORO · NIVEL 2", "gold_ingot_3": "LINGOTE DE ORO · NIVEL 3", "gold_ingot_4": "LINGOTE DE ORO · NIVEL 4","iron": "HIERRO · NIVEL 1", "iron_2": "HIERRO · NIVEL 2", "iron_3": "HIERRO · NIVEL 3", "iron_4": "HIERRO · NIVEL 4", "iron_ingot": "LINGOTE DE HIERRO · NIVEL 1", "iron_ingot_2": "LINGOTE DE HIERRO · NIVEL 2", "iron_ingot_3": "LINGOTE DE HIERRO · NIVEL 3", "iron_ingot_4": "LINGOTE DE HIERRO · NIVEL 4", "coal": "CARBÓN · NIVEL 1", "brass": "LATÓN · NIVEL 1", "coal_2": "CARBÓN · NIVEL 2", "brass_2": "LATÓN · NIVEL 2", "coal_3": "CARBÓN · NIVEL 3", "brass_3": "LATÓN · NIVEL 3", "coal_4": "CARBÓN · NIVEL 4", "brass_4": "LATÓN · NIVEL 4", "brass_ingot": "LINGOTE DE LATÓN · NIVEL 1", "brass_ingot_2": "LINGOTE DE LATÓN · NIVEL 2", "brass_ingot_3": "LINGOTE DE LATÓN · NIVEL 3", "brass_ingot_4": "LINGOTE DE LATÓN · NIVEL 4"}
 const CATEGORY_ART := {"EXPANSION": "expansion", "VETAS": "coal", "HERRAMIENTAS": "drill", "AUTOMATIZACIÓN": "junction", "DEFENSA": "launcher", "INVESTIGACIÓN": "research", "RECURSOS": "resources"}
 const RESEARCH_VIEW := {
 	"saw": ["saw", "Sierra", "1 → 2"],
 	"iron": ["iron", "Hierro", "Nueva veta"],
+	"gold": ["gold", "Oro", "Nueva veta"],
 	"drill": ["drill", "Taladro", "Automático"],
 	"brass": ["ore", "Latón", "Nueva veta"],
 	"straight_belt": ["belt", "Cinta", "Transportadora"],
@@ -318,7 +319,7 @@ func update_progression() -> void:
 
 func visible_shop_items(category: String = "") -> Array[String]:
 	var result: Array[String] = []
-	for item: String in ["coal", "brass", "iron", "straight", "corner_right", "corner_left", "junction", "drill", "compactor", "furnace", "saw"]:
+	for item: String in ["coal", "brass", "iron", "gold", "straight", "corner_right", "corner_left", "junction", "drill", "compactor", "furnace", "saw"]:
 		if not category.is_empty() and item not in ITEM_CATEGORIES.get(category, []): continue
 		if progression == null or progression.is_item_unlocked(item): result.append(item)
 	return result
@@ -717,40 +718,19 @@ func update_cycle() -> void:
 		cycle_goal.text = cycle.tutorial_text()
 		cycle_action.disabled = false
 		var game: Node = get_parent().get_parent()
+		cycle_action.hide()
 		match cycle.tutorial_step:
-			0:
-				cycle_action.hide()
-				if game.get("placing_coal"):
-					cycle_goal.text = "Coloca la veta en la casilla dorada."
-				else:
-					cycle_goal.text = tutorial_navigation_text()
-			6:
-				cycle_action.hide()
-				cycle_goal.text = tutorial_navigation_text() if cycle.needs_ammo_vein() and not cycle.needs_tutorial_income() and not game.get("placing_coal") else cycle.tutorial_text()
 			1:
-				cycle_action.text = "MUNICIÓN · %d / 4" % roundi(cycle.ammo_damage() / 0.5) if cycle.tutorial_step == 6 else "CARBÓN VENDIDO · %d / %d" % [mini(cycle.coal_sold, cycle.TUTORIAL_SALES_TARGET), cycle.TUTORIAL_SALES_TARGET]
+				cycle_action.show()
+				cycle_action.text = "CARBÓN VENDIDO · %d / %d" % [mini(cycle.coal_sold,cycle.TUTORIAL_SALES_TARGET),cycle.TUTORIAL_SALES_TARGET]
 				cycle_action.disabled = true
 			2:
+				cycle_action.show()
 				cycle_action.text = "2 × Nv. 1 → Nv. 2"
 				cycle_action.disabled = true
-			3, 4, 5:
-				cycle_action.hide()
-				if cycle.needs_tutorial_income():
-					cycle_goal.text = cycle.tutorial_text()
-				elif cycle.advanced_vein_lesson() and (not cycle.vein_fusion_targets().is_empty() or game.get("placing_coal")):
-					cycle_goal.text = cycle.tutorial_text()
-				elif cycle.vein_lesson_active() and cycle.mining.coal_veins.has(cycle.TUTORIAL_NEW_VEIN_CELL):
-					cycle_goal.text = cycle.tutorial_text()
-				elif game.get("placing_coal") and cycle.vein_lesson_active():
-					cycle_goal.text = "Coloca la segunda veta en la casilla dorada."
-				elif game.get("placing_launcher"):
-					cycle_goal.text = "Coloca el Lanzapepitas en la plataforma dorada."
-				else:
-					cycle_goal.text = tutorial_navigation_text()
-			7:
-				queue_first_night()
-				cycle_action.text = "LA CERCA ESTÁ CEDIENDO…"
-				cycle_action.disabled = not cycle.can_start_night()
+			cycle.TUTORIAL_LAST_STEP: queue_first_night()
+		if not tutorial_purchase().is_empty():
+			cycle_goal.text += "\n" + tutorial_navigation_text()
 	elif cycle.is_research_tutorial_active():
 		cycle_heading.text = "INVESTIGACIÓN"
 		cycle_title.text = "Tu primer desbloqueo"
@@ -796,10 +776,12 @@ func tutorial_purchase() -> Dictionary:
 		4:
 			if cycle.vein_fusion_targets().is_empty() and not game.get("placing_coal"): return {"category":"VETAS","item":"coal","instruction":"Compra otra veta de carbón para seguir fusionando."}
 		5:
-			if not cycle.platforms_ready(): return {"category":"DEFENSA","item":"defense_platforms","instruction":"Compra las plataformas para colocar el arma."}
-			if not game.get("placing_launcher"): return {"category":"DEFENSA","item":"launcher","instruction":"Compra el Lanzapepitas."}
+			if not game.get("placing_brass") and cycle.workshop_targets().is_empty(): return {"category":"VETAS","item":"brass","instruction":"Compra la veta de latón."}
 		6:
-			if cycle.needs_ammo_vein() and not game.get("placing_coal"): return {"category":"VETAS","item":"coal","instruction":"Compra una veta de Nv. 1 para fabricar munición."}
+			if not cycle.furnace_blueprint_exists() and not game.get_node("WorldInteractions").placing_furnace and cycle.workshop_targets().is_empty(): return {"category":"HERRAMIENTAS","item":"furnace","instruction":"Compra el plano del horno."}
+		8: return {"category":"DEFENSA","item":"defense_platforms","instruction":"Compra las plataformas de defensa."}
+		9:
+			if not game.get("placing_launcher"): return {"category":"DEFENSA","item":"launcher","instruction":"Compra el Lanzapepitas."}
 	return {}
 
 func tutorial_navigation_text() -> String:
@@ -878,8 +860,8 @@ func create_art_button(kind: String, description: String, price: int = -1) -> Bu
 	art.custom_minimum_size = Vector2(36, 36)
 	art.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(art)
-	var short_names := {"ore:iron": "Hierro · Nv. 1", "ore:iron_2": "Hierro · Nv. 2", "ore:iron_3": "Hierro · Nv. 3", "ore:iron_4": "Hierro · Nv. 4", "ore:iron_ingot": "Ling. hierro · Nv. 1", "ore:iron_ingot_2": "Ling. hierro · Nv. 2", "ore:iron_ingot_3": "Ling. hierro · Nv. 3", "ore:iron_ingot_4": "Ling. hierro · Nv. 4",
-		"expansion": "Ampliar base", "coal": "Carbón", "brass": "Latón", "iron": "Hierro",
+	var short_names := {"ore:gold": "Oro · Nv. 1", "ore:gold_2": "Oro · Nv. 2", "ore:gold_3": "Oro · Nv. 3", "ore:gold_4": "Oro · Nv. 4", "ore:gold_ingot": "Ling. oro · Nv. 1", "ore:gold_ingot_2": "Ling. oro · Nv. 2", "ore:gold_ingot_3": "Ling. oro · Nv. 3", "ore:gold_ingot_4": "Ling. oro · Nv. 4","ore:iron": "Hierro · Nv. 1", "ore:iron_2": "Hierro · Nv. 2", "ore:iron_3": "Hierro · Nv. 3", "ore:iron_4": "Hierro · Nv. 4", "ore:iron_ingot": "Ling. hierro · Nv. 1", "ore:iron_ingot_2": "Ling. hierro · Nv. 2", "ore:iron_ingot_3": "Ling. hierro · Nv. 3", "ore:iron_ingot_4": "Ling. hierro · Nv. 4",
+		"expansion": "Ampliar base", "coal": "Carbón", "brass": "Latón", "iron": "Hierro", "gold": "Oro",
 		"saw": "Sierra", "drill": "Taladro", "compactor": "Compactador", "furnace": "Horno", "straight": "Cinta recta",
 		"corner_right": "Cinta L derecha", "corner_left": "Cinta L izquierda",
 		"junction": "Cinta en T", "platform": "Plataformas", "launcher": "Lanzapepitas",
@@ -1158,6 +1140,7 @@ func open_category(category: String) -> void:
 			add_item_button("VETA DE CARBÓN", economy.COAL_VEIN_PRICE, "coal", coal_vein_requested)
 			add_item_button("VETA DE LATÓN", economy.BRASS_VEIN_PRICE, "brass", brass_vein_requested)
 			add_item_button("VETA DE HIERRO", economy.IRON_VEIN_PRICE, "iron", coal_vein_requested)
+			add_item_button("VETA DE ORO", economy.GOLD_VEIN_PRICE, "gold", coal_vein_requested)
 		"HERRAMIENTAS":
 			add_item_button("TALADRO AUTOMÁTICO · 200", economy.DRILL_PRICE, "drill", drill_requested)
 			add_item_button("COMPACTADOR · 300", CompactorScript.PRICE, "compactor", compactor_requested)
@@ -1439,6 +1422,7 @@ class ItemArt extends "res://Scripts/world_renderer.gd":
 		match kind:
 			"saw": preload("res://Scripts/saw_manager.gd").draw_machine(self,Vector2.ZERO,{"direction":1})
 			"coal": draw_coal_vein(Vector2.ZERO, 1, 0, false)
+			"gold": draw_vein(Vector2.ZERO, "gold", {"level": 1, "direction": 1, "progress": 0})
 			"iron": draw_vein(Vector2.ZERO, "iron", {"level": 1, "direction": 1, "progress": 0})
 			"brass": draw_brass_vein(Vector2.ZERO, 1, 0, false)
 			"straight", "corner_right", "corner_left", "junction":

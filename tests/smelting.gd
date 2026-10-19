@@ -105,7 +105,7 @@ func run_checks() -> void:
 		check(not mover.drop("nugget", a, platform) and game.mining.nugget_type(a) == kind, "Level-one weapons reject level-%d ingots without consuming them" % level)
 		cash = game.economy.coins
 		xp = game.progression.total_experience
-		check(mover.drop("nugget", a, game.grid.sale_cell) and game.economy.coins == cash + 189 * int(pow(3, level - 1)) and game.progression.total_experience == xp + 16 * int(pow(2, level - 1)), "Level-%d ingots sell with the correct value and input-equivalent EXP" % level)
+		check(mover.drop("nugget", a, game.grid.sale_cell) and game.economy.coins == cash + [150,400,1000,2500][level-1] and game.progression.total_experience == xp + [1,2,3,5][level-1], "Level-%d ingots sell with the correct value and input-equivalent EXP" % level)
 		clear_items()
 	put(a, {"brass_2": 1})
 	put(b, {"brass_ingot": 1})

@@ -16,7 +16,7 @@ func run_checks() -> void:
 			var kind: String = material if tier == 1 else material + "_" + str(tier)
 			var value: int = expected[material][tier-1]
 			check(game.economy.sale_value(kind) == value,"Exact configured sale price for %s" % kind)
-			if kind not in game.mining.ORE_KINDS: continue # Gold is reserved for the future material.
+			if kind not in game.mining.ORE_KINDS: continue
 			clear_items()
 			put(cell,{kind: 1})
 			var balance: int = game.economy.coins
@@ -27,7 +27,7 @@ func run_checks() -> void:
 			game.conveyors.tick()
 			game.conveyors.tick()
 			check(game.economy.coins == balance + value and game.mining.nuggets_at(sale_belt) == 0,"Conveyor sale pays the same price once: %s" % kind)
-	var ingots := {"brass": [189,567,1701,5103], "iron": [243,729,2187,6561]}
+	var ingots := {"brass": [150,400,1000,2500], "iron": [350,1000,2500,7500], "gold": [1000,2500,7500,20000]}
 	for material: String in ingots:
 		for tier in range(1,5):
 			clear_items()
@@ -35,18 +35,18 @@ func run_checks() -> void:
 			put(cell,{kind: 1})
 			var balance: int = game.economy.coins
 			var value: int = ingots[material][tier-1]
-			check(game.economy.sale_value(kind) == value and mover.drop("nugget",cell,game.grid.sale_cell) and game.economy.coins == balance + value,"Ingot retains its previous sale price: %s" % kind)
+			check(game.economy.sale_value(kind) == value and mover.drop("nugget",cell,game.grid.sale_cell) and game.economy.coins == balance + value,"Ingot pays its configured sale price: %s" % kind)
 	clear_items()
-	for material: String in {"coal": 100,"brass": 500,"iron": 5000}:
-		var price: int = {"coal": 100,"brass": 500,"iron": 5000}[material]
+	for material: String in {"coal": 100,"brass": 500,"iron": 5000,"gold": 50000}:
+		var price: int = {"coal": 100,"brass": 500,"iron": 5000,"gold": 50000}[material]
 		check(mover.item_price(material) == price,"Placement quotes the updated vein price: %s" % material)
 		game.mining.place_vein(cell,1,material)
 		check(mover.resale_value("vein",cell) == price / 2,"Vein resale retains half of the new purchase price: %s" % material)
 		game.mining.veins_for(material).erase(cell)
-	check(game.economy.GOLD_VEIN_PRICE == 50000,"Gold vein's future price is reserved at 50000")
+	check(game.economy.GOLD_VEIN_PRICE == 50000,"Gold vein costs 50000")
 	game.economy.toggle_developer_mode()
 	game.shop.open_category("VETAS")
-	for material: String in ["coal","brass","iron"]:
+	for material: String in ["coal","brass","iron","gold"]:
 		var label: Label = game.shop.purchase_buttons[material].get_meta("price_label")
 		check(label.text == "◆ %d" % mover.item_price(material),"Store displays the current vein price: %s" % material)
 	print("RESULT: ",passed," passed; ",failed," failed; economy prices")

@@ -6,6 +6,7 @@ var shift_batch: bool = false
 var placing_resource: String = ""
 var placing_furnace: bool = false
 var placing_iron: bool = false
+var placing_gold: bool = false
 var placing_saw: bool = false
 
 func _ready() -> void:
@@ -17,6 +18,7 @@ func stores() -> Dictionary:
 	var result: Dictionary = {"coal_vein": game.get("mining").coal_veins, "brass_vein": game.get("mining").brass_veins, "belt": game.get("conveyors").belts, "entry": game.get("conveyors").last_junction_entry, "drill": game.get("drills").drills, "launcher": game.get("launchers").launchers, "compactor": game.get_node("Compactors").machines}
 	result["blueprint"] = game.get_node("Construction").plans
 	result["iron_vein"] = game.get("mining").iron_veins
+	result["gold_vein"] = game.get("mining").gold_veins
 	result["saw"] = game.get_node("Saws").machines
 	result["furnace"] = game.get_node("Furnaces").machines
 	result.merge(game.get("mining").nugget_stores())
@@ -38,14 +40,14 @@ func cell_data(cell: Vector2i) -> Dictionary:
 func has_kind(cell: Vector2i, kind: String) -> bool:
 	var data: Dictionary = cell_data(cell)
 	if kind == "nugget": return game.get("mining").nuggets_at(cell) > 0
-	if kind == "vein": return data.has("coal_vein") or data.has("brass_vein") or data.has("iron_vein")
+	if kind == "vein": return data.has("coal_vein") or data.has("brass_vein") or data.has("iron_vein") or data.has("gold_vein")
 	return data.has(kind)
 
 func can_hold(cell: Vector2i, data: Dictionary) -> bool:
 	if (not grid.owned_tiles.has(cell) and not grid.defense_tiles.has(cell)) or cell == grid.sale_cell:
 		return false
 	var buildings: int = 0
-	for kind in ["coal_vein", "brass_vein", "iron_vein", "blueprint", "drill", "belt", "launcher", "compactor", "furnace", "saw"]:
+	for kind in ["coal_vein", "brass_vein", "iron_vein", "gold_vein", "blueprint", "drill", "belt", "launcher", "compactor", "furnace", "saw"]:
 		if data.has(kind): buildings += 1
 	if buildings > 1:
 		return false
@@ -56,7 +58,7 @@ func can_hold(cell: Vector2i, data: Dictionary) -> bool:
 		return grid.defense_tiles.has(cell) and not ore
 	if grid.is_defense_position(cell):
 		return data.is_empty()
-	if data.has("coal_vein") or data.has("brass_vein") or data.has("iron_vein") or data.has("drill") or data.has("compactor") or data.has("furnace") or data.has("saw"):
+	if data.has("coal_vein") or data.has("brass_vein") or data.has("iron_vein") or data.has("gold_vein") or data.has("drill") or data.has("compactor") or data.has("furnace") or data.has("saw"):
 		return grid.is_valid_cell(cell) and not ore
 	return grid.is_valid_cell(cell) or grid.is_ammo_cell(cell)
 
@@ -149,6 +151,7 @@ func sell(kind: String, source: Vector2i) -> bool:
 		data.erase("coal_vein")
 		data.erase("brass_vein")
 		data.erase("iron_vein")
+		data.erase("gold_vein")
 	else:
 		data.erase(kind)
 	if kind == "belt": data.erase("entry")
@@ -164,7 +167,7 @@ func swaps_contents(kind: String, source: Vector2i, destination: Vector2i) -> bo
 	return source != destination and not cell_data(destination).is_empty() and not (kind == "nugget" and (destination == grid.sale_cell or game.get("launchers").can_receive(destination) or game.get("mining").can_move_nugget(destination))) and can_drop(kind, source, destination)
 
 func rotate_data(data: Dictionary, direction: int) -> void:
-	for kind in ["coal_vein", "brass_vein", "iron_vein", "blueprint", "belt", "compactor", "furnace", "saw"]:
+	for kind in ["coal_vein", "brass_vein", "iron_vein", "gold_vein", "blueprint", "belt", "compactor", "furnace", "saw"]:
 		if data.has(kind): data[kind]["direction"] = posmod(direction, 4)
 	if data.has("drill"): data["drill"] = posmod(direction, 4)
 
@@ -269,11 +272,12 @@ func clear_drag() -> void:
 	game.get_node("Furnaces").queue_redraw()
 
 func placement_active() -> bool:
-	return placing_saw or placing_iron or placing_furnace or not placing_resource.is_empty() or game.get("placing_coal") or game.get("placing_brass") or game.get("placing_belt") or game.get("placing_drill") or game.get("placing_launcher") or game.get_node("Compactors").placing
+	return placing_saw or placing_iron or placing_gold or placing_furnace or not placing_resource.is_empty() or game.get("placing_coal") or game.get("placing_brass") or game.get("placing_belt") or game.get("placing_drill") or game.get("placing_launcher") or game.get_node("Compactors").placing
 
 func selected_item() -> String:
 	if placing_saw: return "saw"
 	if placing_iron: return "iron"
+	if placing_gold: return "gold"
 	if placing_furnace: return "furnace"
 	if not placing_resource.is_empty(): return "resource:" + placing_resource
 	if game.get("placing_coal"): return "coal"
@@ -303,6 +307,7 @@ func item_price(item: String) -> int:
 		"coal": return economy.COAL_VEIN_PRICE
 		"brass": return economy.BRASS_VEIN_PRICE
 		"iron": return economy.IRON_VEIN_PRICE
+		"gold": return economy.GOLD_VEIN_PRICE
 		"straight", "corner_right", "corner_left", "junction": return economy.CONVEYOR_PRICE
 		"drill": return economy.DRILL_PRICE
 		"launcher": return economy.LAUNCHER_PRICE
@@ -324,6 +329,7 @@ func select_item(item: String) -> bool:
 	match item:
 		"saw": placing_saw = true
 		"iron": placing_iron = true
+		"gold": placing_gold = true
 		"furnace": placing_furnace = true
 		"coal": game.set("placing_coal", true)
 		"brass": game.set("placing_brass", true)
@@ -355,7 +361,7 @@ func place_selected(cell: Vector2i) -> bool:
 		return true
 	var item: String = selected_item()
 	var cycle: RefCounted = game.get("cycle")
-	var placing: String = item if item in ["coal", "launcher"] else ("belt" if game.get("placing_belt") else "other")
+	var placing: String = item if item in ["coal", "brass", "furnace", "launcher"] else ("belt" if game.get("placing_belt") else "other")
 	if item.is_empty() or not selection_available() or not phase_allows() or cycle.is_night or not cycle.allows_world_press(cell, placing): return false
 	if not can_place_item(cell, item): return false
 	var economy: RefCounted = game.get("economy")
@@ -380,7 +386,7 @@ func place_selected(cell: Vector2i) -> bool:
 func can_place_item(cell: Vector2i, item: String) -> bool:
 	var valid: bool = false
 	match item:
-		"coal", "brass", "iron": valid = game.get("mining").can_place_vein(cell) and not game.get("launchers").launchers.has(cell)
+		"coal", "brass", "iron", "gold": valid = game.get("mining").can_place_vein(cell) and not game.get("launchers").launchers.has(cell)
 		"straight", "corner_right", "corner_left", "junction": valid = game.get("conveyors").can_place(cell)
 		"drill": valid = game.get("drills").can_place(cell) and not game.get("launchers").launchers.has(cell)
 		"launcher": valid = game.get("launchers").can_place(cell)
@@ -392,7 +398,7 @@ func can_place_item(cell: Vector2i, item: String) -> bool:
 func build_selected(cell: Vector2i, item: String, direction: int) -> void:
 	var cycle: RefCounted = game.get("cycle")
 	match item:
-		"coal", "brass", "iron": game.get("mining").place_vein(cell, direction, item)
+		"coal", "brass", "iron", "gold": game.get("mining").place_vein(cell, direction, item)
 		"straight", "corner_right", "corner_left", "junction": game.get("conveyors").place(cell, direction, item)
 		"drill": game.get("drills").place(cell, direction)
 		"launcher":
@@ -412,13 +418,14 @@ func cancel_active() -> bool:
 	placing_resource = ""
 	placing_furnace = false
 	placing_iron = false
+	placing_gold = false
 	placing_saw = false
 	shift_batch = false
 	clear_drag()
 	return true
 
 func _process(_delta: float) -> void:
-	if (placing_furnace or placing_iron or placing_saw) and (game.get("cycle").is_night or game.get("cycle").defeated): cancel_active()
+	if (placing_furnace or placing_iron or placing_gold or placing_saw) and (game.get("cycle").is_night or game.get("cycle").defeated): cancel_active()
 	var cycle: RefCounted = game.get("cycle")
 	if not placing_resource.is_empty() and (not game.get("economy").developer_mode or cycle.is_night or cycle.defeated or cycle.is_guided_tutorial_active()):
 		cancel_active()
@@ -431,7 +438,7 @@ func _process(_delta: float) -> void:
 	elif shift_batch: cancel_active()
 
 func _input(event: InputEvent) -> void:
-	if placing_iron and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R and phase_allows():
+	if (placing_iron or placing_gold) and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R and phase_allows():
 		game.set("placement_direction", posmod(int(game.get("placement_direction")) + 1, 4))
 		game.redraw_world()
 		get_viewport().set_input_as_handled()
@@ -447,7 +454,7 @@ func _input(event: InputEvent) -> void:
 		toggle_night_view()
 		get_viewport().set_input_as_handled()
 		return
-	if game.get("cycle").is_tutorial_active() or not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_LEFT or event.pressed or not game.get("holding_object"):
+	if (game.get("cycle").is_tutorial_active() and game.get("cycle").tutorial_step < 5) or not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_LEFT or event.pressed or not game.get("holding_object"):
 		return
 	if not game.get("dragging_object") and event.position.distance_to(game.get("drag_start_position")) < 8.0:
 		if game.get("held_object_type") in ["blueprint", "drill", "compactor", "furnace", "launcher", "saw"] and phase_allows():

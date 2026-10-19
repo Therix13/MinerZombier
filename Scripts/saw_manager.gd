@@ -35,7 +35,7 @@ func place(cell: Vector2i, direction: int = 1) -> bool:
 static func lower_tier(kind: String) -> String:
 	# Keep the material and form: ingots split into ingots, nuggets into nuggets.
 	for level in [2,3,4]:
-		for material in ["coal","brass","iron","brass_ingot","iron_ingot"]:
+		for material in ["coal","brass","iron","gold","brass_ingot","iron_ingot","gold_ingot"]:
 			if kind == material + "_" + str(level): return material if level == 2 else material + "_" + str(level - 1)
 	return ""
 
