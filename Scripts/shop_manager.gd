@@ -76,6 +76,9 @@ var cycle_badge: Label
 var cycle_steps: HBoxContainer
 var cycle_goal: RichTextLabel
 var cycle_action: Button
+var cycle_shift_hint: HBoxContainer
+var cycle_shift_key: PanelContainer
+var shift_key_style: StyleBoxFlat
 var progression: RefCounted
 var progression_panel: PanelContainer
 var level_label: Label
@@ -242,6 +245,7 @@ func _process(_delta: float) -> void:
 	if progression == null:
 		return
 	update_notice_visibility()
+	update_shift_hint()
 	# Preserve research locks even with older scenes that handle purchases themselves.
 	var game: Node = get_parent().get_parent()
 	var item: String = ""
@@ -670,6 +674,30 @@ func build_cycle_panel() -> void:
 	cycle_goal = create_research_label("", 14, Color("#bacbb7"))
 	cycle_goal.custom_minimum_size.y = 58
 	column.add_child(cycle_goal)
+	cycle_shift_hint = HBoxContainer.new()
+	cycle_shift_hint.name = "ShiftPlacementHint"
+	cycle_shift_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cycle_shift_hint.add_theme_constant_override("separation", 10)
+	column.add_child(cycle_shift_hint)
+	cycle_shift_key = PanelContainer.new()
+	cycle_shift_key.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cycle_shift_key.custom_minimum_size = Vector2(84, 38)
+	shift_key_style = create_style("#344535", "#d5b078", 2, 7)
+	shift_key_style.border_width_bottom = 4
+	cycle_shift_key.add_theme_stylebox_override("panel", shift_key_style)
+	cycle_shift_hint.add_child(cycle_shift_key)
+	var key_label := create_label("⇧ SHIFT", 16, Color("#ffe1a2"))
+	key_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	key_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	key_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	key_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cycle_shift_key.add_child(key_label)
+	var hint_label := create_label("Mantén para colocar varias", 12, Color("#bacbb7"))
+	hint_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hint_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cycle_shift_hint.add_child(hint_label)
+	cycle_shift_hint.hide()
 	cycle_action = create_button("")
 	cycle_action.custom_minimum_size.y = 39
 	cycle_action.add_theme_font_size_override("font_size", 14)
@@ -680,6 +708,14 @@ func build_cycle_panel() -> void:
 	cycle_action.add_theme_stylebox_override("disabled", create_style("#263a2d", "#3b5240", 1, 7))
 	cycle_action.pressed.connect(_on_cycle_action)
 	column.add_child(cycle_action)
+
+func update_shift_hint() -> void:
+	if cycle_shift_hint == null or cycle == null: return
+	cycle_shift_hint.visible = cycle.is_tutorial_active() and cycle.tutorial_step in [3,4] and not cycle.needs_tutorial_income() and cycle.vein_fusion_targets().is_empty()
+	if not cycle_shift_hint.visible: return
+	var held: bool = Input.is_key_pressed(KEY_SHIFT)
+	shift_key_style.bg_color = Color("#617648") if held else Color("#344535")
+	shift_key_style.border_width_bottom = 2 if held else 4
 
 func _on_cycle_action() -> void:
 	if cycle_action.disabled or not cycle_action.visible:
@@ -699,6 +735,7 @@ func _on_cycle_action() -> void:
 func update_cycle() -> void:
 	if cycle == null or cycle_title == null:
 		return
+	update_shift_hint()
 	var tutorial: bool = cycle.is_tutorial_active()
 	cycle_heading.text = "PRIMEROS PASOS" if tutorial else "DEFENSA DE LA BASE"
 	cycle_badge.text = "%02d / %02d" % [cycle.tutorial_display_step(), cycle.TUTORIAL_DISPLAY_STEPS] if tutorial else "DÍA %d" % cycle.day
