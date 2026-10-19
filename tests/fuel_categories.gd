@@ -66,9 +66,25 @@ func run_checks() -> void:
 	furnace.machines[cell]["fuel"] = 38
 	var candidates: Array = [{"kind":"coal_3"},{"kind":"coal_2"},{"kind":"coal"},{"kind":"coal"},{"kind":"coal"}]
 	var accepted: Array = furnace.plan_inputs(cell,candidates)
-	check(accepted.size() == 2 and accepted[0]["kind"] == "coal" and accepted[1]["kind"] == "coal" and furnace.machines[cell]["fuel"] == 38,"Simultaneous conveyor reservations admit only fuel that fits without mutating the real furnace")
+	check(accepted.size() == 1 and accepted[0]["kind"] == "coal_3" and furnace.machines[cell]["fuel"] == 38,"Conveyor reservations accept one overflowing coal nugget and reserve the full capacity without mutating real fuel")
 	check(furnace.receive(cell,"coal") and furnace.receive(cell,"coal") and furnace.machines[cell]["fuel"] == 40,"Low-tier coal can fill the final two units of capacity")
 	for kind: String in furnace.FUEL_VALUES: check(not furnace.receive(cell,kind) and furnace.machines[cell]["fuel"] == 40,"A full furnace rejects extra %s without losing fuel" % kind)
+	for kind: String in furnace.FUEL_VALUES:
+		furnace.machines[cell]["fuel"] = 39
+		game.mining.items_for(kind)[source] = 1
+		check(mover.drop("nugget",source,cell) and furnace.machines[cell]["fuel"] == 40 and game.mining.nuggets_at(source) == 0,"Overflowing %s is consumed once, fills the furnace and discards excess fuel" % kind)
+	furnace.machines[cell]["fuel"] = 35
+	check(furnace.receive(cell,"coal_4") and furnace.machines[cell]["fuel"] == 40,"Thirty-five plus twenty fuel caps at forty and loses fifteen")
+	var other := cell + Vector2i.RIGHT
+	game.conveyors.place(source,1)
+	game.conveyors.place(other,3)
+	game.mining.items_for("coal_4")[source] = 1
+	game.mining.items_for("coal_4")[other] = 1
+	furnace.machines[cell]["fuel"] = 39
+	game.conveyors.tick()
+	check(furnace.machines[cell]["fuel"] == 40 and game.mining.nuggets_at(source)+game.mining.nuggets_at(other) == 1,"Two incoming belts consume only one oversized coal nugget to finish filling the furnace")
+	game.conveyors.tick()
+	check(furnace.machines[cell]["fuel"] == 40 and game.mining.nuggets_at(source)+game.mining.nuggets_at(other) == 1,"A full furnace leaves the remaining belt's coal untouched")
 	game.queue_free()
 	await process_frame
 	print("RESULT: %d passed, %d failed; fuel tiers and visible unlock categories" % [passed,failed])
