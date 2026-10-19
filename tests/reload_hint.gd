@@ -1,0 +1,113 @@
+extends "res://tests/interactions.gd"
+
+func click_control(control: Control) -> void:
+	var at: Vector2 = root.get_screen_transform() * (control.get_global_transform_with_canvas() * (control.size * 0.5))
+	await mouse_move(at)
+	await mouse_button(at,true)
+	await mouse_button(at,false)
+
+func run_checks() -> void:
+	root.show()
+	game = load("res://main.tscn").instantiate()
+	root.add_child(game)
+	current_scene = game
+	await settle()
+	game.set_process(false)
+	game.cycle.skip_tutorial()
+	game.cycle.day = 5
+	game.cycle.barrier_broken = true
+	game.grid.purchase_defense_platforms()
+	mover = game.get_node("WorldInteractions")
+	var hint: Control = game.ui_layer.get_node("ReloadHint")
+	hint.set_process(false)
+	var saves: Node = game.get_node("SaveGame")
+	var wave: Node = game.zombie_manager
+	wave.set_process(false)
+	var left: Vector2i = game.grid.defense_cell("left")
+	var right: Vector2i = game.grid.defense_cell("right")
+	game.launchers.place(left)
+	game.launchers.place(right)
+	game.launchers.receive(left,"coal")
+	game.launchers.receive(right,"coal_4")
+	game.cycle.changed.emit()
+	game.phase_clock.update_clock()
+	check(not game.phase_clock.action.visible,"Day clock has no button to advance to 22:00 even when armed")
+	game.phase_clock.on_action()
+	check(not game.cycle.is_night,"The old clock action cannot start a night")
+	var morning: Dictionary = saves.snapshot()
+	game.cycle.start_night(true)
+	wave.start_wave(5)
+	for z: Node in wave.living_zombies(): z.depart()
+	game.launchers.launchers[left]["ammo"].clear()
+	hint._process(0.01)
+	check(not hint.active and not saves.reload_hint_seen,"An empty turret without living zombies never triggers the guide")
+	game.launchers.receive(left,"coal")
+	var enemy: Node2D = preload("res://Scripts/zombie.gd").new()
+	var center: Vector2 = game.grid.get_cell_rect(left).get_center()
+	enemy.setup(Vector2(center.x,-120),Vector2(center.x,-28))
+	enemy.configure("brute")
+	wave.connect_zombie(enemy)
+	wave.add_child(enemy)
+	enemy.set_process(false)
+	game.camera_controller.set_defense_view(true)
+	game.camera_controller.stop_transition()
+	game.shop.set_view_mode(true)
+	hint._process(0.01)
+	check(not hint.active,"Loaded turrets do not show a warning")
+	game.launchers.advance(0.01)
+	hint._process(0.01)
+	await settle()
+	check(hint.active and hint.visible and saves.reload_hint_seen,"A turret's last shot triggers the one-time lesson on a later night")
+	check(hint.pointer.visible and "pico" in hint.message.text and "P" in hint.message.text,"The guide highlights the view icon and explains the P shortcut")
+	check(game.launchers.launchers[right]["ammo"].size() > 0,"One empty turret triggers the hint while the other still has ammunition")
+	if DisplayServer.get_name() != "headless":
+		await RenderingServer.frame_post_draw
+		root.get_texture().get_image().save_png("/tmp/reload-hint.png")
+	await click_control(game.shop.view_button)
+	game.camera_controller.stop_transition()
+	hint._process(0.01)
+	check(not game.camera_controller.defense_view and not hint.pointer.visible and "Arrastra" in hint.message.text,"The actual view button opens the mine and updates the reload instruction")
+	var source := Vector2i(15,1)
+	game.mining.items_for("coal")[source] = 1
+	check(mover.drop("nugget",source,left),"The player can reload during the guide without interaction locks")
+	hint._process(0.01)
+	check(not hint.active and not hint.visible,"Reloading dismisses the guide automatically")
+	game.launchers.launchers[left]["ammo"].clear()
+	hint._process(0.01)
+	check(not hint.active,"The same night never repeats the lesson")
+	var learned: Dictionary = saves.snapshot()
+	check(learned["reload_hint_seen"] and saves.restore_snapshot(learned),"Learning the lesson survives saving and loading")
+	hint._process(0.01)
+	check(not hint.active,"Loading a later night with empty turrets does not repeat the lesson")
+	check(saves.restore_snapshot(morning) and saves.reload_hint_seen,"Restoring an earlier dawn checkpoint does not undo a learned lesson")
+	game.cycle.is_night = true
+	hint._process(0.01)
+	check(not hint.active,"The lesson remains one-time across retries")
+	var bad: Dictionary = learned.duplicate(true)
+	bad["reload_hint_seen"] = "invalid"
+	check(not saves.valid_snapshot(bad),"Save validation rejects malformed lesson state")
+	# An interrupted tutorial retires with the night and can also be acknowledged.
+	saves.reload_hint_seen = false
+	game.cycle.is_night = false
+	game.cycle.defeated = false
+	game.cycle.day = 6
+	game.cycle.start_night(true)
+	wave.active_wave = false
+	wave.start_wave(6)
+	wave.set_process(false)
+	game.launchers.launchers[left]["ammo"].clear()
+	hint._process(0.01)
+	check(hint.active,"A fresh unlearned lesson can trigger on any later night")
+	await settle()
+	await click_control(hint.accept)
+	check(not hint.active and saves.reload_hint_seen,"Entendido closes the nonmodal guide permanently")
+	saves.reload_hint_seen = false
+	hint._process(0.01)
+	check(hint.active,"A pending hint is active before dawn")
+	game.cycle.complete_night()
+	hint._process(0.01)
+	check(not hint.visible and saves.reload_hint_seen,"Dawn hides the guide without allowing it to repeat")
+	print("RESULT: %d passed, %d failed; one-time reload guide" % [passed,failed])
+	game.queue_free()
+	await settle()
+	quit(1 if failed else 0)

@@ -28,6 +28,7 @@ var last_message := ""
 var urgent_pending := false
 var last_cycle_state: Array = []
 var day_checkpoint: Dictionary = {}
+var reload_hint_seen: bool = false
 
 func _ready() -> void:
 	game = get_parent()
@@ -207,7 +208,7 @@ func snapshot(include_checkpoint: bool = true) -> Dictionary:
 	camera_data["zoom"] = game.camera.zoom.x
 	var result: Dictionary = {
 		"version": VERSION, "tutorial_revision": TUTORIAL_REVISION, "material_revision": 2, "compactor_revision": 2, "combat_revision": 2, "saved_at": int(Time.get_unix_time_from_system()),
-		"coins": game.economy.coins, "developer_mode": game.economy.developer_mode,
+		"coins": game.economy.coins, "developer_mode": game.economy.developer_mode, "reload_hint_seen": reload_hint_seen,
 		"grid": {"width": game.grid.cave_width, "height": game.grid.cave_height, "platforms": not game.grid.defense_tiles.is_empty()},
 		"veins": veins, "resources": game.mining.nugget_stores().duplicate(true),
 		"belts": game.conveyors.belts.duplicate(true), "junctions": game.conveyors.last_junction_entry.duplicate(true),
@@ -359,6 +360,8 @@ func restore_snapshot(data: Dictionary) -> bool:
 	data = migrate_materials(data)
 	if not valid_snapshot(data): return false
 	restoring = true
+	# This lesson stays learned even when retrying an earlier dawn checkpoint.
+	reload_hint_seen = reload_hint_seen or bool(data.get("reload_hint_seen",false))
 	loaded_game = true
 	Engine.set_meta(INTRO_KEY, true)
 	game.get_node("WorldInteractions").cancel_active()
@@ -468,6 +471,7 @@ func dictionary_keys(data: Dictionary, names: Array) -> bool:
 
 func valid_snapshot(data: Dictionary) -> bool:
 	data = migrate_materials(data)
+	if not data.get("reload_hint_seen",false) is bool: return false
 	if not data.get("combat_revision") is int or data.get("combat_revision") != 2: return false
 	if not data.get("compactor_revision") is int or data.get("compactor_revision") != 2: return false
 	if not data.get("material_revision") is int or data.get("material_revision") != 2: return false

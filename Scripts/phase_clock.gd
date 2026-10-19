@@ -64,9 +64,9 @@ func _ready() -> void:
 	day_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	day_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(day_label)
-	action = game.shop.create_button("»")
+	action = game.shop.create_button("↻")
 	action.custom_minimum_size = Vector2(28,26)
-	action.tooltip_text = "Adelantar hasta las 22:00"
+	action.tooltip_text = "Reintentar el día"
 	action.pressed.connect(on_action)
 	row.add_child(action)
 	build_speed_controls()
@@ -126,7 +126,7 @@ func can_tick() -> bool:
 
 func on_action() -> void:
 	if game.cycle.defeated: game.restart_game()
-	elif game.cycle.can_start_night(): game.start_night()
+
 
 func _process(_delta: float) -> void:
 	sync_speed()
@@ -145,7 +145,7 @@ func update_clock() -> void:
 	var cycle: RefCounted = game.cycle
 	visible = true
 	var minutes: int = clock_minutes()
-	var signature: Array = [minutes,cycle.day,cycle.is_night,cycle.defeated,cycle.can_start_night()]
+	var signature: Array = [minutes,cycle.day,cycle.is_night,cycle.defeated]
 	if signature == last_state: return
 	last_state = signature
 	update_layout()
@@ -155,10 +155,8 @@ func update_clock() -> void:
 	phase_icon.queue_redraw()
 	tooltip_text = "Noche · 22:00–06:00 · 2 minutos\nClic en un zombi para priorizarlo" if cycle.is_night else "Día · 06:00–22:00 · 5 minutos"
 	if cycle.day == 1 and not cycle.is_night: tooltip_text = "Día 1 · Completa el tutorial para comenzar la primera noche"
-	action.text = "»"
-	action.tooltip_text = "Adelantar hasta las 22:00"
-	action.visible = not cycle.is_night and cycle.can_start_night()
-	action.disabled = not cycle.can_start_night()
+	action.visible = cycle.defeated
+	action.disabled = not cycle.defeated
 	if cycle.defeated:
 		time_label.text = "Base destruida"
 		day_label.text = ""

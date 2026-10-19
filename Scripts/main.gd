@@ -134,6 +134,9 @@ func _ready() -> void:
 	var saves := SaveScript.new()
 	saves.name = "SaveGame"
 	add_child(saves)
+	var reload_hint := preload("res://Scripts/reload_hint.gd").new()
+	reload_hint.name = "ReloadHint"
+	ui_layer.add_child(reload_hint)
 
 func update_display_layout() -> void:
 	var factor: float = display_settings.interface_scale()
