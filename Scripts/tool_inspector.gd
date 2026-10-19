@@ -76,7 +76,7 @@ func is_open() -> bool:
 	return overlay != null and overlay.visible
 
 func open_tool(tool_kind: String, at: Vector2i) -> void:
-	if game.get("cycle").is_guided_tutorial_active() or get_tree().paused: return
+	if get_tree().paused: return
 	kind = tool_kind
 	cell = at
 	if not exists(): return
@@ -209,7 +209,7 @@ func fill_slot(slot: Button, art: Control, value: String) -> Label:
 
 func withdraw(item: String) -> bool:
 	if kind == "blueprint": return false
-	if not is_open() or not exists() or not inventory().has(item) or get_tree().paused or game.get("cycle").defeated or game.get("cycle").is_guided_tutorial_active(): return false
+	if not is_open() or not exists() or not inventory().has(item) or get_tree().paused or game.get("cycle").defeated: return false
 	var mining: RefCounted = game.get("mining")
 	var candidates: Array = game.get("grid").owned_tiles.keys()
 	candidates.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.distance_squared_to(cell) < b.distance_squared_to(cell))
@@ -245,7 +245,7 @@ func withdraw(item: String) -> bool:
 
 func _process(_delta: float) -> void:
 	if is_open():
-		if game.get("cycle").defeated or game.get("cycle").is_guided_tutorial_active() or (game.get("night_victory_overlay") != null and game.get("night_victory_overlay").visible): close_inspector()
+		if game.get("cycle").defeated or (game.get("night_victory_overlay") != null and game.get("night_victory_overlay").visible): close_inspector()
 		else: refresh()
 
 class WoodPanel extends PanelContainer:

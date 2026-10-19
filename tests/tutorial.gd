@@ -89,55 +89,46 @@ func wait_shop() -> void:
 	await settle()
 
 func purchase_route(category: String, item: String) -> void:
-	var guide: Node = game.get_node("TutorialGuide")
 	if not shop.shop_open:
-		check(guide.pointer.target == shop.shop_button and not shop.shop_button.disabled, "The guide marks the real menu before buying " + item)
 		await click_control(shop.shop_button)
 		await wait_shop()
-		check(shop.shop_open, "The marked menu opens for " + item)
+	check(shop.shop_open,"The store remains accessible during every lesson")
 	if shop.shop_title.text != category:
-		check(guide.pointer.target == shop.category_buttons[category], "The guide points to the matching category for " + item)
-		for other: String in shop.category_buttons:
-			if other != category: check(shop.category_buttons[other].disabled, "Unrelated category stays locked: " + other)
-		shop.open_category("INVESTIGACIÓN")
-		check(shop.shop_title.text == "TIENDA", "Calling an unrelated category cannot bypass the guide")
+		if shop.shop_title.text != "TIENDA": await click_control(shop.fixed_back_button)
 		await click_control(shop.category_buttons[category])
 	await settle()
-	check(shop.shop_title.text == category and guide.pointer.target == shop.purchase_buttons[item], "The guide marks the real purchase button for " + item)
-	if item == "coal":
-		await click_control(shop.fixed_back_button)
-		check(shop.shop_title.text == "TIENDA" and guide.pointer.target == shop.category_buttons[category], "Returning to categories restores the matching guide marker")
-		await click_control(shop.category_buttons[category])
-	for other: String in shop.purchase_buttons:
-		if other != item: check(shop.purchase_buttons[other].disabled, "Unrelated store purchase stays locked: " + other)
-	if item == "defense_platforms":
-		var coins: int = game.economy.coins
-		shop.request_item("launcher", shop.launcher_requested)
-		check(not game.placing_launcher and game.economy.coins == coins, "A synthetic weapon request cannot skip buying the platforms")
+	check(shop.purchase_buttons.has(item) and not shop.purchase_buttons[item].disabled,"Normal unlock and money rules allow " + item)
 	await click_control(shop.purchase_buttons[item])
 	await wait_shop()
 
-func check_locked_actions() -> void:
-	var coins: int = game.get("economy").coins
-	game.call("buy_brass_vein")
-	game.call("buy_drill")
-	game.call("buy_junction_conveyor")
-	game.call("buy_conveyor")
-	game.call("research_technology", "drill")
-	# Older built-in controllers have their research locks enforced by the shop.
+func research_route() -> void:
+	await create_timer(3.2).timeout
+	if not shop.shop_open:
+		await click_control(shop.shop_button)
+		await wait_shop()
+	if shop.shop_title.text != "INVESTIGACIÓN":
+		if shop.shop_title.text != "TIENDA": await click_control(shop.fixed_back_button)
+		await click_control(shop.category_buttons["INVESTIGACIÓN"])
 	await settle()
-	check(game.get("economy").coins == coins and not game.get("placing_brass") and not game.get("placing_drill") and not game.get("placing_belt"), "Unrelated purchases spend nothing and do not enter placement")
-	check(shop.view_button.disabled and shop.shop_button.disabled == shop.tutorial_purchase().is_empty(), "Only the menu required by the current step is unlocked")
-	if shop.tutorial_purchase().is_empty():
-		shop.open_shop()
-		check(not shop.shop_open, "The store stays locked while mining or loading ammunition")
-	check(not game.get("progression").has_research("drill"), "Research cannot bypass the tutorial")
+	var id: String = cycle.research_to_learn()
+	var points: int = game.progression.research_points
+	var price: int = game.progression.RESEARCHES[id]["cost"]
+	check(shop.research_buttons.has(id) and not shop.research_buttons[id].disabled,"Milestone EXP makes the real research available: "+id)
+	shop.shop_scroll.ensure_control_visible(shop.research_buttons[id])
+	await settle()
+	if DisplayServer.get_name() != "headless":
+		await RenderingServer.frame_post_draw
+		root.get_texture().get_image().save_png("/workspace/.onboarding/display-test/free-research-"+id+".png")
+	await click_control(shop.research_buttons[id])
+	check(game.progression.has_research(id) and game.progression.research_points == points - price,"The player spends normal research points to unlock "+id)
+	shop.close_shop()
+	await wait_shop()
 
 func extract_one() -> void:
 	for index in range(game.mining.hardness(game.mining.vein_at(cycle.tutorial_mining_cell()))): await click_cell(cycle.tutorial_mining_cell())
 
 func earn_purchase_money() -> void:
-	check(cycle.needs_tutorial_income() and cycle.allows_action("mine_coal") and cycle.allows_action("sell_coal") and shop.shop_button.disabled, "Insufficient funds unlock mining and selling without skipping the purchase")
+	check(cycle.needs_tutorial_income() and cycle.allows_action("mine_coal") and cycle.allows_action("sell_coal") and not shop.shop_button.disabled, "Insufficient funds give advice while leaving the store accessible")
 	var balance: int = game.economy.coins
 	var earned: int = 0
 	var count: int = 0
@@ -154,7 +145,7 @@ func earn_purchase_money() -> void:
 			await drag_cell(targets[0], targets[1])
 		count += 1
 	await settle()
-	check(count < 300 and not cycle.needs_tutorial_income() and game.economy.coins == balance + earned and not cycle.allows_action("mine_coal"), "Only actual tier sales fund the next purchase; its menu then unlocks")
+	check(count < 300 and not cycle.needs_tutorial_income() and game.economy.coins == balance + earned and cycle.allows_action("mine_coal"), "Sales fund the next purchase without locking other actions")
 
 func fund_current_vein() -> void:
 	var count := 0
@@ -228,146 +219,164 @@ func learn_advanced_veins() -> void:
 
 func run_checks() -> void:
 	root.show()
-	root.size = Vector2i(1280, 720)
+	root.size = Vector2i(1280,720)
 	var args: PackedStringArray = OS.get_cmdline_user_args()
 	var scene_name: String = args[0] if not args.is_empty() else "main.tscn"
-	game = load("res://" + scene_name).instantiate()
-	if "--legacy" in args: game.set_script(load(OS.get_environment("GODOT_LEGACY_MAIN")))
+	game = load("res://"+scene_name).instantiate()
 	root.add_child(game)
 	current_scene = game
 	await settle()
-	await settle()
-	var display: CanvasLayer
 	for child in game.get_children():
-		if child.has_method("toggle_pause_menu"): display = child
-	display.resolution = Vector2i(1280, 720)
-	display.window_mode = 0
-	display.apply_display(false)
+		if child.has_method("toggle_pause_menu"):
+			child.resolution = Vector2i(1280,720)
+			child.window_mode = 0
+			child.apply_display(false)
 	await settle()
-	await settle()
-	shop = game.get("shop")
-	cycle = game.get("cycle")
-	grid = game.get("grid")
-	check(cycle.tutorial_step == 0 and cycle.is_tutorial_active(), "Fresh game starts in guided mode")
-	check(game.has_node("TutorialGuide"), "Tutorial input guard is installed")
-	await check_locked_actions()
-	await key(KEY_P)
-	await key(KEY_P, false)
-	check(not game.get("economy").developer_mode and not game.get("camera_controller").defense_view, "P stays blocked during normal tutorial play")
-	await key(KEY_ESCAPE)
-	await key(KEY_ESCAPE, false)
-	check(paused and display.menu_open, "ESC remains available during the tutorial")
-	await key(KEY_ESCAPE)
-	await key(KEY_ESCAPE, false)
-	check(not paused, "ESC resumes the guided game")
-	shop._on_cycle_action()
-	check(not game.placing_coal and game.economy.coins == 100 and not shop.cycle_action.visible, "The tutorial card cannot purchase an item directly")
-	await purchase_route("VETAS", "coal")
-	check(game.get("placing_coal") and game.get("economy").coins == 100, "The real store selects a coal vein without charging")
-	if not game.get("placing_coal"):
-		quit(1)
-		return
-	await click_cell(Vector2i(16, 1))
-	check(game.get("placing_coal") and game.get("mining").coal_veins.is_empty(), "Wrong placement cell is blocked without losing the purchase")
+	shop = game.shop
+	cycle = game.cycle
+	grid = game.grid
+	var guide: Node = game.get_node("TutorialGuide")
+	check(cycle.tutorial_step == 0 and "Nv. 4" in shop.cycle_goal.get_parsed_text(),"The first card introduces nugget fusion through level four")
+	check(not shop.shop_button.disabled and not shop.view_button.disabled,"Shop and view controls remain available from the start")
+	await click_control(shop.shop_button)
+	await wait_shop()
+	for category: String in shop.category_buttons: check(not shop.category_buttons[category].disabled,"Tutorial does not lock menu category "+category)
+	await click_control(shop.category_buttons["VETAS"])
+	check(not shop.purchase_buttons.has("brass") and not game.get_node("WorldInteractions").select_item("brass"),"Research-locked brass cannot be bought at the start")
+	await click_control(shop.purchase_buttons["coal"])
+	await wait_shop()
 	await key(KEY_R)
-	await key(KEY_R, false)
-	check(game.get("placement_direction") == 1, "Rotation cannot break the guided output direction")
-	await key(KEY_SHIFT)
-	await click_cell(cycle.TUTORIAL_COAL_CELL)
-	await key(KEY_SHIFT, false)
-	check(cycle.tutorial_step == 1 and game.get("mining").coal_veins.size() == 1, "Marked cell completes the coal placement step")
-	check(not game.get("placing_coal") and game.get("economy").coins == 0, "Shift cannot purchase extra objects during the tutorial")
-	await drag_cell(cycle.TUTORIAL_COAL_CELL, Vector2i(16, 1))
-	check(game.get("mining").coal_veins.has(cycle.TUTORIAL_COAL_CELL) and game.get("mining").coal_veins.size() == 1, "Dragging the vein cannot move it out of the guided route")
+	check(game.placement_direction == 2,"Rotation remains available during the tutorial")
+	for i in range(3): await key(KEY_R)
+	await click_cell(Vector2i(14,1))
+	check(cycle.tutorial_step == 1 and cycle.coal_cell == Vector2i(14,1),"Any valid coal placement advances the guide and tracks its location")
+	await drag_cell(Vector2i(14,1),cycle.TUTORIAL_COAL_CELL)
+	check(cycle.coal_cell == cycle.TUTORIAL_COAL_CELL,"The guide follows a freely moved vein")
 	await extract_one()
-	check(game.get("mining").nuggets_at(cycle.TUTORIAL_ORE_CELL) == 1 and cycle.tutorial_step == 1, "Five real mining clicks produce the tutorial nugget")
-	await drag_cell(cycle.TUTORIAL_ORE_CELL, Vector2i(16, 1))
-	check(game.get("mining").nuggets_at(cycle.TUTORIAL_ORE_CELL) == 1, "Dropping ore on an unrelated tile preserves it at the source")
-	await drag_cell(cycle.TUTORIAL_ORE_CELL, grid.sale_cell)
-	check(cycle.tutorial_step == 1 and game.get("economy").coins == 3 and not cycle.expansion_bonus_granted, "One sale does not advance or grant the five-sale bonus")
-	for index in range(4):
+	await drag_cell(cycle.coal_output(),Vector2i(16,1))
+	check(game.mining.nuggets_at(Vector2i(16,1)) == 1,"Loose ore can move away from the suggested tile")
+	await drag_cell(Vector2i(16,1),grid.sale_cell)
+	for i in range(4):
 		await extract_one()
-		await drag_cell(cycle.TUTORIAL_ORE_CELL, grid.sale_cell)
-		if index < 3:
-			check(cycle.tutorial_step == 1 and not cycle.expansion_bonus_granted, "Sale %d still waits for all five nuggets" % (index + 2))
-	check(cycle.tutorial_step == 2 and game.economy.coins == 15 and not cycle.expansion_bonus_granted, "Five sales lead directly to fusion without free coins")
+		await drag_cell(cycle.coal_output(),grid.sale_cell)
+	check(cycle.tutorial_step == 2 and game.economy.coins == 15,"Five real sales advance the advisory lesson without free gold")
 	await extract_one()
-	await drag_cell(cycle.TUTORIAL_ORE_CELL, cycle.TUTORIAL_FUSION_CELL)
-	check(cycle.tutorial_step == 2 and game.mining.nugget_type(cycle.TUTORIAL_FUSION_CELL) == "coal", "The first nugget waits on the marked fusion tile")
+	await drag_cell(cycle.coal_output(),cycle.TUTORIAL_FUSION_CELL)
 	await extract_one()
-	await drag_cell(cycle.TUTORIAL_ORE_CELL, cycle.TUTORIAL_FUSION_CELL)
-	check(cycle.fusion_taught and cycle.tutorial_step == 2 and game.mining.nugget_type(cycle.TUTORIAL_FUSION_CELL) == "coal_2", "Fusion stays in its lesson until the more valuable nugget is sold")
-	check("8" in cycle.tutorial_text() and "3" in cycle.tutorial_text(), "The lesson compares refined and raw sale prices")
-	await drag_cell(cycle.TUTORIAL_FUSION_CELL, grid.sale_cell)
-	check(cycle.fusion_sold and cycle.tutorial_step == 3 and game.economy.coins == 23 and cycle.needs_tutorial_income(), "Selling the fused nugget pays only its sale price and opens the income task")
+	await drag_cell(cycle.coal_output(),cycle.TUTORIAL_FUSION_CELL)
+	check(cycle.fusion_taught and "Nv. 4" in cycle.tutorial_text(),"The first real fusion reinforces the full tier progression")
+	await drag_cell(cycle.TUTORIAL_FUSION_CELL,grid.sale_cell)
+	check(cycle.tutorial_step == 3,"Selling the first refined nugget advances the guide")
 	await extract_one()
-	var balance_after_fusion: int = game.economy.coins
-	await drag_cell(cycle.TUTORIAL_ORE_CELL,grid.sale_cell)
-	check(game.economy.coins == balance_after_fusion and game.mining.nugget_type(cycle.TUTORIAL_ORE_CELL) == "coal","After learning level-two nuggets, the next lesson blocks raw nugget sales")
-	check("Nv. 2" in cycle.tutorial_text(),"Funding the first vein fusion explicitly requests level-two nuggets")
+	var cash: int = game.economy.coins
+	await drag_cell(cycle.coal_output(),grid.sale_cell)
+	check(game.economy.coins == cash+3,"Lower-tier nuggets remain sellable even while higher-tier sales are suggested")
 	await earn_purchase_money()
-	check(cycle.tutorial_step == 3 and cycle.vein_lesson_active() and grid.cave_width == 3 and game.economy.coins >= 100 and game.economy.coins < 108 and not cycle.allows_action("expand"), "The fourth lesson funds the second vein instead of buying an expansion")
 	await purchase_route("VETAS","coal")
 	await click_cell(cycle.TUTORIAL_NEW_VEIN_CELL)
-	check(game.mining.coal_veins.size() == 2 and game.economy.coins < 8 and cycle.tutorial_display_step() == 4,"The second vein is paid for and marked as the fourth lesson")
-	await drag_cell(cycle.TUTORIAL_NEW_VEIN_CELL,cycle.TUTORIAL_COAL_CELL)
-	check(cycle.vein_fusion_taught and cycle.tutorial_step == 4 and game.mining.vein_level(cycle.TUTORIAL_COAL_CELL) == 2 and game.mining.coal_veins.size() == 1,"A real drag fuses the two veins before defense preparation")
+	await drag_cell(cycle.TUTORIAL_NEW_VEIN_CELL,cycle.coal_cell)
+	check(cycle.tutorial_step == 4,"A real vein fusion advances the advisory guide")
+	guide.focus_objective()
+	await settle()
 	await learn_advanced_veins()
+	check(game.progression.level >= 2 and game.progression.research_points >= 1 and not game.progression.has_research("brass"),"The brass milestone grants missing EXP but does not unlock brass")
+	var xp: int = game.progression.total_experience
+	for i in range(5): cycle.refresh_tutorial()
+	check(game.progression.total_experience == xp,"Milestone EXP is granted once, never on each refresh")
+	check(not game.get_node("WorldInteractions").select_item("brass"),"Brass remains locked until the player researches it")
+	await research_route()
 	if cycle.needs_tutorial_income(): await earn_purchase_money()
-	check(cycle.tutorial_step == 5 and game.progression.has_research("brass") and not cycle.allows_action("unlock_defense"),"Laton is taught before defensive purchases, without a research-level deadlock")
-	var cash: int = game.economy.coins
+	cash = game.economy.coins
 	await purchase_route("VETAS","brass")
 	await click_cell(cycle.TUTORIAL_BRASS_CELL)
-	check(cycle.tutorial_step == 6 and game.economy.coins == cash - 500,"A real brass vein costs 500 and advances to furnace construction")
+	check(cycle.tutorial_step == 6 and game.economy.coins == cash-500,"Researched brass is bought normally for 500")
+	check(not game.progression.has_research("furnace") and not game.get_node("WorldInteractions").select_item("furnace"),"The furnace milestone also preserves its research lock")
+	check(game.progression.level >= 3 and game.progression.research_points >= 2,"Furnace EXP covers its prerequisite and its own normal research cost")
+	xp = game.progression.total_experience
+	for i in range(5): cycle.refresh_tutorial()
+	check(game.progression.total_experience == xp,"Furnace XP cannot be farmed by refreshing the guide")
+	for attempt in range(3):
+		if cycle.research_to_learn().is_empty(): break
+		await research_route()
+	check(game.progression.has_research("drill") and game.progression.has_research("furnace"),"The player researches the drill prerequisite and then the furnace")
 	if cycle.needs_tutorial_income(): await earn_purchase_money()
 	cash = game.economy.coins
 	await purchase_route("HERRAMIENTAS","furnace")
 	await click_cell(cycle.TUTORIAL_FURNACE_CELL)
-	check(cycle.furnace_blueprint_exists() and game.economy.coins == cash - 350,"The paid furnace is a blueprint, not a free completed tool")
+	check(cycle.furnace_blueprint_exists() and game.economy.coins == cash-350,"The unlocked furnace still costs gold and requires its blueprint materials")
 	await advance_workshop(6)
-	check(cycle.tutorial_step == 7 and game.get_node("Furnaces").machines.has(cycle.TUTORIAL_FURNACE_CELL),"Two delivered coal level-four nuggets construct the furnace")
 	await advance_workshop(7)
-	check(cycle.tutorial_step == 8 and cycle.brass_ingot_sold,"The player must fuse brass, fuel the furnace, smelt and sell the actual ingot before defenses")
+	check(cycle.tutorial_step == 8 and cycle.brass_ingot_sold,"The player smelts and sells a real brass ingot")
 	if cycle.needs_tutorial_income(): await earn_purchase_money()
 	cash = game.economy.coins
 	await purchase_route("DEFENSA","defense_platforms")
-	check(cycle.tutorial_step == 9 and grid.defense_tiles.size() == 2 and game.economy.coins == cash - 1000,"Defense platforms cost 1000 and come after smelting")
+	check(cycle.tutorial_step == 9 and game.economy.coins == cash-1000,"Defense platforms still cost 1000")
 	if cycle.needs_tutorial_income(): await earn_purchase_money()
 	cash = game.economy.coins
 	await purchase_route("DEFENSA","launcher")
-	await click_cell(grid.defense_cell("right"))
-	check(game.launchers.launchers.is_empty() and game.placing_launcher and game.economy.coins == cash,"Wrong launcher placement preserves the purchase funds")
 	await click_cell(grid.defense_cell("left"))
-	check(cycle.tutorial_step == 10 and game.economy.coins == cash - 200,"Lanzapepitas keeps its original price of 200")
+	check(cycle.tutorial_step == 10 and game.economy.coins == cash-200,"The launcher keeps its price")
 	await advance_workshop(10)
-	check(cycle.tutorial_step == cycle.TUTORIAL_LAST_STEP and is_equal_approx(cycle.ammo_damage(),2.0),"Basic brass ammunition completes the single tutorial")
-	var total_exp: int = game.get("progression").total_experience
-	await click_cell(cycle.TUTORIAL_COAL_CELL)
-	check(game.get("progression").total_experience == total_exp and game.get("mining").coal_veins[cycle.TUTORIAL_COAL_CELL]["progress"] == 0, "Final tutorial step permits only starting the night")
-	check(game.has_node("BarrierBreach") and paused and not cycle.is_night,"Completing the tutorial automatically starts the fence-collapse scene before combat")
+	check(cycle.tutorial_step == cycle.TUTORIAL_LAST_STEP and game.has_node("BarrierBreach"),"Following the guide still finishes with the fence-collapse cinematic")
 	var breach: CanvasLayer = game.get_node("BarrierBreach")
-	breach.set_process(false)
-	check(not cycle.start_night(),"The first night cannot bypass the fence collapse")
-	breach.elapsed = breach.runtime_duration()
-	breach.present_frame()
-	check(breach.film.barrier.destruction == 1.0,"The fence is visibly destroyed at the end of the second scene")
 	breach.finish()
 	await settle()
-	check(cycle.is_night and cycle.barrier_broken and not paused and not cycle.is_tutorial_active() and grid.cave_width == 3 and grid.cave_height == 3,"The collapse ends directly in the first active wave")
-	var night_cash: int = game.economy.coins
-	var manager: Node = game.get("zombie_manager")
-	manager.set_process(false)
-	while manager.spawn_count < manager.wave_total: manager.call("spawn_zombie")
-	for enemy in get_nodes_in_group("zombies"):
-		enemy.call("take_damage", 100.0)
-	manager.call("_process", 3.0)
+	check(cycle.is_night and not cycle.is_tutorial_active(),"The full guided route starts night one")
+	game.cycle.lose_night()
+	game.queue_free()
 	await settle()
-	await click_control(game.get("night_victory_continue_button"))
+	await full_board_regression(scene_name)
+	print("RESULT: ",passed," passed; ",failed," failed; free tutorial=",scene_name)
+	quit(0 if failed == 0 else 1)
+
+func full_board_regression(scene_name: String) -> void:
+	game = load("res://"+scene_name).instantiate()
+	root.add_child(game)
+	current_scene = game
 	await settle()
-	check(cycle.day == 2 and not cycle.is_night and not cycle.is_research_tutorial_active(),"There are no further tutorials after night one")
-	check(game.economy.coins == night_cash and game.progression.total_experience >= total_exp,"Night completion grants no free gold")
-	check(not shop.view_button.disabled and not shop.shop_button.disabled and game.get_node("TutorialGuide").resupply_step == -1,"Normal play and research remain free after the tutorial")
-	shop.open_shop()
-	check(shop.shop_open,"The store remains freely accessible after night one")
-	print("RESULT: ", passed, " passed; ", failed, " failed; tutorial=", scene_name)
-	quit(1 if failed > 0 else 0)
+	shop = game.shop
+	cycle = game.cycle
+	grid = game.grid
+	cycle.research_boosts = {"brass":true,"furnace":true}
+	game.mining.place_vein(cycle.TUTORIAL_COAL_CELL,1,"coal")
+	game.mining.coal_veins[cycle.TUTORIAL_COAL_CELL]["level"] = 4
+	game.mining.place_vein(cycle.TUTORIAL_BRASS_CELL,1,"brass")
+	var furnace: Node = game.get_node("Furnaces")
+	furnace.place(cycle.TUTORIAL_FURNACE_CELL,0)
+	furnace.machines[cycle.TUTORIAL_FURNACE_CELL]["fuel"] = 20
+	cycle.tutorial_step = 7
+	var fixture := {"coal":Vector2i(15,1),"coal_2":Vector2i(15,0),"coal_3":Vector2i(16,0),"brass":Vector2i(15,2),"brass_2":Vector2i(16,2),"brass_3":Vector2i(14,1)}
+	for kind: String in fixture: game.mining.items_for(kind)[fixture[kind]] = 1
+	cycle.refresh_tutorial()
+	game.get_node("TutorialGuide").focus_objective()
+	await settle()
+	check(cycle.workshop_targets().size() == 2,"A full board produces a space-clearing suggestion instead of a dead end")
+	if DisplayServer.get_name() != "headless":
+		await RenderingServer.frame_post_draw
+		root.get_texture().get_image().save_png("/workspace/.onboarding/display-test/free-full-board.png")
+	await click_cell(cycle.furnace_cell)
+	check(game.get_node("ToolInspector").is_open(),"Tool contents can be inspected during the tutorial")
+	game.get_node("ToolInspector").close_inspector()
+	var cash: int = game.economy.coins
+	await drag_cell(Vector2i(15,0),grid.sale_cell)
+	check(game.economy.coins == cash+8 and game.mining.nuggets_at(Vector2i(15,0)) == 0,"The screenshot's loose coal level two can be sold during brass smelting")
+	await drag_cell(Vector2i(15,1),grid.sale_cell)
+	game.mining.items_for("brass_2")[Vector2i(15,1)] = 1
+	await drag_cell(Vector2i(15,1),Vector2i(16,2))
+	check(game.mining.nugget_type(Vector2i(16,2)) == "brass_3","The player can also fuse loose nuggets outside the suggested pair")
+	await drag_cell(cycle.furnace_cell,Vector2i(15,0))
+	check(cycle.furnace_cell == Vector2i(15,0),"Moving a furnace updates the guide's delivery target")
+	await drag_cell(cycle.furnace_cell,cycle.TUTORIAL_FURNACE_CELL)
+	await advance_workshop(7)
+	check(cycle.tutorial_step == 8,"Free selling and fusing recover a full board and finish the smelting lesson")
+	cycle.tutorial_step = 4
+	game.mining.coal_veins[cycle.coal_cell]["level"] = 3
+	grid.purchase_defense_platforms()
+	game.launchers.place(grid.defense_cell("left"))
+	game.launchers.receive(grid.defense_cell("left"),"brass")
+	game.launchers.receive(grid.defense_cell("left"),"brass")
+	cycle.refresh_tutorial()
+	await settle()
+	check(cycle.tutorial_step == 4 and cycle.can_start_night() and shop.cycle_action.visible and not shop.cycle_action.disabled,"The player can start the night before finishing advisory objectives")
+	game.queue_free()
+	await settle()

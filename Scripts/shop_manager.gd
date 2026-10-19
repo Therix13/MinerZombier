@@ -92,6 +92,7 @@ var resource_buttons: Dictionary = {}
 var item_grid: GridContainer
 var category_buttons: Dictionary = {}
 var purchase_buttons: Dictionary = {}
+var focused_tutorial_research: String = ""
 var fallback_display: CanvasLayer
 var known_research_level: int = 1
 var research_notice: PanelContainer
@@ -185,7 +186,7 @@ func set_cycle(game_cycle: RefCounted) -> void:
 	ensure_intro.call_deferred()
 
 func queue_first_night() -> void:
-	if breach_queued or cycle == null or not cycle.is_tutorial_active() or cycle.tutorial_step != cycle.TUTORIAL_LAST_STEP or not cycle.can_start_night(): return
+	if breach_queued or cycle == null or not cycle.is_tutorial_active() or not cycle.can_start_night(): return
 	breach_queued = true
 	show_breach.call_deferred()
 
@@ -596,7 +597,7 @@ func refresh_research_buttons() -> void:
 		return
 	if research_summary != null:
 		set_research_text(research_summary, "Nivel %d · %d {research}" % [progression.level, progression.research_points])
-	var blocked: bool = cycle != null and (cycle.is_night or cycle.defeated or cycle.is_tutorial_active())
+	var blocked: bool = cycle != null and (cycle.is_night or cycle.defeated)
 	for technology_id in research_buttons:
 		var button: Button = research_buttons[technology_id]
 		var data: Dictionary = progression.RESEARCHES[technology_id]
@@ -624,7 +625,7 @@ func refresh_research_buttons() -> void:
 		status.add_theme_color_override("font_color", color)
 		var reason: String = progression.research_block_reason(technology_id)
 		if blocked and not researched:
-			reason = "Completa el tutorial." if cycle.is_tutorial_active() else "Investiga durante el día."
+			reason = "Investiga durante el día."
 		button.tooltip_text = "%s\n%s\nNivel %d · Coste: %d de investigación" % [data["name"], data["description"], data["level"], data["cost"]]
 		for prerequisite in data["requires"]:
 			button.tooltip_text += "\nRequiere: %s" % progression.RESEARCHES[prerequisite]["name"]
@@ -696,7 +697,7 @@ func _on_cycle_action() -> void:
 	if cycle.defeated:
 		restart_requested.emit()
 	elif cycle.is_tutorial_active():
-		if cycle.tutorial_step == cycle.TUTORIAL_LAST_STEP:
+		if cycle.can_start_night():
 			queue_first_night()
 		update_cycle()
 	elif cycle.can_start_night() and not shop_open and not shop_animating:
@@ -726,9 +727,13 @@ func update_cycle() -> void:
 				cycle_action.disabled = true
 			2:
 				cycle_action.show()
-				cycle_action.text = "2 × Nv. 1 → Nv. 2"
+				cycle_action.text = "Nv. 1 → 2 → 3 → 4"
 				cycle_action.disabled = true
 			cycle.TUTORIAL_LAST_STEP: queue_first_night()
+		if cycle.can_start_night() and cycle.tutorial_step != cycle.TUTORIAL_LAST_STEP:
+			cycle_action.show()
+			cycle_action.disabled = false
+			cycle_action.text = "INICIAR NOCHE"
 		if not tutorial_purchase().is_empty():
 			cycle_goal.text += "\n" + tutorial_navigation_text()
 	elif cycle.is_research_tutorial_active():
@@ -754,8 +759,8 @@ func update_cycle() -> void:
 		if cycle.needs_defense_warning():
 			cycle_goal.text = "Alto riesgo de perder. Coloca al menos 2 torretas."
 			cycle_goal.add_theme_color_override("default_color", Color("#edbb76"))
-	shop_button.disabled = (tutorial and tutorial_purchase().is_empty()) or cycle.is_night or cycle.defeated
-	view_button.disabled = cycle.is_guided_tutorial_active() or cycle.defeated
+	shop_button.disabled = cycle.is_night or cycle.defeated
+	view_button.disabled = cycle.defeated
 	var guide: Node = get_parent().get_parent().get_node_or_null("TutorialGuide")
 	if guide != null and guide.resupply_active():
 		guide.apply_resupply_card(self)
@@ -764,8 +769,10 @@ func update_cycle() -> void:
 func tutorial_purchase() -> Dictionary:
 	if cycle != null and cycle.is_research_tutorial_active():
 		return {"category": "INVESTIGACIÓN", "item": "research", "instruction": "Investiga la veta de latón." if progression.level == 2 else "Desbloquea un objeto a tu elección."}
-	if cycle == null or not cycle.is_tutorial_active() or cycle.needs_tutorial_income():
-		return {}
+	if cycle == null or not cycle.is_tutorial_active(): return {}
+	var research_id: String = cycle.research_to_learn()
+	if not research_id.is_empty(): return {"category":"INVESTIGACIÓN","item":"research:"+research_id,"instruction":"Investiga %s." % progression.RESEARCHES[research_id]["name"]}
+	if cycle.needs_tutorial_income(): return {}
 	var game: Node = get_parent().get_parent()
 	match cycle.tutorial_step:
 		0:
@@ -798,15 +805,18 @@ func tutorial_ui_target() -> Control:
 	if not shop_open: return shop_button
 	if shop_title.text != purchase["category"]:
 		return category_buttons.get(purchase["category"])
-	if purchase["item"] == "research":
-		return research_summary
+	if str(purchase["item"]).begins_with("research:"):
+		var id: String = str(purchase["item"]).trim_prefix("research:")
+		var button: Control = research_buttons.get(id)
+		if button != null and focused_tutorial_research != id:
+			focused_tutorial_research = id
+			shop_scroll.call_deferred("ensure_control_visible",button)
+		return button
+	if purchase["item"] == "research": return research_summary
 	return purchase_buttons.get(purchase["item"])
 
-func tutorial_allows_item(item: String) -> bool:
-	if cycle != null and cycle.is_research_tutorial_active(): return false
-	if cycle == null or not cycle.is_tutorial_active(): return true
-	var purchase: Dictionary = tutorial_purchase()
-	return shop_open and not shop_animating and not purchase.is_empty() and purchase["item"] == item and shop_title.text == purchase["category"]
+func tutorial_allows_item(_item: String) -> bool:
+	return true
 
 func create_style(background: String, border: String, border_size: int, radius: int) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -1101,15 +1111,16 @@ func show_categories() -> void:
 	if economy.developer_mode: categories.append("RECURSOS")
 	for category in categories:
 		var button := create_art_button(CATEGORY_ART[category], category.capitalize())
-		button.disabled = cycle != null and cycle.is_guided_tutorial_active() and tutorial_purchase().get("category", "") != category
+		button.disabled = false
 		button.pressed.connect(open_category.bind(category))
 		category_buttons[category] = button
 		catalog_grid().add_child(button)
 	if cycle != null: update_cycle()
 
 func open_category(category: String) -> void:
+	focused_tutorial_research = ""
 	if category == "RECURSOS" and not economy.developer_mode: return
-	if shop_animating or (cycle != null and cycle.is_guided_tutorial_active() and tutorial_purchase().get("category", "") != category):
+	if shop_animating:
 		return
 	shop_title.text = category
 	fixed_back_button.show()
@@ -1240,8 +1251,6 @@ func handle_outside_click(event: InputEvent) -> bool:
 	return true
 
 func open_shop() -> void:
-	if cycle != null and cycle.is_tutorial_active() and tutorial_purchase().is_empty():
-		return
 	if shop_open or shop_animating or (cycle != null and (cycle.is_night or cycle.defeated)):
 		return
 	show_categories()

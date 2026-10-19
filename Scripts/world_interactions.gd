@@ -129,7 +129,7 @@ func resale_value(kind: String, source: Vector2i) -> int:
 
 func can_sell(kind: String, source: Vector2i) -> bool:
 	var cycle: RefCounted = game.get("cycle")
-	return kind in ["vein", "belt", "drill", "launcher", "compactor", "furnace", "saw"] and phase_allows() and not cycle.is_night and not cycle.is_guided_tutorial_active() and (grid.owned_tiles.has(source) or grid.defense_tiles.has(source)) and has_kind(source, kind) and not (kind == "belt" and loaded_belt(source))
+	return kind in ["vein", "belt", "drill", "launcher", "compactor", "furnace", "saw"] and phase_allows() and not cycle.is_night and (grid.owned_tiles.has(source) or grid.defense_tiles.has(source)) and has_kind(source, kind) and not (kind == "belt" and loaded_belt(source))
 
 func sell(kind: String, source: Vector2i) -> bool:
 	if not can_sell(kind, source): return false
@@ -294,7 +294,7 @@ func selection_available() -> bool:
 
 func select_resource(kind: String) -> bool:
 	var cycle: RefCounted = game.get("cycle")
-	if not game.get("economy").developer_mode or kind not in game.get("mining").ORE_KINDS or get_tree().paused or cycle.is_night or cycle.defeated or cycle.is_guided_tutorial_active(): return false
+	if not game.get("economy").developer_mode or kind not in game.get("mining").ORE_KINDS or get_tree().paused or cycle.is_night or cycle.defeated: return false
 	cancel_active()
 	placing_resource = kind
 	game.get("shop").close_shop()
@@ -330,7 +330,9 @@ func select_item(item: String) -> bool:
 		"saw": placing_saw = true
 		"iron": placing_iron = true
 		"gold": placing_gold = true
-		"furnace": placing_furnace = true
+		"furnace":
+			placing_furnace = true
+			game.set("placement_direction", 0)
 		"coal": game.set("placing_coal", true)
 		"brass": game.set("placing_brass", true)
 		"straight", "corner_right", "corner_left", "junction":
@@ -352,7 +354,7 @@ func place_selected(cell: Vector2i) -> bool:
 	if not placing_resource.is_empty():
 		var cycle: RefCounted = game.get("cycle")
 		var mining: RefCounted = game.get("mining")
-		if not selection_available() or not phase_allows() or cycle.is_night or cycle.is_guided_tutorial_active() or not mining.can_move_nugget(cell): return false
+		if not selection_available() or not phase_allows() or cycle.is_night or not mining.can_move_nugget(cell): return false
 		mining.items_for(placing_resource)[cell] = 1
 		mining.changed.emit()
 		if Input.is_key_pressed(KEY_SHIFT): shift_batch = true
@@ -376,7 +378,7 @@ func place_selected(cell: Vector2i) -> bool:
 		build_selected(cell, item, direction)
 	game.set("placement_paid", false)
 	game.get_node("Compactors").paid = false
-	if cycle.is_guided_tutorial_active() or not Input.is_key_pressed(KEY_SHIFT) or not economy.can_afford(item_price(item)):
+	if not Input.is_key_pressed(KEY_SHIFT) or not economy.can_afford(item_price(item)):
 		cancel_active()
 	else:
 		shift_batch = true
@@ -427,23 +429,23 @@ func cancel_active() -> bool:
 func _process(_delta: float) -> void:
 	if (placing_furnace or placing_iron or placing_gold or placing_saw) and (game.get("cycle").is_night or game.get("cycle").defeated): cancel_active()
 	var cycle: RefCounted = game.get("cycle")
-	if not placing_resource.is_empty() and (not game.get("economy").developer_mode or cycle.is_night or cycle.defeated or cycle.is_guided_tutorial_active()):
+	if not placing_resource.is_empty() and (not game.get("economy").developer_mode or cycle.is_night or cycle.defeated):
 		cancel_active()
 		return
 	if not placement_active():
 		shift_batch = false
 		return
-	if game.get("cycle").is_guided_tutorial_active(): return
 	if Input.is_key_pressed(KEY_SHIFT): shift_batch = true
 	elif shift_batch: cancel_active()
 
 func _input(event: InputEvent) -> void:
-	if (placing_iron or placing_gold) and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R and phase_allows():
+	if (placing_iron or placing_gold or game.get("cycle").is_tutorial_active() and (placement_active() or game.get("holding_object"))) and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R and phase_allows():
 		game.set("placement_direction", posmod(int(game.get("placement_direction")) + 1, 4))
+		if game.get("holding_object"): game.set("dragging_object", true)
 		game.redraw_world()
 		get_viewport().set_input_as_handled()
 		return
-	if event is InputEventKey and (event.keycode == KEY_SHIFT or event.physical_keycode == KEY_SHIFT) and placement_active() and not game.get("cycle").is_guided_tutorial_active():
+	if event is InputEventKey and (event.keycode == KEY_SHIFT or event.physical_keycode == KEY_SHIFT) and placement_active():
 		if event.pressed:
 			shift_batch = true
 		else:
@@ -454,7 +456,7 @@ func _input(event: InputEvent) -> void:
 		toggle_night_view()
 		get_viewport().set_input_as_handled()
 		return
-	if (game.get("cycle").is_tutorial_active() and game.get("cycle").tutorial_step < 5) or not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_LEFT or event.pressed or not game.get("holding_object"):
+	if not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_LEFT or event.pressed or not game.get("holding_object"):
 		return
 	if not game.get("dragging_object") and event.position.distance_to(game.get("drag_start_position")) < 8.0:
 		if game.get("held_object_type") in ["blueprint", "drill", "compactor", "furnace", "launcher", "saw"] and phase_allows():
@@ -483,7 +485,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if game.get("camera_controller").transitioning and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		get_viewport().set_input_as_handled()
 		return
-	if game.get("cycle").is_tutorial_active() or not phase_allows() or not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_LEFT or not event.pressed or game.get("holding_object"):
+	if not phase_allows() or not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_LEFT or not event.pressed or game.get("holding_object"):
 		return
 	if game.get("placing_coal") or game.get("placing_brass") or game.get("placing_belt") or game.get("placing_drill") or game.get("placing_launcher") or game.get_node("Compactors").placing:
 		return

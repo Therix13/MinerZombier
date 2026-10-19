@@ -44,13 +44,9 @@ func on_step_changed() -> void:
 	if not cycle.is_tutorial_active():
 		queue_redraw()
 		return
-	if cycle.needs_tutorial_income():
-		game.get("shop").close_shop()
 	if last_step != cycle.tutorial_step:
+		if last_step < 0: focus_objective.call_deferred()
 		last_step = cycle.tutorial_step
-		# This also cancels/refunds Shift-repeat purchases in older scene scripts.
-		game.cancel_placement.call_deferred()
-		focus_objective.call_deferred()
 	game.get("shop").update_cycle()
 	queue_redraw()
 
@@ -78,9 +74,9 @@ func _process(delta: float) -> void:
 		update_resupply()
 		update_ui_pointer()
 		return
-	var vein: Dictionary = cycle.mining.coal_veins.get(cycle.TUTORIAL_COAL_CELL, {})
+	var vein: Dictionary = cycle.mining.coal_veins.get(cycle.coal_cell, {})
 	var shop: Control = game.get("shop")
-	var state: Array = [cycle.tutorial_step, game.get("placing_coal"), game.get("placing_belt"), game.get("placing_launcher"), cycle.mining.nuggets_at(cycle.TUTORIAL_ORE_CELL), vein.get("progress", 0), cycle.ammo_damage(), cycle.economy.coins, shop.shop_open, shop.shop_animating, shop.shop_title.text]
+	var state: Array = [cycle.tutorial_step, game.get("placing_coal"), game.get("placing_belt"), game.get("placing_launcher"), cycle.mining.nuggets_at(cycle.coal_output()), vein.get("progress", 0), cycle.ammo_damage(), cycle.economy.coins, shop.shop_open, shop.shop_animating, shop.shop_title.text]
 	if state != last_state:
 		last_state = state
 		game.get("shop").update_cycle()
@@ -164,49 +160,15 @@ func is_over_control(control: Control, position: Vector2) -> bool:
 	return Rect2(Vector2.ZERO, control.size).has_point(local)
 
 func _input(event: InputEvent) -> void:
-	# Let menu dismissal consume the click before tutorial world-input locks.
-	if game.get("shop").handle_outside_click(event): return
-	if not cycle.is_guided_tutorial_active():
-		return
-	# Victory must be dismissible before the day-two lesson takes input.
-	var victory: Control = game.get("night_victory_overlay")
-	if victory != null and victory.visible:
-		return
-	if event is InputEventKey:
-		# Pause, display settings, and keyboard navigation remain accessible.
-		if event.keycode in [KEY_P, KEY_R] or event.physical_keycode in [KEY_P, KEY_R]:
-			get_viewport().set_input_as_handled()
-		return
-	if not event is InputEventMouseButton:
-		return
-	var shop: Control = game.get("shop")
-	if (shop.shop_open or shop.shop_animating) and is_over_control(shop.shop_panel, event.position):
-		return
-	if not shop.tutorial_purchase().is_empty() and is_over_control(shop.shop_button, event.position):
-		return
-	if event.button_index != MOUSE_BUTTON_LEFT:
-		get_viewport().set_input_as_handled()
-		return
-	var cell: Vector2i = cycle.grid.world_to_cell(game.get_local_mouse_position())
-	if not event.pressed and game.get("holding_object"):
-		if not cycle.allows_interaction(game.get("held_object_type"), game.get("held_object_cell"), cell, game.get("dragging_object")):
-			clear_interaction()
-			get_viewport().set_input_as_handled()
-		return
-	if is_over_card(event.position):
-		return
-	if not event.pressed or not cycle.allows_world_press(cell, placing_kind()):
-		get_viewport().set_input_as_handled()
-	elif not placing_kind().is_empty():
-		game.set("placement_direction", 0 if placing_kind() == "furnace" else 1)
+	game.get("shop").handle_outside_click(event)
 
 func targets() -> Array[Vector2i]:
 	if cycle.tutorial_step >= 5:
 		var targets: Array[Vector2i] = cycle.workshop_targets()
 		if not targets.is_empty(): return targets
 		match placing_kind():
-			"brass": return [cycle.TUTORIAL_BRASS_CELL]
-			"furnace": return [cycle.TUTORIAL_FURNACE_CELL]
+			"brass": return [cycle.brass_cell]
+			"furnace": return [cycle.furnace_cell]
 			"launcher": return [cycle.grid.defense_cell("left")]
 		return []
 	if cycle.advanced_vein_lesson() and not cycle.needs_tutorial_income():
@@ -224,7 +186,7 @@ func targets() -> Array[Vector2i]:
 		if cycle.mining.nuggets_at(cycle.tutorial_output_cell()) > 0: return [cycle.tutorial_output_cell(),cycle.grid.defense_cell("left") if cycle.mining.nugget_type(cycle.tutorial_output_cell()) == "coal" else cycle.grid.sale_cell]
 		return [cycle.tutorial_mining_cell()]
 	if cycle.vein_lesson_active() and not cycle.needs_tutorial_income():
-		if cycle.mining.coal_veins.has(cycle.TUTORIAL_NEW_VEIN_CELL): return [cycle.TUTORIAL_NEW_VEIN_CELL,cycle.TUTORIAL_COAL_CELL]
+		if cycle.mining.coal_veins.has(cycle.TUTORIAL_NEW_VEIN_CELL): return [cycle.TUTORIAL_NEW_VEIN_CELL,cycle.coal_cell]
 		var cells: Array[Vector2i] = []
 		if game.get("placing_coal"): cells.append(cycle.TUTORIAL_NEW_VEIN_CELL)
 		return cells
@@ -233,18 +195,18 @@ func targets() -> Array[Vector2i]:
 	if cycle.tutorial_step == 2 or cycle.needs_tutorial_income():
 		if cycle.mining.nugget_type(cycle.TUTORIAL_FUSION_CELL) == "coal_2":
 			return [cycle.TUTORIAL_FUSION_CELL, cycle.grid.sale_cell]
-		if cycle.mining.nuggets_at(cycle.TUTORIAL_ORE_CELL) > 0:
-			return [cycle.TUTORIAL_ORE_CELL, cycle.TUTORIAL_FUSION_CELL]
-		return [cycle.TUTORIAL_COAL_CELL]
+		if cycle.mining.nuggets_at(cycle.coal_output()) > 0:
+			return [cycle.coal_output(), cycle.TUTORIAL_FUSION_CELL]
+		return [cycle.coal_cell]
 	match cycle.tutorial_step:
 		0:
-			if game.get("placing_coal"): result.append(cycle.TUTORIAL_COAL_CELL)
+			if game.get("placing_coal"): result.append(cycle.coal_cell)
 		1, 6:
-			if cycle.tutorial_step == 6 and cycle.mining.nugget_type(cycle.TUTORIAL_ORE_CELL) in ["coal_2", "coal_3", "coal_4"]:
-				return [cycle.TUTORIAL_ORE_CELL, cycle.grid.sale_cell]
-			if cycle.mining.nuggets_at(cycle.TUTORIAL_ORE_CELL) > 0:
-				return [cycle.TUTORIAL_ORE_CELL, cycle.grid.sale_cell if cycle.tutorial_step == 1 else cycle.grid.defense_cell("left")]
-			return [cycle.TUTORIAL_COAL_CELL]
+			if cycle.tutorial_step == 6 and cycle.mining.nugget_type(cycle.coal_output()) in ["coal_2", "coal_3", "coal_4"]:
+				return [cycle.coal_output(), cycle.grid.sale_cell]
+			if cycle.mining.nuggets_at(cycle.coal_output()) > 0:
+				return [cycle.coal_output(), cycle.grid.sale_cell if cycle.tutorial_step == 1 else cycle.grid.defense_cell("left")]
+			return [cycle.coal_cell]
 		5:
 			if game.get("placing_launcher"): result.append(cycle.grid.defense_cell("left"))
 		7: result.append(cycle.grid.defense_cell("left"))
