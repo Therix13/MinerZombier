@@ -188,7 +188,7 @@ func _draw() -> void:
 		draw_rect(Rect2(outer.position + Vector2(3.0, 3.0), Vector2(fill_width, 12.0)), Color("#8cb46e"))
 	draw_rect(outer, Color("#c49a5e"), false, 2.0)
 	var label: String = str(int(base_health)) + " / " + str(int(BASE_MAX_HEALTH))
-	draw_string(ThemeDB.fallback_font, Vector2(center_x - 24.0, center_y - 5.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#553623"))
+	draw_string(ThemeDB.fallback_font, Vector2(center_x - 24.0, center_y - 5.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#e8d6b1"))
 
 	for shot: Dictionary in acid_shots:
 		var t: float = clampf(float(shot["age"]) / float(shot["duration"]),0,1)

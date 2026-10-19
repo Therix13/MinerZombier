@@ -53,7 +53,7 @@ func _draw() -> void:
 		ground_rebuilds += 1
 	for cell in grid.ammo_tiles:
 		var connector_rect: Rect2 = grid.get_cell_rect(cell)
-		draw_rect(connector_rect, Color("#687f72"))
+		draw_rect(connector_rect, Color("#6d6a54"))
 		draw_rect(connector_rect.grow(-1.0), Color("#d1ad66"), false, 2.0)
 		var connector_center: Vector2 = connector_rect.get_center()
 		draw_circle(connector_center, 3.0, Color("#d1ad66"))
@@ -553,15 +553,47 @@ func draw_defense_platform(rect: Rect2) -> void:
 
 # One retained canvas for the terrain; moving ore never rebuilds its geometry.
 class GroundCanvas extends Node2D:
+	const Scenery = preload("res://Scripts/mine_scenery.gd")
 	var grid: RefCounted
+	var meshes: Array[ArrayMesh] = []
 	func _draw() -> void:
 		if grid == null: return
-		draw_rect(Rect2(Vector2.ZERO, Vector2(grid.MAP_WIDTH * grid.TILE_SIZE, grid.GRID_OFFSET_Y)), Color.WHITE)
-		var bounds := Rect2(0, grid.GRID_OFFSET_Y, grid.MAP_WIDTH * grid.TILE_SIZE, grid.MAP_HEIGHT * grid.TILE_SIZE)
-		draw_rect(bounds, Color("#383838"))
-		for cell: Vector2i in grid.owned_tiles:
-			if grid.is_valid_cell(cell): draw_rect(grid.get_cell_rect(cell), Color("#7b946f"))
-		draw_grid_lines(self, bounds, grid.TILE_SIZE, Vector2(0, grid.GRID_OFFSET_Y))
+		meshes.clear()
+		var bounds := Rect2(0,grid.GRID_OFFSET_Y,grid.MAP_WIDTH * grid.TILE_SIZE,grid.MAP_HEIGHT * grid.TILE_SIZE)
+		meshes.append(Scenery.field(self,bounds,0))
+		var start_x: float = floori(grid.MAP_WIDTH / 2.0) - floori(grid.cave_width / 2.0)
+		var cave := Rect2(start_x * grid.TILE_SIZE,grid.GRID_OFFSET_Y,grid.cave_width * grid.TILE_SIZE,grid.cave_height * grid.TILE_SIZE)
+		var brush := Scenery.Brush.new()
+		brush.draw_rect(cave.grow(12),Color("#242e2a"))
+		brush.draw_rect(cave.grow(5),Color("#676657"))
+		meshes.append(brush.flush(self))
+		meshes.append(Scenery.field(self,cave,1))
+		brush = Scenery.Brush.new()
+		# Only excavated cells get a quiet placement grid; solid rock stays organic.
+		var lines := PackedVector2Array()
+		for x in range(grid.cave_width+1):
+			lines.append(Vector2(cave.position.x+x*48,cave.position.y))
+			lines.append(Vector2(cave.position.x+x*48,cave.end.y))
+		for y in range(grid.cave_height+1):
+			lines.append(Vector2(cave.position.x,cave.position.y+y*48))
+			lines.append(Vector2(cave.end.x,cave.position.y+y*48))
+		brush.draw_multiline(lines,Color("#645d4c",0.6),1)
+		for side in [-1,1]:
+			var x: float = cave.get_center().x + side * (cave.size.x * 0.5 + 10)
+			for y in range(int(cave.position.y)+22,int(cave.end.y),96):
+				brush.draw_rect(Rect2(x-4,y-16,8,57),Color("#503d2d"))
+				brush.draw_line(Vector2(x-1,y-16),Vector2(x-1,y+41),Color("#9a784d"),2)
+				Scenery.lamp(brush,Vector2(x,y+4))
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 66382
+		for i in range(150):
+			var at := Vector2(rng.randf_range(10,bounds.end.x-10),rng.randf_range(bounds.position.y+10,bounds.end.y-10))
+			if cave.grow(27).has_point(at): continue
+			Scenery.stone(brush,at,rng.randf_range(0.9,1.5) if i % 12 == 0 else rng.randf_range(0.15,0.4),Color("#5d655a"))
+			if i % 2 == 0:
+				var crack := PackedVector2Array([at+Vector2(-24,8),at,at+Vector2(18,-17),at+Vector2(38,-14)])
+				brush.draw_polyline(crack,Color("#26352f",0.4),2)
+		meshes.append(brush.flush(self))
 
 	static func draw_grid_lines(canvas: Node2D, bounds: Rect2, tile_size: float, origin: Vector2) -> void:
 		var lines := PackedVector2Array()
