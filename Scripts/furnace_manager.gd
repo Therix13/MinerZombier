@@ -9,7 +9,7 @@ signal changed
 const PRICE: int = 350
 const CAPACITY: int = 40
 const PROCESS_TIME: float = 4.0
-const FUEL_COST: int = 1
+const FUEL_COST: int = 20
 const DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 const FUEL_VALUES := {"coal": 1, "coal_2": 3, "coal_3": 8, "coal_4": 20}
 var machines: Dictionary = {}

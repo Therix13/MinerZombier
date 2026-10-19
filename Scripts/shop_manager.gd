@@ -513,6 +513,7 @@ func update_cycle() -> void:
 	if cycle == null or cycle_title == null:
 		return
 	update_shift_hint()
+	get_node("CyclePanel").visible = not (cycle.is_night and cycle.tutorial_step >= cycle.TUTORIAL_LAST_STEP)
 	var tutorial: bool = cycle.is_tutorial_active()
 	cycle_heading.text = "PRIMEROS PASOS" if tutorial else "DEFENSA DE LA BASE"
 	cycle_badge.text = "%02d / %02d" % [cycle.tutorial_display_step(), cycle.TUTORIAL_DISPLAY_STEPS] if tutorial else "DÍA %d" % cycle.day
@@ -562,6 +563,12 @@ func tutorial_purchase() -> Dictionary:
 	if cycle == null or not cycle.is_tutorial_active(): return {}
 	if cycle.needs_tutorial_income(): return {}
 	var game: Node = get_parent().get_parent()
+	if cycle.tutorial_step == 11 and not cycle.platforms_ready():
+		return {"category":"DEFENSA","item":"defense_platforms","instruction":"Compra las plataformas."}
+	if cycle.tutorial_step == 12 and not cycle.launcher_ready() and cycle.launcher_blueprint_cell() == Vector2i(-999,-999) and cycle.launchers.launchers.is_empty() and not game.get("placing_launcher"):
+		return {"category":"DEFENSA","item":"launcher","instruction":"Elige el lanzapepitas."}
+	if cycle.tutorial_step == 13 and cycle.ammo_vein() == Vector2i(-999,-999) and not game.get("placing_coal"):
+		return {"category":"VETAS","item":"coal","instruction":"Compra una veta de carbón Nv. 1 para munición."}
 	if cycle.tutorial_step == 6 and not game.get("placing_brass"):
 		return {"category":"VETAS","item":"brass","instruction":"Elige la veta de latón."}
 	if cycle.tutorial_step == 7 and not cycle.furnace_ready() and not cycle.furnace_blueprint_exists() and not game.get_node("WorldInteractions").placing_furnace:
@@ -579,6 +586,7 @@ func tutorial_navigation_text() -> String:
 	return purchase["instruction"]
 
 func tutorial_ui_target() -> Control:
+	if cycle != null and cycle.is_tutorial_active() and cycle.tutorial_step == 14: return cycle_action
 	var purchase: Dictionary = tutorial_purchase()
 	if purchase.is_empty() or shop_animating: return null
 	if not shop_open: return shop_button

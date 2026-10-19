@@ -36,6 +36,7 @@ func _ready() -> void:
 	barrier.grid = cycle.grid
 	game.add_child(barrier)
 	cycle.brass_ingot_created = cycle.brass_ingot_created or game.get("progression").created_resources.has("brass_ingot")
+	cycle.brass_ingot_3_created = cycle.brass_ingot_3_created or game.get("progression").created_resources.has("brass_ingot_3") or game.get("progression").created_resources.has("brass_ingot_4")
 	cycle.refresh_tutorial()
 	on_step_changed()
 
@@ -44,7 +45,7 @@ func on_step_changed() -> void:
 		queue_redraw()
 		return
 	if last_step != cycle.tutorial_step:
-		if last_step < 0: focus_objective.call_deferred()
+		if last_step < 0 or cycle.tutorial_step == 12: focus_objective.call_deferred()
 		last_step = cycle.tutorial_step
 	game.get("shop").update_cycle()
 	queue_redraw()

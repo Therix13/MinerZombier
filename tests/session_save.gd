@@ -90,6 +90,7 @@ func run_checks() -> void:
 	check(game.camera.position.is_equal_approx(original["camera"]["position"]),"Loading preserves the camera instead of refocusing the tutorial")
 	var legacy: Dictionary = saves.snapshot()
 	legacy["cycle"].erase("brass_ingot_created")
+	legacy["cycle"].erase("brass_ingot_3_created")
 	check(saves.valid_snapshot(legacy) and saves.restore_snapshot(legacy),"Saves from before the expanded tutorial remain loadable")
 	check(not game.cycle.brass_ingot_created,"An old save without a crafted ingot starts with the proper default")
 	# Persist a saw with one output blocked, then release only its pending item.
@@ -109,7 +110,7 @@ func run_checks() -> void:
 	game.mining.items_for("coal_3").erase(Vector2i(14,1))
 	game.conveyors.belts[Vector2i(14,1)]["direction"] = 0
 	game.get_node("Furnaces").try_output(Vector2i(14,2))
-	check(game.mining.nugget_type(Vector2i(14,1)) == "brass_ingot" and game.get_node("Furnaces").machines[Vector2i(14,2)]["fuel"] == 19,"A restored furnace releases its existing ingot without burning fuel again")
+	check(game.mining.nugget_type(Vector2i(14,1)) == "brass_ingot" and game.get_node("Furnaces").machines[Vector2i(14,2)]["fuel"] == 0,"A restored furnace releases its existing ingot without burning fuel again")
 	# Actual save/read operations cover integrity checks and backup recovery.
 	game.economy.coins = 5000
 	check(saves.save_game(),"A second snapshot can replace the first atomically")
