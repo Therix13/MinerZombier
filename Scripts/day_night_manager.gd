@@ -220,11 +220,8 @@ func income_targets() -> Array[Vector2i]:
 		if tier == level and not cells.is_empty(): return [cells[0], grid.sale_cell]
 		if cells.size() >= 2: return [cells[1], cells[0]]
 	if mining.nuggets_at(coal_output()) > 0:
-		var staging: Array[Vector2i] = [TUTORIAL_FUSION_CELL, Vector2i(14, 1), Vector2i(16, 2)]
-		for cell: Vector2i in grid.owned_tiles:
-			if grid.is_valid_cell(cell) and cell not in [furnace_cell,copper_cell] and not staging.has(cell): staging.append(cell)
-		for cell: Vector2i in staging:
-			if cell not in [coal_output(),furnace_cell,copper_cell] and mining.can_move_nugget(cell): return [coal_output(), cell]
+		var nearest: Vector2i = nearest_resource_space(coal_output())
+		if nearest != Vector2i(-999,-999): return [coal_output(), nearest]
 		return [coal_output(),grid.sale_cell]
 	return [coal_cell]
 
@@ -379,9 +376,20 @@ func resource_targets(material: String, tier: int, destination: Vector2i) -> Arr
 		return park_resource(output,material)
 	return [vein]
 
-func park_resource(source: Vector2i, material: String = "copper") -> Array[Vector2i]:
+func nearest_resource_space(source: Vector2i) -> Vector2i:
+	var nearest := Vector2i(-999,-999)
+	var best_distance: float = INF
 	for at: Vector2i in grid.owned_tiles:
-		if at != source and at != grid.sale_cell and at not in [coal_cell,copper_cell,furnace_cell] and grid.is_valid_cell(at) and mining.can_move_nugget(at): return [source,at]
+		if at == source or at == grid.sale_cell or not grid.is_valid_cell(at) or not mining.can_move_nugget(at): continue
+		var distance: float = Vector2(source).distance_squared_to(Vector2(at))
+		if distance < best_distance:
+			best_distance = distance
+			nearest = at
+	return nearest
+
+func park_resource(source: Vector2i, material: String = "copper") -> Array[Vector2i]:
+	var nearest: Vector2i = nearest_resource_space(source)
+	if nearest != Vector2i(-999,-999): return [source, nearest]
 	for kind: String in mining.ORE_KINDS:
 		if kind.get_slice("_",0) == material or "_ingot" in kind: continue
 		for at: Vector2i in mining.items_for(kind): return [at,grid.sale_cell]
