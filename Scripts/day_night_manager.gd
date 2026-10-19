@@ -500,13 +500,13 @@ func can_start_night() -> bool:
 
 func advance_day(delta: float) -> bool:
 	if is_night or defeated or is_tutorial_active(): return false
-	# The first night still follows the player's tutorial/cinematic start.
-	if day == 1: return false
+	# A guided first day is untimed; skipping the tutorial enables the normal clock.
+	if day == 1 and not tutorial_skipped: return false
 	day_remaining = maxf(0,day_remaining - maxf(0,delta))
 	return day_remaining <= 0
 
 func start_night(automatic: bool = false) -> bool:
-	if (not can_start_night() and not (automatic and day > 1 and not is_night and not defeated)) or (day == 1 and not barrier_broken):
+	if (not can_start_night() and not (automatic and (day > 1 or tutorial_skipped) and not is_night and not defeated)) or (day == 1 and not barrier_broken):
 		return false
 	if is_tutorial_active(): tutorial_step = TUTORIAL_LAST_STEP
 	is_night = true

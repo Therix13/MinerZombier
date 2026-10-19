@@ -138,14 +138,14 @@ func clock_minutes() -> int:
 		return (22 * 60 + floori(elapsed / 120.0 * 8 * 60)) % (24 * 60)
 	var elapsed: float = 300.0 - clampf(game.cycle.day_remaining,0.0,300.0)
 	# The first day's tutorial is untimed and stays at sunrise until night begins.
-	if game.cycle.day == 1: elapsed = 0.0
+	if game.cycle.day == 1 and not game.cycle.tutorial_skipped: elapsed = 0.0
 	return 6 * 60 + floori(elapsed / 300.0 * 16 * 60)
 
 func update_clock() -> void:
 	var cycle: RefCounted = game.cycle
 	visible = true
 	var minutes: int = clock_minutes()
-	var signature: Array = [minutes,cycle.day,cycle.is_night,cycle.defeated]
+	var signature: Array = [minutes,cycle.day,cycle.is_night,cycle.defeated,cycle.tutorial_skipped]
 	if signature == last_state: return
 	last_state = signature
 	update_layout()
@@ -154,7 +154,7 @@ func update_clock() -> void:
 	phase_icon.night = cycle.is_night
 	phase_icon.queue_redraw()
 	tooltip_text = "Noche · 22:00–06:00 · 2 minutos\nClic en un zombi para priorizarlo" if cycle.is_night else "Día · 06:00–22:00 · 5 minutos"
-	if cycle.day == 1 and not cycle.is_night: tooltip_text = "Día 1 · Completa el tutorial para comenzar la primera noche"
+	if cycle.day == 1 and not cycle.tutorial_skipped and not cycle.is_night: tooltip_text = "Día 1 · Completa el tutorial para comenzar la primera noche"
 	action.visible = cycle.defeated
 	action.disabled = not cycle.defeated
 	if cycle.defeated:

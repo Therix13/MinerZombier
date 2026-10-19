@@ -519,7 +519,7 @@ func update_cycle() -> void:
 	if cycle == null or cycle_title == null:
 		return
 	update_shift_hint()
-	get_node("CyclePanel").visible = cycle.day == 1 and not (cycle.is_night and cycle.tutorial_step >= cycle.TUTORIAL_LAST_STEP)
+	get_node("CyclePanel").visible = cycle.day == 1 and not cycle.tutorial_skipped and not economy.developer_mode and not (cycle.is_night and cycle.tutorial_step >= cycle.TUTORIAL_LAST_STEP)
 	var tutorial: bool = cycle.is_tutorial_active()
 	cycle_heading.text = "PRIMEROS PASOS" if tutorial else "DEFENSA DE LA BASE"
 	cycle_badge.text = "%02d / %02d" % [cycle.tutorial_display_step(), cycle.TUTORIAL_DISPLAY_STEPS] if tutorial else "DÍA %d" % cycle.day

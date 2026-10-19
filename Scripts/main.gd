@@ -397,7 +397,7 @@ func toggle_view() -> void:
 	shop.set_view_mode(camera_controller.defense_view)
 
 func start_night(automatic: bool = false) -> void:
-	if not cycle.can_start_night() and not (automatic and cycle.day > 1 and not cycle.is_night and not cycle.defeated):
+	if not cycle.can_start_night() and not (automatic and (cycle.day > 1 or cycle.tutorial_skipped) and not cycle.is_night and not cycle.defeated):
 		return
 	if placing_coal or placing_copper or placing_belt or placing_drill or placing_launcher:
 		cancel_placement()
