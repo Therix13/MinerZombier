@@ -756,7 +756,7 @@ func tutorial_purchase() -> Dictionary:
 	if cycle.needs_tutorial_income(): return {}
 	var game: Node = get_parent().get_parent()
 	if cycle.tutorial_step in [0,2,3,4] and cycle.vein_fusion_targets().is_empty() and not game.get("placing_coal"):
-		return {"category":"VETAS","item":"coal","instruction":"Compra vetas de carbón. Mantén Shift para colocar varias."}
+		return {"category":"VETAS","item":"coal","instruction":"Elige la veta de carbón."}
 	return {}
 
 func tutorial_navigation_text() -> String:

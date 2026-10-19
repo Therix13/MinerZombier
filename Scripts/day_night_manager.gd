@@ -303,25 +303,20 @@ func grant_research_experience(id: String) -> void:
 		progression.add_experience(progression.experience_to_next_level() - progression.experience)
 
 func tutorial_text() -> String:
-	if tutorial_step == 0:
-		return "Compra tu primera veta de carbón por 100 de oro y colócala en la cuadrícula."
-	if tutorial_step == 1:
-		return "Fusiona 2 pepitas iguales: Nv. 1 → 2 → 3 → 4. Vende las de Nv. 4 por 50 de oro hasta reunir 100. " + income_instruction()
-	if tutorial_step == 5:
-		return "Vende carbón Nv. 4 hasta reunir 500 de oro (%d / 500). Recibirás la EXP que falte para acceder a la investigación del latón. " % economy.coins + income_instruction()
+	match tutorial_step:
+		0: return "Compra una veta de carbón."
+		1: return "Puedes fusionar pepitas hasta Nv. 4.\nVéndelas hasta reunir 100 de oro."
+		5: return "Vende carbón Nv. 4 hasta reunir 500 de oro.\nAsí podrás investigar el latón."
 	if tutorial_step in [2,3,4]:
-		var budget: int = {2:100,3:200,4:400}[tutorial_step]
-		var count: int = {2:1,3:2,4:4}[tutorial_step]
-		var goal: int = target_vein_level()
 		if needs_tutorial_income():
-			return "Vende pepitas de carbón Nv. 4 hasta reunir %d de oro. Comprarás %d vetas para crear una Nv. %d. " % [tutorial_purchase_price(),count,goal] + income_instruction()
-		var pair: Array[Vector2i] = vein_fusion_targets()
-		if not pair.is_empty():
-			var tier: int = mining.vein_level(pair[0])
-			return "Arrastra una veta marcada sobre la otra: 2 vetas Nv. %d → 1 Nv. %d. Continúa hasta una veta Nv. %d." % [tier,tier+1,goal]
-		if tutorial_step == 2: return "Compra otra veta de carbón por 100 de oro y fusiónala con tu primera veta para crear una Nv. 2."
-		return "Con %d de oro puedes comprar %d vetas. Mantén Shift al colocarlas para repetir; suéltalo para cancelar. Fusiona pares iguales hasta una veta Nv. %d." % [budget,count,goal]
-	return "¡Tutorial completado! Puedes investigar la veta de latón y continuar a tu ritmo."
+			return "Vende carbón Nv. 4 hasta reunir %d de oro." % tutorial_purchase_price()
+		var goal: int = target_vein_level()
+		if not vein_fusion_targets().is_empty():
+			return "Fusiona las vetas marcadas hasta Nv. %d." % goal
+		if tutorial_step == 2: return "Compra otra veta de carbón.\nFusiona las dos para crear una Nv. 2."
+		var count: int = 2 if tutorial_step == 3 else 4
+		return "Coloca %d vetas manteniendo Shift.\nFusiónalas hasta Nv. %d." % [count,goal]
+	return "¡Tutorial completado!\nInvestiga la veta de latón."
 
 func income_instruction() -> String:
 	var targets: Array[Vector2i] = income_targets()
