@@ -57,8 +57,25 @@ func run_checks() -> void:
 	check(target.hits == 1 and weapons.launchers[cell]["ammo"].size() == 3,"Entering visible range consumes exactly one round per shot")
 	check(is_equal_approx(target.total,weapons.ammo_damage("gold")),"Nugget tier changes round count rather than per-shot damage")
 	check(weapons.RANGE == 300 and not weapons.in_range(cell,center + Vector2(301,0)),"World-space range is reduced to 300")
+	check(weapons.capacity_at(cell) == 5 and weapons.interval_at(cell) == 4.0 and weapons.damage_multiplier == 0.5,"Level one retains its capacity, cadence and damage multiplier")
+	weapons.launchers[cell]["level"] = 2
+	weapons.launchers[cell]["ammo"].clear()
+	check(weapons.receive(cell,"coal_4") and weapons.receive(cell,"coal_3") and weapons.launchers[cell]["ammo"].size() == 7,"Level two accepts exactly seven rounds from mixed tiers")
+	check(not weapons.receive(cell,"coal"),"Level two rejects an eighth round without consuming it")
+	var upgraded_save: Dictionary = game.get_node("SaveGame").snapshot()
+	check(game.get_node("SaveGame").valid_snapshot(upgraded_save),"A full seven-round level-two launcher is valid for saving")
+	weapons.launchers[cell]["cooldown"] = 0.0
+	var before_hits: int = target.hits
+	weapons.advance(0.01)
+	weapons.advance(1.99)
+	check(target.hits == before_hits + 1,"Level two waits the full two seconds between shots")
+	weapons.advance(0.02)
+	check(target.hits == before_hits + 2 and weapons.launchers[cell]["ammo"].size() == 5,"Level two fires again after two seconds and spends one round")
 	target.queue_free()
 	await settle()
+	check(game.get_node("SaveGame").restore_snapshot(upgraded_save) and weapons.launchers[cell]["ammo"].size() == 7,"Reload preserves all seven rounds")
+	weapons.launchers[cell]["ammo"].assign(["gold","gold","gold"])
+	weapons.launchers[cell]["level"] = 1
 	var near: Node2D = preload("res://Scripts/zombie.gd").new()
 	near.setup(Vector2(center.x,-40),Vector2(center.x,-28))
 	near.configure("walker")

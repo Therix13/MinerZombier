@@ -141,9 +141,10 @@ func refresh() -> void:
 		"launcher":
 			var level: int = game.get("launchers").level_at(cell)
 			status.text = "Lanzapepitas · Nv. %d" % level
+			status.text += "\n%d / %d disparos · cada %.0f s" % [game.launchers.launchers[cell]["ammo"].size(),game.launchers.capacity_at(cell),game.launchers.interval_at(cell)]
 			if level == 1: status.text += " · Oxidado"
 			if not game.get("launchers").is_active_position(cell): status.text += " · Fuera de defensa"
-			if level == 1: status.text += "\nFusiona dos Nv. 1 (máx. 5 pepitas entre ambos)."
+			if level == 1: status.text += "\nFusiona dos Nv. 1 (máx. 7 disparos entre ambos)."
 		"drill": status.text = ""
 	if withdrawal_blocked: status.text += " · Sin espacio libre."
 	var signature: String = var_to_str(items)

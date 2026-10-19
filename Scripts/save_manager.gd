@@ -440,7 +440,7 @@ func valid_snapshot(data: Dictionary) -> bool:
 		if not entry is int or not number(entry,-1,3): return false
 	for launcher: Variant in data["launchers"].values():
 		if not launcher is Dictionary or not launcher.get("level",1) is int or launcher.get("level",1) not in [1,2]: return false
-		if not launcher is Dictionary or not number(launcher.get("cooldown"),0,4) or not number(launcher.get("angle"),-100,100) or not launcher.get("ammo") is Array or launcher["ammo"].size() > 5: return false
+		if not launcher is Dictionary or not number(launcher.get("cooldown"),0,4) or not number(launcher.get("angle"),-100,100) or not launcher.get("ammo") is Array or launcher["ammo"].size() > (7 if launcher.get("level",1) == 2 else 5): return false
 		for kind: Variant in launcher["ammo"]:
 			if kind not in ["coal","copper","iron","gold"]: return false
 	for key: String in ["compactors","furnaces","saws","blueprints"]:
@@ -452,7 +452,7 @@ func valid_snapshot(data: Dictionary) -> bool:
 				for item: Variant in machine["delivered"]:
 					if item not in recipes[machine["item"]] or not number(machine["delivered"][item],0,recipes[machine["item"]][item]): return false
 				if machine.has("ammo"):
-					if machine["item"] != "launcher_2" or not machine["ammo"] is Array or machine["ammo"].size() > 5: return false
+					if machine["item"] != "launcher_2" or not machine["ammo"] is Array or machine["ammo"].size() > 7: return false
 					for ammo: Variant in machine["ammo"]:
 						if ammo not in ["coal","copper","iron","gold"]: return false
 				continue

@@ -5,6 +5,8 @@ signal changed
 
 const CAPACITY: int = 5
 const FIRE_INTERVAL: float = 4.0
+const UPGRADED_CAPACITY: int = 7
+const UPGRADED_FIRE_INTERVAL: float = 2.0
 const RANGE: float = 300.0
 const ENGAGEMENT_TOP: float = -200.0
 const DAMAGE_MULTIPLIER: float = 0.5
@@ -50,11 +52,17 @@ func place(cell: Vector2i, level: int = 1) -> bool:
 func level_at(cell: Vector2i) -> int:
 	return int(launchers.get(cell,{}).get("level",1))
 
+func capacity_at(cell: Vector2i) -> int:
+	return UPGRADED_CAPACITY if level_at(cell) == 2 else capacity
+
+func interval_at(cell: Vector2i) -> float:
+	return UPGRADED_FIRE_INTERVAL if level_at(cell) == 2 else fire_interval
+
 func can_fuse(source: Vector2i, destination: Vector2i) -> bool:
 	if source == destination or not launchers.has(source) or not launchers.has(destination): return false
 	if level_at(source) != 1 or level_at(destination) != 1: return false
 	if world.get("cycle").is_night: return false
-	return launchers[source]["ammo"].size() + launchers[destination]["ammo"].size() <= capacity
+	return launchers[source]["ammo"].size() + launchers[destination]["ammo"].size() <= UPGRADED_CAPACITY
 
 func fuse(source: Vector2i, destination: Vector2i) -> bool:
 	if not can_fuse(source,destination): return false
@@ -90,7 +98,7 @@ func round_kind(kind: String) -> String:
 func can_receive(cell: Vector2i, kind: String = "") -> bool:
 	if not launchers.has(cell): return false
 	var units: int = 1 if kind.is_empty() else ammo_units(kind)
-	return units > 0 and (launchers[cell]["ammo"] as Array).size() + units <= capacity
+	return units > 0 and (launchers[cell]["ammo"] as Array).size() + units <= capacity_at(cell)
 
 func receive(cell: Vector2i, kind: String) -> bool:
 	if not can_receive(cell,kind) or ammo_units(kind) == 0: return false
@@ -149,7 +157,7 @@ func advance(delta: float) -> void:
 		var target_position: Vector2 = world.to_local(nearest.global_position)
 		data["angle"] = (target_position - center).angle()
 		var kind: String = str(ammo.pop_front())
-		data["cooldown"] = fire_interval
+		data["cooldown"] = interval_at(cell)
 		var damage: float = ammo_damage(kind)
 		if nearest.has_method("take_damage"):
 			nearest.call("take_damage", damage)

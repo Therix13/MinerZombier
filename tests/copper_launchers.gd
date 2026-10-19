@@ -95,6 +95,8 @@ func run_checks() -> void:
 	check(not weapons.can_fuse(a,b) and not mover.drop("launcher",a,b),"Combat blocks launcher fusion")
 	game.cycle.is_night = false
 	for index in range(5): weapons.receive(a,"coal")
+	weapons.receive(b,"coal_2")
+	check(weapons.can_fuse(a,b),"Fusion permits seven rounds to fit the upgraded capacity")
 	weapons.receive(b,"coal")
 	check(not weapons.can_fuse(a,b),"Fusion never discards ammunition beyond capacity")
 	clear_items()

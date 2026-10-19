@@ -536,8 +536,9 @@ func draw_launcher_on(canvas: Node2D, center: Vector2, data: Dictionary, preview
 	canvas.draw_circle(muzzle,5,metal)
 	canvas.draw_circle(muzzle,3,edge)
 	var ammo: Array = data.get("ammo",[])
-	for i in range(5):
-		canvas.draw_circle(center + Vector2(-14 + i*7,16),1.8,light if i < ammo.size() else edge)
+	var slots: int = 5 if rusty else 7
+	for i in range(slots):
+		canvas.draw_circle(center + Vector2(-14 + i * (28.0 / (slots - 1)),16),1.8,light if i < ammo.size() else edge)
 	if level == 2:
 		for x in [-3,3]: canvas.draw_line(center + Vector2(x,-19),center + Vector2(x,-14),light,2)
 

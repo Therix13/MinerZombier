@@ -418,7 +418,7 @@ func launcher_ready() -> bool:
 
 func launcher_full() -> bool:
 	for cell: Vector2i in launchers.launchers:
-		if launchers.is_active_position(cell) and launchers.launchers[cell]["ammo"].size() >= launchers.capacity: return true
+		if launchers.is_active_position(cell) and launchers.launchers[cell]["ammo"].size() >= launchers.capacity_at(cell): return true
 	return false
 
 func launcher_blueprint_cell() -> Vector2i:
