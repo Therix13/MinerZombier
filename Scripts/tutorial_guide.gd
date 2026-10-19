@@ -48,7 +48,7 @@ func on_step_changed() -> void:
 		queue_redraw()
 		return
 	if last_step != cycle.tutorial_step:
-		if last_step < 0 or cycle.tutorial_step == 12: focus_objective.call_deferred()
+		if last_step < 0 or cycle.tutorial_step == 13: focus_objective.call_deferred()
 		last_step = cycle.tutorial_step
 	game.get("shop").update_cycle()
 	queue_redraw()

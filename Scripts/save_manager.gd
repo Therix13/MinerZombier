@@ -5,6 +5,7 @@ signal status_changed(message: String, success: bool)
 const StartScreenScript = preload("res://Scripts/start_screen.gd")
 const ZombieScript = preload("res://Scripts/zombie.gd")
 const VERSION := 1
+const TUTORIAL_REVISION := 2
 const DEFAULT_PATH := "user://savegame.dat"
 const SESSION_ACTION: StringName = &"mine_defense_session_action"
 const SKIP_START: StringName = &"mine_defense_skip_start_screen"
@@ -152,7 +153,7 @@ func snapshot() -> Dictionary:
 	camera_data["position"] = game.camera.position
 	camera_data["zoom"] = game.camera.zoom.x
 	return {
-		"version": VERSION, "saved_at": int(Time.get_unix_time_from_system()),
+		"version": VERSION, "tutorial_revision": TUTORIAL_REVISION, "saved_at": int(Time.get_unix_time_from_system()),
 		"coins": game.economy.coins, "developer_mode": game.economy.developer_mode,
 		"grid": {"width": game.grid.cave_width, "height": game.grid.cave_height, "platforms": not game.grid.defense_tiles.is_empty()},
 		"veins": veins, "resources": game.mining.nugget_stores().duplicate(true),
@@ -266,6 +267,12 @@ func restore_snapshot(data: Dictionary) -> bool:
 	}
 	for key: String in CYCLE_FIELDS:
 		game.cycle.set(key,data["cycle"].get(key,tutorial_defaults.get(key,game.cycle.get(key))))
+	# Revision 2 inserts expansion between ingot fusion and the defense lessons.
+	if int(data.get("tutorial_revision",1)) < TUTORIAL_REVISION and game.cycle.tutorial_step >= 11:
+		if game.cycle.day == 1 and not game.cycle.is_night and not game.cycle.tutorial_skipped and game.cycle.tutorial_step < 15 and game.grid.cave_width < 7:
+			game.cycle.tutorial_step = 11
+		else:
+			game.cycle.tutorial_step += 1
 	for enemy: Node in get_tree().get_nodes_in_group("zombies"):
 		if game.is_ancestor_of(enemy):
 			enemy.remove_from_group("zombies")
@@ -327,6 +334,7 @@ func dictionary_keys(data: Dictionary, names: Array) -> bool:
 	return true
 
 func valid_snapshot(data: Dictionary) -> bool:
+	if not data.get("tutorial_revision",1) is int or data.get("tutorial_revision",1) not in [1,TUTORIAL_REVISION]: return false
 	if data.get("version") != VERSION or not number(data.get("saved_at"),0,1e12) or not number(data.get("coins"),0,1e12) or not data.get("developer_mode") is bool: return false
 	if not dictionary_keys(data,["grid","veins","resources","belts","junctions","drills","launchers","compactors","furnaces","saws","blueprints","progression","cycle","wave","camera"]): return false
 	var map: Dictionary = data["grid"]
