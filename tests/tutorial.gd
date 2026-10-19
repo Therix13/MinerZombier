@@ -256,3 +256,4 @@ func fuse_veins_to(level: int) -> void:
 func acknowledge_unlocks() -> void:
 	if shop.unlock_notice.visible:
 		await click_control(shop.unlock_notice_accept)
+		await create_timer(1.05,true,false,true).timeout

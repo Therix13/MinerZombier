@@ -31,6 +31,7 @@ const PANEL_WIDTH := 340.0
 const TOGGLE_SIZE := 58.0
 const MONEY_BOX_WIDTH := 148.0
 const ANIMATION_TIME := 0.3
+const UNLOCK_FADE_SECONDS := 1.0
 const CATEGORIES := ["EXPANSION", "VETAS", "HERRAMIENTAS", "AUTOMATIZACIÓN", "DEFENSA"]
 const ITEM_CATEGORIES := {
 	"VETAS": ["coal", "copper", "iron", "gold"],
@@ -97,6 +98,7 @@ var unlock_notice_accept: Button
 var unlock_notice_grid: GridContainer
 var unlock_notice_cards: Dictionary = {}
 var unlock_notice_tween: Tween
+var unlock_notice_closing: bool = false
 var notice_item_ids: Array[String] = []
 
 func setup(economy_manager: RefCounted, grid_manager: RefCounted) -> void:
@@ -339,24 +341,42 @@ func build_unlock_notice() -> void:
 	unlock_notice_accept.custom_minimum_size.y = 44
 	unlock_notice_accept.add_theme_stylebox_override("normal",create_style("#684721","#d6b374",2,8))
 	unlock_notice_accept.add_theme_stylebox_override("hover",create_style("#805c30","#ffe1a2",2,8))
-	unlock_notice_accept.pressed.connect(accept_unlock_notice)
+	unlock_notice_accept.pressed.connect(accept_unlock_notice.bind(true))
 	column.add_child(unlock_notice_accept)
 	unlock_notice.hide()
 	unlock_notice_backdrop.hide()
 
-func accept_unlock_notice() -> void:
+func accept_unlock_notice(animate: bool = false) -> void:
+	# Restoration may clear immediately; the player's button uses the transition.
+	if animate and unlock_notice_closing: return
 	notice_item_ids.clear()
+	if unlock_notice_tween != null: unlock_notice_tween.kill()
+	if not animate or not unlock_notice_backdrop.visible:
+		finish_unlock_notice()
+		return
+	unlock_notice_closing = true
+	unlock_notice_accept.disabled = true
+	unlock_notice_tween = create_tween().set_ignore_time_scale(true)
+	unlock_notice_tween.tween_property(unlock_notice_backdrop,"modulate:a",0.0,UNLOCK_FADE_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	unlock_notice_tween.finished.connect(finish_unlock_notice)
+
+func finish_unlock_notice() -> void:
+	unlock_notice_closing = false
 	unlock_notice.hide()
 	unlock_notice_backdrop.hide()
-
+	unlock_notice_backdrop.modulate.a = 1.0
+	unlock_notice_accept.disabled = false
+	if not notice_item_ids.is_empty():
+		rebuild_notice_cards()
+		update_notice_visibility()
 
 func announce_unlocks(item_ids: Array[String]) -> void:
 	if item_ids.is_empty(): return
 	for item_id: String in item_ids:
 		if item_id not in notice_item_ids: notice_item_ids.append(item_id)
+	# New unlocks arriving during dismissal wait for their own complete entrance.
+	if unlock_notice_closing: return
 	rebuild_notice_cards()
-	unlock_notice.hide()
-	unlock_notice_backdrop.hide()
 	update_notice_visibility()
 
 func rebuild_notice_cards() -> void:
@@ -397,18 +417,23 @@ func rebuild_notice_cards() -> void:
 		unlock_notice_cards[item_id] = card
 
 func update_notice_visibility() -> void:
-	if unlock_notice == null or notice_item_ids.is_empty(): return
+	if unlock_notice == null: return
 	var victory: Control = get_parent().get_parent().get("night_victory_overlay")
 	if (cycle != null and (cycle.is_night or cycle.defeated)) or (victory != null and victory.visible):
+		if unlock_notice_tween != null: unlock_notice_tween.kill()
+		unlock_notice_closing = false
+		unlock_notice_accept.disabled = false
 		unlock_notice.hide()
 		unlock_notice_backdrop.hide()
-	elif not unlock_notice.visible:
+		return
+	if notice_item_ids.is_empty() or unlock_notice_closing: return
+	if not unlock_notice.visible:
 		unlock_notice.show()
 		unlock_notice_backdrop.show()
 		if unlock_notice_tween != null: unlock_notice_tween.kill()
 		unlock_notice_backdrop.modulate.a = 0
-		unlock_notice_tween = create_tween()
-		unlock_notice_tween.tween_property(unlock_notice_backdrop,"modulate:a",1.0,0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		unlock_notice_tween = create_tween().set_ignore_time_scale(true)
+		unlock_notice_tween.tween_property(unlock_notice_backdrop,"modulate:a",1.0,UNLOCK_FADE_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		unlock_notice_accept.grab_focus()
 
 func build_cycle_panel() -> void:
