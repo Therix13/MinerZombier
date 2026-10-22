@@ -12,7 +12,7 @@ const SKIP_START: StringName = &"mine_defense_skip_start_screen"
 const INTRO_KEY: StringName = &"mine_defense_intro_seen"
 const CYCLE_FIELDS := ["day_remaining", "day", "is_night", "defeated", "tutorial_step", "fusion_taught", "vein_fusion_taught", "barrier_broken", "fusion_sold", "copper_ingot_sold", "copper_ingot_created", "copper_ingot_3_created", "level3_sold", "level4_sold", "coal_sold", "expansion_bonus_granted", "free_launcher_available", "tutorial_skipped", "funded_steps", "coal_cell", "copper_cell", "furnace_cell"]
 const WAVE_FIELDS := ["spawn_timer", "spawn_from_left", "spawn_count", "wave_total", "wave_day", "active_wave", "base_health", "cleared_time", "wave_elapsed", "retreat_started"]
-const ENEMY_FIELDS := ["position", "destination", "health", "max_health", "walking_time", "attacking", "attack_timer", "limbs", "archetype", "armor", "phase", "ability_timer", "charge_used", "retreating"]
+const ENEMY_FIELDS := ["position", "destination", "health", "max_health", "walking_time", "attacking", "attack_timer", "limbs", "archetype", "armor", "phase", "ability_timer", "charge_used", "retreating", "status"]
 const CAMERA_FIELDS := ["mine_position", "mine_zoom", "combat_mine_active", "combat_mine_position", "combat_mine_zoom", "defense_view"]
 
 var game: Node2D
@@ -33,7 +33,10 @@ func _ready() -> void:
 	path = str(Engine.get_meta(&"mine_defense_save_path", path))
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	get_tree().auto_accept_quit = false
-	status_changed.connect(func(message: String, _success: bool): game.display_settings.save_status.text = message)
+	status_changed.connect(func(message: String, success: bool):
+		game.display_settings.save_status.text = message
+		game.display_settings.save_status.visible = not success
+	)
 	game.cycle.changed.connect(update_day_checkpoint)
 	initialize.call_deferred()
 
@@ -175,14 +178,14 @@ func snapshot(include_checkpoint: bool = true) -> Dictionary:
 		if enemy is ZombieScript and game.is_ancestor_of(enemy) and enemy.health > 0:
 			enemies.append(properties(enemy, ENEMY_FIELDS))
 	var veins: Dictionary = {}
-	for material: String in ["coal", "copper", "iron", "gold"]: veins[material] = game.mining.veins_for(material).duplicate(true)
+	for material: String in game.mining.VEIN_KINDS: veins[material] = game.mining.veins_for(material).duplicate(true)
 	var camera_data: Dictionary = properties(game.camera_controller, CAMERA_FIELDS)
 	camera_data["position"] = game.camera.position
 	camera_data["zoom"] = game.camera.zoom.x
 	var result: Dictionary = {
 		"version": VERSION, "tutorial_revision": TUTORIAL_REVISION, "material_revision": 2, "compactor_revision": 2, "combat_revision": 2, "saved_at": int(Time.get_unix_time_from_system()),
 		"coins": game.economy.coins, "developer_mode": game.economy.developer_mode, "reload_hint_seen": reload_hint_seen, "archive_id": archive_id,
-		"grid": {"width": game.grid.cave_width, "height": game.grid.cave_height, "platforms": not game.grid.defense_tiles.is_empty()},
+		"grid": {"width": game.grid.cave_width, "height": game.grid.cave_height, "platforms": not game.grid.defense_tiles.is_empty(), "defense_slots": game.grid.defense_tiles.size()},
 		"veins": veins, "resources": game.mining.nugget_stores().duplicate(true),
 		"belts": game.conveyors.belts.duplicate(true), "junctions": game.conveyors.last_junction_entry.duplicate(true),
 		"belt_time": game.conveyors.accumulator, "drills": game.drills.drills.duplicate(true), "drill_time": game.drills.accumulator,
@@ -196,6 +199,7 @@ func snapshot(include_checkpoint: bool = true) -> Dictionary:
 		"enemies": enemies, "acid_shots":game.zombie_manager.acid_shots.duplicate(true), "acid_pools":game.zombie_manager.acid_pools.duplicate(true), "camera": camera_data, "victory": game.night_victory_overlay.visible,
 		"notices": game.shop.notice_item_ids.duplicate(),
 	}
+	if game.get("campaign") != null: result["campaign"] = game.campaign.state.duplicate(true)
 	if include_checkpoint and not day_checkpoint.is_empty() and day_checkpoint["cycle"]["day"] == game.cycle.day:
 		result["day_checkpoint"] = day_checkpoint.duplicate(true)
 	return result
@@ -348,6 +352,13 @@ func renamed_material(value: Variant) -> Variant:
 	return value
 
 func migrate_materials(data: Dictionary) -> Dictionary:
+	# New material stores are empty in existing campaigns.
+	if data.get("veins") is Dictionary and data.get("resources") is Dictionary:
+		data = data.duplicate(true)
+		for material: String in game.mining.VEIN_KINDS:
+			if not data["veins"].has(material): data["veins"][material] = {}
+		for kind: String in game.mining.ORE_KINDS:
+			if not data["resources"].has(kind): data["resources"][kind] = {}
 	if data.get("material_revision",1) != 1: return migrate_compactors(data)
 	var result: Dictionary = renamed_material(data)
 	# Previously built copper weapons retain their finished tier-two version.
@@ -405,6 +416,9 @@ func restore_snapshot(data: Dictionary) -> bool:
 	data = migrate_materials(data)
 	if not valid_snapshot(data): return false
 	restoring = true
+	if game.get("campaign") != null:
+		game.campaign.state = data.get("campaign",game.campaign.INITIAL_STATE).duplicate(true)
+		game.campaign.toast_time = 0
 	# This lesson stays learned even when retrying an earlier dawn checkpoint.
 	reload_hint_seen = reload_hint_seen or bool(data.get("reload_hint_seen",false))
 	loaded_game = true
@@ -418,7 +432,7 @@ func restore_snapshot(data: Dictionary) -> bool:
 	game.grid.cave_width = map["width"]
 	game.grid.cave_height = map["height"]
 	game.grid.apply_cave_size()
-	if map["platforms"]: game.grid.purchase_defense_platforms()
+	if map["platforms"]: game.grid.purchase_defense_platforms(int(map.get("defense_slots",2)))
 	for material: String in data["veins"]: replace_dictionary(game.mining.veins_for(material),data["veins"][material])
 	for kind: String in data["resources"]: replace_dictionary(game.mining.items_for(kind),data["resources"][kind])
 	replace_dictionary(game.conveyors.belts,data["belts"])
@@ -462,7 +476,7 @@ func restore_snapshot(data: Dictionary) -> bool:
 		enemy.configure(saved["archetype"])
 		for key: String in ENEMY_FIELDS:
 			if key == "limbs": enemy.limbs.assign(saved[key])
-			else: enemy.set(key,saved[key])
+			else: enemy.set(key,saved.get(key,{"slow":0.0,"support":0.0,"hits":0}) if key == "status" else saved[key])
 		if enemy.retreating or enemy.phase == "retreat":
 			enemy.retreating = false
 			enemy.phase = "advance"
@@ -528,6 +542,7 @@ func dictionary_keys(data: Dictionary, names: Array) -> bool:
 
 func valid_snapshot(data: Dictionary) -> bool:
 	data = migrate_materials(data)
+	if data.has("campaign") and not preload("res://Scripts/campaign_manager.gd").valid_state(data["campaign"]): return false
 	if not valid_archive_id(data.get("archive_id","legacy")): return false
 	if not data.get("reload_hint_seen",false) is bool: return false
 	if not data.get("combat_revision") is int or data.get("combat_revision") != 2: return false
@@ -538,13 +553,14 @@ func valid_snapshot(data: Dictionary) -> bool:
 	if not dictionary_keys(data,["grid","veins","resources","belts","junctions","drills","launchers","compactors","furnaces","saws","blueprints","progression","cycle","wave","camera"]): return false
 	var map: Dictionary = data["grid"]
 	if not map.get("width") is int or not map.get("height") is int: return false
-	if Vector2i(map.get("width",0),map.get("height",0)) not in [Vector2i(3,3),Vector2i(7,5)] or not map.get("platforms") is bool: return false
-	for material: String in ["coal","copper","iron","gold"]:
-		if not cells(data["veins"].get(material)): return false
+	if Vector2i(map.get("width",0),map.get("height",0)) not in [Vector2i(3,3),Vector2i(7,5),Vector2i(11,7),Vector2i(15,9)] or not map.get("platforms") is bool: return false
+	if map.get("defense_slots",2 if map["platforms"] else 0) not in [0,2,4,6]: return false
+	for material: String in game.mining.VEIN_KINDS:
+		if not cells(data["veins"].get(material,{})): return false
 		for vein: Variant in data["veins"][material].values():
 			if not vein is Dictionary or not number(vein.get("level"),1,4) or not number(vein.get("direction"),0,3) or not number(vein.get("progress"),0,11): return false
 	for kind: String in game.mining.ORE_KINDS:
-		if not cells(data["resources"].get(kind)): return false
+		if not cells(data["resources"].get(kind,{})): return false
 		for count: Variant in data["resources"][kind].values():
 			if not count is int or not number(count,1,1000): return false
 	for key: String in ["belts","junctions","drills","launchers","compactors","furnaces","saws","blueprints"]:
@@ -560,9 +576,15 @@ func valid_snapshot(data: Dictionary) -> bool:
 		if not entry is int or not number(entry,-1,3): return false
 	for launcher: Variant in data["launchers"].values():
 		if not launcher is Dictionary or not launcher.get("level",1) is int or launcher.get("level",1) not in [1,2]: return false
-		if not launcher is Dictionary or not number(launcher.get("cooldown"),0,4) or not number(launcher.get("angle"),-100,100) or not launcher.get("ammo") is Array or launcher["ammo"].size() > (7 if launcher.get("level",1) == 2 else 5): return false
+		var weapon: String = launcher.get("weapon","")
+		if not weapon.is_empty() and not preload("res://Scripts/content_catalog.gd").WEAPONS.has(weapon): return false
+		var maximum: int = preload("res://Scripts/content_catalog.gd").WEAPONS[weapon]["capacity"] if not weapon.is_empty() else (7 if launcher.get("level",1) == 2 else 5)
+		if not weapon.is_empty(): maximum = int(maximum * (1.0 + int(data.get("campaign",{}).get("arsenal_rank",0)) * 0.25))
+		if not number(launcher.get("cooldown"),0,4) or not number(launcher.get("angle"),-100,100) or not launcher.get("ammo") is Array or launcher["ammo"].size() > maximum: return false
 		for kind: Variant in launcher["ammo"]:
-			if kind not in ["coal","copper","iron","gold"]: return false
+			if weapon.is_empty():
+				if kind not in ["coal","copper","iron","gold"]: return false
+			elif kind != preload("res://Scripts/content_catalog.gd").WEAPONS[weapon]["ammo"]: return false
 	for key: String in ["compactors","furnaces","saws","blueprints"]:
 		for machine: Variant in data[key].values():
 			if not machine is Dictionary or not number(machine.get("direction"),0,3): return false
@@ -602,7 +624,7 @@ func valid_snapshot(data: Dictionary) -> bool:
 	for item: Variant in data["progression"]["created_resources"]:
 		if item not in game.mining.ORE_KINDS or not data["progression"]["created_resources"][item] is bool: return false
 	for item: Variant in data["progression"]["completed_veins"]:
-		if item not in ["coal","copper","iron","gold"] or not data["progression"]["completed_veins"][item] is bool: return false
+		if item not in game.mining.VEIN_KINDS or not data["progression"]["completed_veins"][item] is bool: return false
 	var cycle: Dictionary = data["cycle"]
 	for key: String in CYCLE_FIELDS:
 		if key not in ["copper_ingot_created","copper_ingot_3_created"] and not cycle.has(key): return false
@@ -624,9 +646,13 @@ func valid_snapshot(data: Dictionary) -> bool:
 	for enemy: Variant in data["enemies"]:
 		if not enemy is Dictionary: return false
 		for key: String in ENEMY_FIELDS:
-			if not enemy.has(key): return false
+			if key != "status" and not enemy.has(key): return false
 		if not enemy["position"] is Vector2 or not enemy["position"].is_finite() or not enemy["destination"] is Vector2 or not enemy["destination"].is_finite(): return false
 		if not number(enemy["max_health"],0.5,1e9) or not number(enemy["health"],0.001,enemy["max_health"]) or not number(enemy["walking_time"],0,1e12) or not number(enemy["attack_timer"],-1e6,1e6) or not enemy["attacking"] is bool or not enemy["limbs"] is Array: return false
+		if enemy.has("status"):
+			if not enemy["status"] is Dictionary: return false
+			if not enemy["status"].get("frenzy",false) is bool: return false
+			if not number(enemy["status"].get("slow",0),0,10) or not number(enemy["status"].get("support",0),-1e6,10) or not number(enemy["status"].get("hits",0),0,1e9): return false
 		if enemy["archetype"] not in ZombieScript.TYPES or enemy["phase"] not in ["advance","windup","charge","exposed","retreat"]: return false
 		if not number(enemy["armor"],0,10) or not number(enemy["ability_timer"],0,6) or not enemy["charge_used"] is bool or not enemy["retreating"] is bool: return false
 		for limb: Variant in enemy["limbs"]:

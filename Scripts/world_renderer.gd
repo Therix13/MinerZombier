@@ -80,7 +80,7 @@ func _draw() -> void:
 				var rhythm: Node = get_parent().get_node_or_null("WorkshopRhythm")
 				if rhythm != null: center = rhythm.nugget_position(cell, kind, center)
 				draw_nugget(center, kind, amount)
-	for material: String in ["coal", "copper", "iron", "gold"]:
+	for material: String in mining.VEIN_KINDS:
 		for cell: Vector2i in mining.veins_for(material):
 			if holding_object and dragging_object and held_object_type == "vein" and cell == held_object_cell: continue
 			draw_vein(grid.get_cell_rect(cell).get_center(), material, mining.veins_for(material)[cell])
@@ -93,6 +93,15 @@ func _draw() -> void:
 		draw_rect(defense_outline.grow(-1.0), Color("#eab958"), false, 3.0)
 	for shot in launchers.shots:
 		draw_line(shot["from"], shot["to"], Color("#d9b46a") if str(shot["kind"]).begins_with("copper") else Color("#444444"), 5.0 if str(shot["kind"]).ends_with("_2") else 3.0)
+		if shot.get("weapon","") in ["grenadier","rocketeer"]:
+			var radius: float = preload("res://Scripts/content_catalog.gd").WEAPONS[shot["weapon"]]["radius"]
+			var age: float = 1.0 - float(shot["time"]) / 0.45
+			draw_circle(shot["to"],radius * age,Color(1,0.55,0.18,0.22 * (1 - age)))
+			draw_arc(shot["to"],radius * age,0,TAU,24,Color(1,0.8,0.4,1 - age),2)
+		elif shot.get("weapon","") == "tesla":
+			var mid: Vector2 = (shot["from"] + shot["to"]) * 0.5
+			draw_polyline(PackedVector2Array([shot["from"],mid + Vector2(12,-10),mid + Vector2(-8,8),shot["to"]]),Color("#a8f0ff"),3)
+
 	draw_sale_cell()
 	if placing_coal and preview_allowed("coal") and grid.owned_tiles.has(hovered_cell) and mining.can_place_vein(hovered_cell) and not conveyors.belts.has(hovered_cell) and not drills.drills.has(hovered_cell) and not launchers.launchers.has(hovered_cell):
 		draw_coal_vein(grid.get_cell_rect(hovered_cell).get_center(), placement_direction, 0, true)
@@ -151,12 +160,22 @@ func _draw() -> void:
 	if is_instance_valid(interactions) and (interactions.placing_iron or interactions.placing_gold) and interactions.phase_allows():
 		draw_iron_vein(grid.get_cell_rect(hovered_cell).get_center(), placement_direction, 0, "gold" if interactions.placing_gold else "iron")
 		draw_rect(grid.get_cell_rect(hovered_cell).grow(-1), Color("#f0c777") if mining.can_place_vein(hovered_cell) else Color("#df7770"), false, 2)
+	if is_instance_valid(interactions) and not interactions.placing_content.is_empty() and interactions.phase_allows():
+		var item: String = interactions.placing_content
+		var center: Vector2 = grid.get_cell_rect(hovered_cell).get_center()
+		if preload("res://Scripts/content_catalog.gd").WEAPONS.has(item):
+			draw_launcher(center,{"weapon":item},true)
+		else: draw_vein(center,item,{"direction":placement_direction,"progress":0,"level":1},true)
+		draw_rect(grid.get_cell_rect(hovered_cell).grow(-1),Color("#ffe2a1") if interactions.can_place_item(hovered_cell,item) else Color("#e96f6f"),false,2)
 	if is_instance_valid(interactions) and not interactions.placing_resource.is_empty() and interactions.phase_allows():
 		var valid: bool = mining.can_move_nugget(hovered_cell)
 		draw_rect(grid.get_cell_rect(hovered_cell).grow(-2), Color("#ffe18a") if valid else Color("#df7770"), false, 2)
 		draw_nugget(grid.get_cell_rect(hovered_cell).get_center(), interactions.placing_resource, 1)
 
 func draw_nugget(center: Vector2, kind: String, amount: int) -> void:
+	if kind in mining.EXTRA_KINDS:
+		preload("res://Scripts/content_art.gd").resource(self,center,kind,amount)
+		return
 	if not rasterizing and amount == 1 and ArtAtlas.paint(self, "ore:" + kind, center): return
 	if kind.begins_with("iron") or kind.begins_with("gold"):
 		if "_ingot" in kind: draw_ingot(center, kind, amount)
@@ -258,7 +277,8 @@ func preview_allowed(kind: String) -> bool:
 	return tutorial == null or tutorial.allows_world_press(hovered_cell, kind)
 
 func draw_vein(center: Vector2, kind: String, data: Dictionary, preview: bool = false) -> void:
-	if kind in ["iron", "gold"]: draw_iron_vein(center, int(data["direction"]), int(data["progress"]), kind)
+	if preload("res://Scripts/content_catalog.gd").MATERIALS.has(kind): preload("res://Scripts/content_art.gd").vein(self,center,kind,int(data["direction"]),int(data.get("level",1)))
+	elif kind in ["iron", "gold"]: draw_iron_vein(center, int(data["direction"]), int(data["progress"]), kind)
 	elif kind == "copper": draw_copper_vein(center, int(data["direction"]), int(data["progress"]), preview)
 	else: draw_coal_vein(center, int(data["direction"]), int(data["progress"]), preview)
 	var level: int = clampi(int(data.get("level", 1)), 1, 4)
@@ -511,6 +531,9 @@ func draw_launcher(center: Vector2, data: Dictionary, preview: bool) -> void:
 	draw_launcher_on(self, center, data, preview)
 
 func draw_launcher_on(canvas: Node2D, center: Vector2, data: Dictionary, preview: bool) -> void:
+	if data.has("weapon"):
+		preload("res://Scripts/content_art.gd").weapon(canvas,center,data)
+		return
 	var level: int = int(data.get("level",1))
 	var rusty: bool = level == 1
 	var rect := Rect2(center - Vector2(21,21), Vector2(42,42))

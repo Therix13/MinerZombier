@@ -12,7 +12,7 @@ const CORNER_RIGHT := "corner_right"
 const CORNER_LEFT := "corner_left"
 const JUNCTION := "junction"
 const FILTER := "filter"
-const FILTER_MATERIALS := ["coal", "copper", "iron", "gold"]
+const FILTER_MATERIALS := ["coal", "copper", "iron", "gold", "nitrate", "sulfur", "tungsten", "powder", "bullet", "grenade", "rocket", "battery"]
 
 var grid: RefCounted
 var mining: RefCounted

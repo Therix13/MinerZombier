@@ -49,7 +49,7 @@ func defense_cell(side: String) -> Vector2i:
 	return Vector2i(center_x - 3 if side == "left" else center_x + 3, -3)
 
 func is_defense_position(cell: Vector2i) -> bool:
-	return cell == defense_cell("left") or cell == defense_cell("right")
+	return defense_tiles.has(cell) or cell == defense_cell("left") or cell == defense_cell("right")
 
 func is_ammo_cell(cell: Vector2i) -> bool:
 	return ammo_tiles.has(cell)
@@ -57,16 +57,15 @@ func is_ammo_cell(cell: Vector2i) -> bool:
 func purchase_defense_cell(_side: String) -> bool:
 	return purchase_defense_platforms()
 
-func purchase_defense_platforms() -> bool:
-	var left_cell: Vector2i = defense_cell("left")
-	var right_cell: Vector2i = defense_cell("right")
-	if defense_tiles.has(left_cell) and defense_tiles.has(right_cell):
-		return false
-	defense_tiles[left_cell] = true
-	defense_tiles[right_cell] = true
-	for platform: Vector2i in [left_cell, right_cell]:
-		for offset_y in [1, 2]:
-			var connection: Vector2i = platform + Vector2i(0, offset_y)
-			ammo_tiles[connection] = true
-			owned_tiles[connection] = true
+func purchase_defense_platforms(count: int = 2) -> bool:
+	if defense_tiles.size() >= count: return false
+	var center: int = MAP_WIDTH / 2
+	for index in range(clampi(count,2,6)):
+		var distance: int = 3 + (index / 2) * 3
+		var platform := Vector2i(center + (-distance if index % 2 == 0 else distance),-3)
+		defense_tiles[platform] = true
+		for y in [1,2]:
+			var cell: Vector2i = platform + Vector2i(0,y)
+			ammo_tiles[cell] = true
+			owned_tiles[cell] = true
 	return true

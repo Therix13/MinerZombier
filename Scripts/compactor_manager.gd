@@ -52,7 +52,7 @@ func place(cell: Vector2i, output_direction: int) -> bool:
 	return true
 
 func family(kind: String) -> String:
-	if kind not in mining.ORE_KINDS: return ""
+	if kind not in mining.ORE_KINDS or kind in preload("res://Scripts/content_catalog.gd").AMMO: return ""
 	var suffix: String = kind.get_slice("_",kind.get_slice_count("_") - 1)
 	return kind.trim_suffix("_" + suffix) if suffix.is_valid_int() else kind
 

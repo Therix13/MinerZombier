@@ -34,7 +34,7 @@ func _ready() -> void:
 		effects_volume = clampf(float(config.get_value("audio", "effects", effects_volume)), 0, 1)
 	music = make_player(make_score(false))
 	tension = make_player(make_score(true))
-	for kind in ["mine", "belt", "press", "fire", "finish", "shot", "sale"]:
+	for kind in ["mine", "belt", "press", "fire", "finish", "shot", "sale", "pistol", "explosion", "electric"]:
 		sounds[kind] = make_effect(kind)
 	for i in range(12): voices.append(make_player(null))
 	game.get("mining").struck.connect(on_struck)
@@ -42,7 +42,7 @@ func _ready() -> void:
 	game.get_node("Construction").completed.connect(func(cell: Vector2i): feedback("finish", cell))
 	game.get("mining").vein_fused.connect(func(cell: Vector2i): feedback("finish", cell))
 	game.get("conveyors").transported.connect(on_transport)
-	game.get("launchers").fired.connect(func(cell: Vector2i): feedback("shot", cell))
+	game.get("launchers").fired.connect(on_weapon_fired)
 	game.get("mining").fusion_completed.connect(func(_kind: String): request_sound("finish"))
 	game.get("mining").sale_completed.connect(func(_kind: String): request_sound("sale"))
 	game.get("conveyors").sale_completed.connect(func(_kind: String): request_sound("sale"))
@@ -139,6 +139,15 @@ func make_effect(kind: String) -> AudioStreamWAV:
 		"shot":
 			note(samples, 0, 0.16, 55, 0.6, 1, rng)
 			note(samples, 0, 0.07, 180, 0.3, 2, rng)
+		"pistol":
+			note(samples,0,0.045,125,0.55,3,rng)
+			note(samples,0,0.08,70,0.35,1,rng)
+		"explosion":
+			note(samples,0,0.32,38,0.65,1,rng)
+			note(samples,0,0.18,90,0.35,3,rng)
+		"electric":
+			note(samples,0,0.12,1400,0.22,2,rng)
+			note(samples,0.04,0.18,700,0.2,3,rng)
 		"finish", "sale":
 			note(samples, 0, 0.22, 660, 0.32, 0, rng)
 			note(samples, 0.09, 0.25, 880, 0.24, 0, rng)
@@ -153,6 +162,12 @@ func request_sound(kind: String) -> void:
 func feedback(kind: String, cell: Vector2i) -> void:
 	if impacts.size() < 64: impacts.append({"cell": cell, "age": 0.0, "kind": kind})
 	request_sound(kind)
+
+func on_weapon_fired(cell: Vector2i) -> void:
+	var weapon: String = game.launchers.launchers.get(cell,{}).get("weapon","")
+	var sound: String = "pistol" if weapon == "pistol" else ("explosion" if weapon in ["grenadier","rocketeer"] else ("electric" if weapon == "tesla" else "shot"))
+	if impacts.size() < 64: impacts.append({"cell":cell,"age":0.0,"kind":"shot"})
+	request_sound(sound)
 
 func on_struck(cell: Vector2i) -> void:
 	feedback("mine", cell)

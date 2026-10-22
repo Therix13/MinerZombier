@@ -18,7 +18,22 @@ const TYPES := {
 	"brute": {"name":"DEMOLEDOR", "health":6.0, "speed":20.0, "armor":2.0, "damage":2.0},
 	"plague": {"name":"REY DE LA PLAGA", "health":10.0, "speed":17.0, "armor":0.0, "damage":2.0},
 	"bomber": {"name":"Explosivo", "health":2.0, "speed":35.0, "armor":0.0, "damage":6.0},
+	"crawler": {"name":"Rastrero","health":0.6,"speed":44,"armor":0,"damage":0.4,"behavior":"walker"},
+	"stalker": {"name":"Acechador","health":2.5,"speed":38,"armor":0,"damage":1.5,"behavior":"walker"},
+	"dodger": {"name":"Esquivo","health":2,"speed":46,"armor":0,"damage":1,"behavior":"walker"},
+	"shielder": {"name":"Portaescudo","health":4,"speed":18,"armor":3,"damage":1,"behavior":"walker"},
+	"healer": {"name":"Contagiador","health":3,"speed":21,"armor":0,"damage":1,"behavior":"walker"},
+	"swarm": {"name":"Colmena","health":3,"speed":22,"armor":0,"damage":1,"behavior":"walker"},
+	"sapper": {"name":"Saboteador","health":3,"speed":33,"armor":0,"damage":2,"behavior":"spitter"},
+	"berserker": {"name":"Furioso","health":5,"speed":29,"armor":1,"damage":2,"behavior":"brute"},
+	"warden": {"name":"EL CARCELERO","health":24,"speed":18,"armor":6,"damage":3,"behavior":"brute"},
+	"broodmother": {"name":"MADRE DE LA COLMENA","health":24,"speed":16,"armor":0,"damage":2,"behavior":"plague"},
+	"executor": {"name":"EL EJECUTOR","health":40,"speed":19,"armor":5,"damage":4,"behavior":"brute"},
 }
+signal minions_requested(origin: Vector2, count: int)
+signal sabotage
+var status: Dictionary = {"slow":0.0,"support":0.0,"hits":0}
+
 signal acid_spit(origin: Vector2, damage: float, volley: int)
 var focused: bool = false
 var archetype: String = "walker"
@@ -53,8 +68,15 @@ func configure(kind: String) -> void:
 	max_health = stats["health"]
 	health = max_health
 	armor = stats["armor"]
-	if archetype == "brute": scale = Vector2.ONE * 1.35
-	elif archetype == "plague": scale = Vector2.ONE * 1.55
+	if behavior() == "brute": scale = Vector2.ONE * 1.35
+	elif behavior() == "plague": scale = Vector2.ONE * 1.55
+	if archetype == "executor": scale = Vector2.ONE * 1.7
+
+func behavior() -> String:
+	return str(TYPES[archetype].get("behavior",archetype))
+
+func apply_slow(seconds: float) -> void:
+	status["slow"] = maxf(float(status.get("slow",0)),seconds)
 
 func depart() -> void:
 	remove_from_group("zombies")
@@ -68,49 +90,54 @@ func _ready() -> void:
 	update_visual()
 
 func _process(delta: float) -> void:
+	status["slow"] = maxf(0,float(status.get("slow",0)) - delta)
+	advance_support(delta)
 	hit_flash = maxf(0,hit_flash - delta)
 	if phase == "windup":
 		ability_timer = maxf(0,ability_timer - delta)
 		queue_redraw()
 		if ability_timer <= 0:
-			if archetype == "brute":
+			if behavior() == "brute":
 				phase = "charge"
-			elif archetype == "bomber":
+			elif behavior() == "bomber":
 				base_attacked.emit(float(TYPES[archetype]["damage"]))
 				depart()
 				return
 			else:
-				acid_spit.emit(position,float(TYPES[archetype]["damage"]),3 if archetype == "plague" else 1)
+				if archetype == "broodmother": minions_requested.emit(position,2)
+				if archetype == "sapper": sabotage.emit()
+				acid_spit.emit(position,float(TYPES[archetype]["damage"]),3 if behavior() == "plague" else 1)
 				phase = "exposed"
-				ability_timer = 5.0 if archetype == "plague" else 1.0
+				ability_timer = 5.0 if behavior() == "plague" else 1.0
 		update_visual()
 		return
 	if phase == "exposed":
 		ability_timer = maxf(0,ability_timer - delta)
 		if ability_timer <= 0:
 			phase = "advance"
-			attack_timer = 6.0 if archetype in ["spitter","plague"] else ATTACK_INTERVAL
+			if archetype in ["warden","executor","berserker"]: charge_used = false
+			attack_timer = 6.0 if behavior() in ["spitter","plague"] else ATTACK_INTERVAL
 			queue_redraw()
 		update_visual()
 		return
-	if archetype == "brute" and not charge_used and position.y >= -160:
+	if behavior() == "brute" and not charge_used and position.y >= -160:
 		charge_used = true
 		phase = "windup"
 		ability_timer = 1.5
 		queue_redraw()
 		return
-	if archetype == "bomber" and position.y >= -60:
+	if behavior() == "bomber" and position.y >= -60:
 		phase = "windup"
 		ability_timer = 2.0
 		queue_redraw()
 		return
-	if archetype in ["spitter","plague"] and position.y >= (-100.0 if archetype == "plague" else -120.0): attacking = true
+	if behavior() in ["spitter","plague"] and position.y >= (-100.0 if behavior() == "plague" else -120.0): attacking = true
 	if attacking:
 		attack_timer -= delta
 		if attack_timer <= 0:
-			if archetype in ["spitter","plague"]:
+			if behavior() in ["spitter","plague"]:
 				phase = "windup"
-				ability_timer = 2.0 if archetype == "plague" else 1.0
+				ability_timer = 2.0 if behavior() == "plague" else 1.0
 				queue_redraw()
 			else:
 				attack_timer += ATTACK_INTERVAL
@@ -120,6 +147,9 @@ func _process(delta: float) -> void:
 		return
 	var remaining: Vector2 = destination - position
 	var speed: float = 150.0 if phase == "charge" else float(TYPES[archetype]["speed"])
+	if float(status.get("slow",0)) > 0: speed *= 0.5
+	if status.get("frenzy",false): speed *= 1.2
+	if archetype in ["berserker","executor"] and health < max_health * 0.5: speed *= 1.4
 	var step: float = speed * delta
 	if remaining.length_squared() <= step * step:
 		position = destination
@@ -136,6 +166,17 @@ func _process(delta: float) -> void:
 		walking_time += delta * 8.0
 	update_visual()
 
+func advance_support(delta: float) -> void:
+	if archetype not in ["healer","shielder"]: return
+	status["support"] = float(status.get("support",0)) - delta
+	if float(status["support"]) > 0: return
+	status["support"] = 3.0
+	for ally: Node2D in get_parent().living_zombies():
+		if ally == self or ally.position.distance_squared_to(position) > 10000: continue
+		if archetype == "healer": ally.health = minf(ally.max_health,ally.health + 0.4)
+		else: ally.armor = minf(3,ally.armor + 0.3)
+		ally.queue_redraw()
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_LEFT or not event.pressed or retreating: return
 	if get_global_mouse_position().distance_to(global_position) > 22.0 * scale.x: return
@@ -147,8 +188,11 @@ func _unhandled_input(event: InputEvent) -> void:
 func take_damage(amount: float) -> void:
 	if health <= 0.0 or amount <= 0.0:
 		return
+	status["hits"] = int(status.get("hits",0)) + 1
+	if archetype == "stalker" and position.y < -180: amount *= 0.35
+	if archetype == "dodger" and int(status["hits"]) % 3 == 0 and phase != "exposed": amount *= 0.3
 	if phase == "exposed": amount *= 2.0
-	elif archetype == "plague": amount *= 0.3
+	elif behavior() == "plague": amount *= 0.3
 	if armor > 0 and phase != "exposed":
 		var absorbed: float = minf(armor,amount)
 		armor -= absorbed
@@ -165,6 +209,7 @@ func take_damage(amount: float) -> void:
 	if health <= 0.0:
 		remove_from_group("zombies")
 		set_process(false)
+		if archetype == "swarm": minions_requested.emit(position,2)
 		defeated.emit()
 		queue_free()
 	else:
@@ -206,13 +251,14 @@ static func paint_circle(image: Image, origin: Vector2i, center: Vector2, radius
 
 static func get_body_atlas() -> ImageTexture:
 	if body_atlas != null: return body_atlas
-	var image := Image.create(BODY_SIZE.x * 8, BODY_SIZE.y * 4, false, Image.FORMAT_RGBA8)
-	for state in range(32):
+	var image := Image.create(BODY_SIZE.x * 8, BODY_SIZE.y * 16, false, Image.FORMAT_RGBA8)
+	for state in range(128):
 		var origin := Vector2i(state % 8, state / 8) * BODY_SIZE + Vector2i(32, 40)
-		var arms := Color("#a9b86c") if state >= 16 else Color("#849c66")
+		var stride: int = [-2,0,2,0][int(state / 32)]
+		var arms := Color("#a9b86c") if state % 32 >= 16 else Color("#849c66")
 		paint_circle(image, origin, Vector2(1, 11), 13, Color(0, 0, 0, 0.21))
-		if state & 4: paint_rect(image, origin, Rect2i(-7, 14, 5, 9), Color("#556d43"))
-		if state & 8: paint_rect(image, origin, Rect2i(2, 14, 5, 9), Color("#556d43"))
+		if state & 4: paint_rect(image, origin, Rect2i(-7, 14 + stride, 5, 9), Color("#556d43"))
+		if state & 8: paint_rect(image, origin, Rect2i(2, 14 - stride, 5, 9), Color("#556d43"))
 		paint_rect(image, origin, Rect2i(-8, 1, 16, 16), Color("#394b35"))
 		if state & 1: paint_rect(image, origin, Rect2i(-11, 6, 6, 13), arms)
 		if state & 2: paint_rect(image, origin, Rect2i(5, 6, 6, 13), arms)
@@ -221,6 +267,19 @@ static func get_body_atlas() -> ImageTexture:
 		paint_rect(image, origin, Rect2i(-6, -9, 4, 3), Color("#ecde83"))
 		paint_rect(image, origin, Rect2i(2, -9, 4, 3), Color("#ecde83"))
 		paint_rect(image, origin, Rect2i(-3, -2, 6, 2), Color("#384b36"))
+		# Pixel shading, torn workwear, boots and facial asymmetry keep silhouettes readable.
+		paint_rect(image,origin,Rect2i(-7,2,3,11),Color("#586551"))
+		paint_rect(image,origin,Rect2i(3,3,4,10),Color("#253b35"))
+		paint_rect(image,origin,Rect2i(-2,3,2,11),Color("#a99c77"))
+		paint_rect(image,origin,Rect2i(-7,10,5,3),Color("#695042"))
+		paint_rect(image,origin,Rect2i(-7,-15,10,3),Color("#3e4c3b"))
+		paint_rect(image,origin,Rect2i(-7,-7,3,5),Color("#607f51"))
+		paint_rect(image,origin,Rect2i(5,-6,3,5),Color("#698252"))
+		paint_rect(image,origin,Rect2i(-4,-1,9,3),Color("#293a30"))
+		paint_rect(image,origin,Rect2i(-2,-1,2,2),Color("#ddd0a4"))
+		paint_rect(image,origin,Rect2i(2,-1,2,2),Color("#ddd0a4"))
+		if state & 4: paint_rect(image,origin,Rect2i(-8,21 + stride,7,3),Color("#273537"))
+		if state & 8: paint_rect(image,origin,Rect2i(1,21 - stride,7,3),Color("#273537"))
 	body_atlas = ImageTexture.create_from_image(image)
 	return body_atlas
 
@@ -233,7 +292,10 @@ func create_body_sprite() -> void:
 	body_sprite.name = "BodySprite"
 	body_sprite.show_behind_parent = true
 	body_sprite.texture = get_body_atlas()
-	body_sprite.modulate = Color("#ffc68a") if archetype == "runner" else (Color("#b6ef85") if archetype in ["spitter","plague"] else Color.WHITE)
+	body_sprite.modulate = Color("#ffc68a") if archetype == "runner" else (Color("#b6ef85") if behavior() in ["spitter","plague"] else Color.WHITE)
+	var palettes := {"crawler":"#9baf88","stalker":"#a7b5cc","dodger":"#e5c19c","healer":"#b5e4c9","swarm":"#d1b78b","sapper":"#c6abc9","berserker":"#d4a693","warden":"#b2c8d8","executor":"#d6b69c"}
+	if palettes.has(archetype): body_sprite.modulate = Color(palettes[archetype])
+	body_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	body_sprite.region_enabled = true
 	body_sprite.scale = Vector2.ONE * 0.5
 	add_child(body_sprite)
@@ -242,7 +304,8 @@ func update_visual() -> void:
 	if body_sprite == null:
 		queue_redraw()
 		return
-	var state: int = body_state()
+	var state: int = body_state() + (0 if attacking else posmod(int(walking_time * 2),4) * 32)
+	if archetype == "stalker": modulate.a = 0.45 if position.y < -180 else 1.0
 	if state != last_body_state:
 		body_sprite.region_rect = Rect2(Vector2(Vector2i(state % 8, state / 8) * BODY_SIZE),Vector2(BODY_SIZE))
 		last_body_state = state
@@ -258,32 +321,53 @@ func _draw() -> void:
 
 func draw_archetype() -> void:
 	if focused:
-		var marker_y: float = -65.0 if archetype in ["brute","plague"] else -44.0
+		var marker_y: float = -65.0 if archetype in ["brute","plague","warden","broodmother","executor"] else -44.0
 		draw_colored_polygon(PackedVector2Array([Vector2(-5,marker_y),Vector2(5,marker_y),Vector2(0,marker_y + 6)]),Color("#ffe08a"))
+	if archetype in ["healer","shielder"]:
+		draw_arc(Vector2(0,8),25,0,TAU,16,Color("#94d7b0") if archetype == "healer" else Color("#92b6df"),1)
+	if archetype == "swarm": draw_circle(Vector2(0,7),9,Color("#b88155"))
+	if archetype == "healer":
+		draw_rect(Rect2(-13,4,6,13),Color("#355b4b"))
+		draw_line(Vector2(-10,7),Vector2(-10,13),Color("#c5e8cc"),2)
+		draw_line(Vector2(-13,10),Vector2(-7,10),Color("#c5e8cc"),2)
+	if archetype == "dodger": draw_line(Vector2(-8,-15),Vector2(8,-15),Color("#cf7755"),3)
+	if archetype == "sapper":
+		draw_rect(Rect2(-9,12,18,4),Color("#735348"))
+		draw_line(Vector2(8,7),Vector2(13,16),Color("#a7c6cc"),3)
+	if archetype == "shielder":
+		draw_rect(Rect2(4,4,13,18),Color("#607c90"))
+		draw_rect(Rect2(6,6,9,14),Color("#b4c4cc"),false,2)
+	if archetype in ["warden","executor"]:
+		draw_line(Vector2(-14,4),Vector2(-14,24),Color("#82664b"),3)
+		draw_colored_polygon(PackedVector2Array([Vector2(-15,3),Vector2(-24,0),Vector2(-24,11),Vector2(-15,9)]),Color("#9eaeb8"))
+	if archetype == "broodmother":
+		for point: Vector2 in [Vector2(-9,12),Vector2(11,6),Vector2(5,16)]:
+			draw_circle(point,4,Color("#78923f"))
+			draw_circle(point + Vector2(-1,-1),2,Color("#d5e477"))
 	if armor > 0:
 		draw_rect(Rect2(-10,1,20,14),Color("#596b7b"))
 		draw_rect(Rect2(-10,1,20,14),Color("#d1d8dc"),false,1.5)
 		draw_rect(Rect2(-11,-17,22,6),Color("#8597a3"))
 	if archetype == "runner": draw_line(Vector2(-10,3),Vector2(10,7),Color("#e59a45"),4)
-	if archetype in ["spitter","plague"]:
+	if behavior() in ["spitter","plague"]:
 		draw_circle(Vector2(8,9),6,Color("#4a7628"))
 		draw_circle(Vector2(8,8),3,Color("#bde458"))
-	if archetype == "bomber":
+	if behavior() == "bomber":
 		draw_rect(Rect2(-9,4,18,12),Color("#a64b32"))
 		draw_line(Vector2(-5,7),Vector2(5,13),Color("#ffe293"),2)
-	if archetype == "plague":
+	if behavior() == "plague":
 		for x in [-7,0,7]: draw_rect(Rect2(x - 2,-24,4,7),Color("#d5b566"))
 		if phase != "exposed" and not retreating: draw_arc(Vector2.ZERO,21,PI,TAU,16,Color("#7ac8b5"),2)
 	if phase == "windup":
 		var pulse: float = 0.65 + 0.35 * sin(ability_timer * 12)
 		draw_circle(Vector2(0,23),20,Color(0.95,0.32,0.16,0.16 * pulse))
 		draw_arc(Vector2(0,23),20,0,TAU,24,Color(1,0.55,0.22,pulse),2)
-		draw_string(ThemeDB.fallback_font,Vector2(-15,-28),"¡CARGA!" if archetype == "brute" else ("¡BOOM!" if archetype == "bomber" else "ÁCIDO"),HORIZONTAL_ALIGNMENT_LEFT,-1,9,Color("#ffca72"))
+		draw_string(ThemeDB.fallback_font,Vector2(-15,-28),"¡CARGA!" if behavior() == "brute" else ("¡BOOM!" if behavior() == "bomber" else "ÁCIDO"),HORIZONTAL_ALIGNMENT_LEFT,-1,9,Color("#ffca72"))
 	if phase == "exposed": draw_arc(Vector2.ZERO,20,0,TAU,24,Color("#f1df78"),2)
-	if archetype in ["brute","plague"] or health < max_health:
+	if archetype in ["brute","plague","warden","broodmother","executor"] or health < max_health:
 		draw_rect(Rect2(-18,-42,36,3),Color("#352d28"))
 		draw_rect(Rect2(-18,-42,36 * health / max_health,3),Color("#d79b60"))
-	if archetype in ["brute","plague"]:
+	if archetype in ["brute","plague","warden","broodmother","executor"]:
 		draw_string(ThemeDB.fallback_font,Vector2(-26,-48),str(TYPES[archetype]["name"]),HORIZONTAL_ALIGNMENT_LEFT,-1,8,Color("#f5d198"))
 
 class HitEffect extends Node2D:

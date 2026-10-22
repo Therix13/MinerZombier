@@ -5,7 +5,7 @@ signal items_unlocked(items: Array[String])
 
 const ConstructionScript = preload("res://Scripts/construction_manager.gd")
 const BASE_ITEMS := ["coal", "defense_platforms", "launcher"]
-const NEXT_VEIN := {"coal":"copper", "copper":"iron", "iron":"gold"}
+const NEXT_VEIN := {"coal":"copper", "copper":"iron", "iron":"gold","gold":"tungsten","nitrate":"sulfur"}
 
 var unlocked: Dictionary = {}
 var created_resources: Dictionary = {}
@@ -68,6 +68,9 @@ func restore_vein_milestones() -> void:
 	# Older saves did not track the first copper placement as a separate milestone.
 	if not mining.copper_veins.is_empty() or completed_veins.has("copper") or unlocked.has("iron") or unlocked.has("gold"):
 		unlocked["expansion"] = true
+	if created_resources.has("copper_ingot_3"): unlocked["nitrate"] = true
+	if created_resources.has("nitrate_4"): unlocked["sulfur"] = true
+	if completed_veins.has("gold"): unlocked["tungsten"] = true
 
 func record_vein(cell: Vector2i) -> void:
 	record_placed_vein(cell)
@@ -80,6 +83,12 @@ func record_vein(cell: Vector2i) -> void:
 
 func record_resource(kind: String) -> void:
 	created_resources[kind] = true
+	if kind == "copper_ingot_3":
+		var items: Array[String] = ["nitrate"]
+		unlock_items(items)
+	if kind == "nitrate_4":
+		var items: Array[String] = ["sulfur"]
+		unlock_items(items)
 	var available: Array[String] = []
 	for item: String in ConstructionScript.RECIPES:
 		if item == "launcher_2": continue # Only obtained by fusing two level-one weapons.

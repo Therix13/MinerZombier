@@ -26,7 +26,7 @@ func run_checks() -> void:
 		peak = maxi(peak, sample)
 		energy += float(sample) * sample
 	check(peak > 1000 and peak < 31000 and energy > 0, "Generated score contains audible PCM with clipping headroom")
-	check(rhythm.voices.size() == 12 and rhythm.sounds.size() == 7, "The effect pool and seven distinct tool sounds are available")
+	check(rhythm.voices.size() == 12 and rhythm.sounds.size() == 10, "The effect pool and ten distinct tool and weapon sounds are available")
 	rhythm.set_process(false)
 	rhythm.pending.clear()
 	var c := Vector2i(14, 2)

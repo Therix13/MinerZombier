@@ -5,6 +5,10 @@ signal completed(cell: Vector2i)
 
 const ArtAtlas = preload("res://Scripts/art_atlas.gd")
 const RECIPES := {
+	"pistol":{"iron_ingot_2":1,"copper_ingot_3":1},
+	"grenadier":{"iron_ingot_3":1,"copper_ingot_3":2},
+	"rocketeer":{"gold_ingot_3":1,"iron_ingot_4":1},
+	"tesla":{"tungsten_ingot_3":1,"copper_ingot_4":1},
 	"launcher_2": {"copper_ingot_3": 1, "copper_ingot": 1},
 	"saw": {"iron_3": 1, "iron": 1},
 	"furnace": {"coal_4": 2},
@@ -81,7 +85,7 @@ func recipe_text(item: String) -> String:
 	if not has_recipe(item): return ""
 	var text: String = "Plano: entrega materiales para construir."
 	for material: String in RECIPES[item]:
-		text += "\n%d × %s" % [RECIPES[item][material], game.get("shop").RESOURCE_LABELS.get(material, material)]
+		text += "\n%d × %s" % [RECIPES[item][material], game.get("shop").RESOURCE_LABELS.get(material,preload("res://Scripts/content_catalog.gd").label(material))]
 	return text
 
 func cancel(cell: Vector2i) -> bool:
@@ -132,7 +136,10 @@ func draw_plan(center: Vector2, data: Dictionary) -> void:
 	var key: String = "%s:%d" % [item, direction]
 	if item == "furnace": key = "furnace:%d:0" % direction
 	elif item in ["straight", "corner_right", "corner_left", "junction"]: key = "belt:%s:%d" % [item,direction]
-	if item == "filter":
+	if preload("res://Scripts/content_catalog.gd").WEAPONS.has(item):
+		preload("res://Scripts/content_art.gd").weapon(self,center,{"weapon":item,"ammo":[]})
+		draw_rect(rect,Color("#4d9bde88"))
+	elif item == "filter":
 		preload("res://Scripts/filter_belt_art.gd").draw(self,center,direction)
 		draw_rect(rect,Color("#4d9bde88"))
 	elif item == "launcher_2":

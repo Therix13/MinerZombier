@@ -40,6 +40,7 @@ var night_victory_shade: ColorRect
 var night_victory_center: CenterContainer
 var night_victory_continue_button: Button
 
+var campaign: CanvasLayer
 var phase_clock: Control
 var placement_paid: bool = false
 var placing_coal: bool = false
@@ -131,6 +132,9 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(update_display_layout)
 	update_display_layout()
 	redraw_world()
+	campaign = preload("res://Scripts/campaign_manager.gd").new()
+	campaign.name = "Campaign"
+	add_child(campaign)
 	var saves := SaveScript.new()
 	saves.name = "SaveGame"
 	add_child(saves)
@@ -508,6 +512,7 @@ func on_wave_completed() -> void:
 	if not cycle.is_night:
 		return
 	var completed_night: int = cycle.day
+	if campaign != null: campaign.finish_night(completed_night)
 	progression.record_night_completed(completed_night)
 	cycle.complete_night()
 	var guide: Node = get_node_or_null("TutorialGuide")

@@ -10,8 +10,13 @@ signal vein_placed(cell: Vector2i)
 
 const COAL_CLICKS := 5
 const COPPER_CLICKS := 7
-const ORE_KINDS := ["coal", "copper", "coal_2", "copper_2", "coal_3", "copper_3", "coal_4", "copper_4", "copper_ingot", "copper_ingot_2", "copper_ingot_3", "copper_ingot_4", "iron", "iron_2", "iron_3", "iron_4", "iron_ingot", "iron_ingot_2", "iron_ingot_3", "iron_ingot_4", "gold", "gold_2", "gold_3", "gold_4", "gold_ingot", "gold_ingot_2", "gold_ingot_3", "gold_ingot_4"]
+const ORE_KINDS := ["coal", "copper", "coal_2", "copper_2", "coal_3", "copper_3", "coal_4", "copper_4", "copper_ingot", "copper_ingot_2", "copper_ingot_3", "copper_ingot_4", "iron", "iron_2", "iron_3", "iron_4", "iron_ingot", "iron_ingot_2", "iron_ingot_3", "iron_ingot_4", "gold", "gold_2", "gold_3", "gold_4", "gold_ingot", "gold_ingot_2", "gold_ingot_3", "gold_ingot_4", "nitrate", "nitrate_2", "nitrate_3", "nitrate_4", "sulfur", "sulfur_2", "sulfur_3", "sulfur_4", "tungsten", "tungsten_2", "tungsten_3", "tungsten_4", "tungsten_ingot", "tungsten_ingot_2", "tungsten_ingot_3", "tungsten_ingot_4", "powder", "bullet", "grenade", "rocket", "battery"]
+const VEIN_KINDS := ["coal", "copper", "iron", "gold", "nitrate", "sulfur", "tungsten"]
+const EXTRA_KINDS := ["nitrate", "nitrate_2", "nitrate_3", "nitrate_4", "sulfur", "sulfur_2", "sulfur_3", "sulfur_4", "tungsten", "tungsten_2", "tungsten_3", "tungsten_4", "tungsten_ingot", "tungsten_ingot_2", "tungsten_ingot_3", "tungsten_ingot_4", "powder", "bullet", "grenade", "rocket", "battery"]
 const DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
+
+var extra_veins: Dictionary = {"nitrate":{},"sulfur":{},"tungsten":{}}
+var extra_items: Dictionary = {}
 
 var launchers: RefCounted
 var drills: RefCounted
@@ -41,6 +46,7 @@ var ingots: Dictionary = {"copper_ingot": {}, "copper_ingot_2": {}, "copper_ingo
 
 func setup(grid_manager: RefCounted) -> void:
 	grid = grid_manager
+	for kind: String in EXTRA_KINDS: extra_items[kind] = {}
 	drop_random.randomize()
 
 func dispose() -> void:
@@ -60,9 +66,12 @@ func vein_at(cell: Vector2i) -> String:
 		return "copper"
 	if iron_veins.has(cell): return "iron"
 	if gold_veins.has(cell): return "gold"
+	for material: String in extra_veins:
+		if extra_veins[material].has(cell): return material
 	return ""
 
 func veins_for(kind: String) -> Dictionary:
+	if extra_veins.has(kind): return extra_veins[kind]
 	return gold_veins if kind == "gold" else (iron_veins if kind == "iron" else (copper_veins if kind == "copper" else coal_veins))
 
 func vein_level(cell: Vector2i) -> int:
@@ -104,6 +113,7 @@ func nugget_stores() -> Dictionary:
 
 	result.merge(iron_items)
 	result.merge(gold_items)
+	result.merge(extra_items)
 	return result
 
 func items_for(kind: String) -> Dictionary:
@@ -120,7 +130,8 @@ func next_tier(kind: String) -> String:
 	if kind not in ORE_KINDS or ore_level(kind) >= 4: return ""
 	var level: int = ore_level(kind)
 	var base: String = kind.trim_suffix("_%d" % level) if level > 1 else kind
-	return base + "_" + str(level + 1)
+	var next: String = base + "_" + str(level + 1)
+	return next if next in ORE_KINDS else ""
 
 func can_fuse(source: Vector2i, destination: Vector2i) -> bool:
 	var kind: String = nugget_type(source)
@@ -172,7 +183,7 @@ func place_vein(cell: Vector2i, direction: int, kind: String = "coal") -> bool:
 	return true
 
 func hardness(kind: String) -> int:
-	return {"coal": COAL_CLICKS, "copper": COPPER_CLICKS, "iron": 9, "gold": 11}.get(kind, COAL_CLICKS)
+	return {"coal": COAL_CLICKS, "copper": COPPER_CLICKS, "iron": 9, "gold": 11,"nitrate":7,"sulfur":7,"tungsten":12}.get(kind, COAL_CLICKS)
 
 func mine(cell: Vector2i) -> bool:
 	var kind: String = vein_at(cell)

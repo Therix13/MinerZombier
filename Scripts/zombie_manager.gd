@@ -3,6 +3,8 @@ extends Node2D
 signal base_health_changed(health: float, max_health: float)
 signal wave_completed
 signal base_destroyed
+signal enemy_killed(kind: String)
+signal wave_started
 signal zombie_defeated
 
 const ZombieScript = preload("res://Scripts/zombie.gd")
@@ -47,6 +49,18 @@ func wave_size(day: int) -> int:
 	return mini(MAX_WAVE_ZOMBIES,FIRST_WAVE_ZOMBIES + maxi(0,day - 1) * EXTRA_ZOMBIES_PER_DAY)
 
 func archetype_for(day: int, index: int, total: int) -> String:
+	if day >= 81 and day % 5 == 0 and index == total / 2: return "broodmother" if day % 10 == 0 else "warden"
+	if day >= 601 and day % 5 == 0 and index == total / 3: return "executor"
+	if day >= 361 and index % 9 == 4: return "berserker"
+	if day >= 181 and index % 14 == 7: return "healer" if index % 2 == 1 else "shielder"
+	if day >= 10 and day % 5 == 0 and index == 0: return ["warden","broodmother","executor","plague"][posmod(day / 5 - 2,4)]
+	if day >= 18 and index % 11 == 7: return "dodger"
+	if day >= 15 and index % 13 == 8: return "sapper"
+	if day >= 12 and index % 9 == 6: return "swarm"
+	if day >= 10 and index % 12 == 9: return "healer"
+	if day >= 8 and index % 10 == 5: return "shielder"
+	if day >= 6 and index % 8 == 5: return "stalker"
+	if day >= 21 and index % 15 == 3: return "berserker"
 	if day >= 5 and day % 5 == 0 and (index == 0 or (day >= 10 and index % 12 == 0)): return "plague"
 	if day >= 3 and day % 3 == 0 and index == total / 2: return "brute"
 	if day >= 8 and index % 8 == 6: return "brute"
@@ -61,7 +75,7 @@ func remaining_time() -> float:
 
 func announcement() -> String:
 	if wave_elapsed >= HORDE_DURATION: return "Elimina los zombis restantes para terminar la noche"
-	if wave_day >= 5 and wave_day % 5 == 0: return "Jefe: Rey de la Plaga · Ataca cuando baje el escudo"
+	if wave_day >= 5 and wave_day % 5 == 0: return "Jefe: %s · Ataca durante su vulnerabilidad" % ZombieScript.TYPES[archetype_for(wave_day,0,wave_total)]["name"]
 	if wave_day >= 3 and wave_day % 3 == 0: return "Minijefe: Demoledor · Vulnerable tras cargar"
 	if wave_day >= 6: return "Explosivos · Elimínalos antes de que detonen"
 	if wave_day >= 4: return "Escupidores · Interrumpe su ataque de ácido"
@@ -90,6 +104,7 @@ func start_wave(day: int) -> void:
 	acid_pools.clear()
 	active_wave = true
 	spawn_zombie()
+	wave_started.emit()
 
 func _process(delta: float) -> void:
 	if not active_wave: return
@@ -114,7 +129,13 @@ func _process(delta: float) -> void:
 func connect_zombie(zombie: Node) -> void:
 	zombie.base_attacked.connect(_on_base_attacked)
 	zombie.defeated.connect(zombie_defeated.emit)
+	zombie.defeated.connect(record_enemy_kill.bind(str(zombie.archetype)))
 	zombie.acid_spit.connect(launch_acid)
+	zombie.minions_requested.connect(spawn_minions)
+	zombie.sabotage.connect(sabotage_ammo)
+
+func record_enemy_kill(kind: String) -> void:
+	enemy_killed.emit(kind)
 
 func spawn_zombie() -> void:
 	if not active_wave or spawn_count >= wave_total: return
@@ -126,10 +147,27 @@ func spawn_zombie() -> void:
 	zombie.z_index = 20
 	zombie.setup(Vector2(center_x + side * (SPAWN_DISTANCE + lane),SPAWN_HEIGHT),Vector2(center_x + side * (45.0 + lane),ATTACK_LINE_Y))
 	zombie.configure(archetype_for(wave_day,spawn_count,wave_total))
+	if wave_day >= 21 and wave_day % 9 == 0: zombie.status["frenzy"] = true
+	if wave_day >= 21 and wave_day % 6 == 0: zombie.armor = minf(10,zombie.armor + 1.5)
 	connect_zombie(zombie)
 	add_child(zombie)
 	spawn_count += 1
 	spawn_from_left = not spawn_from_left
+
+func spawn_minions(origin: Vector2, count: int) -> void:
+	if not active_wave: return
+	for i in range(mini(count,MAX_ZOMBIES - living_zombies().size())):
+		var enemy: Node2D = ZombieScript.new()
+		enemy.setup(origin + Vector2(i * 15 - 8,-12),Vector2(origin.x,ATTACK_LINE_Y))
+		enemy.configure("crawler")
+		connect_zombie(enemy)
+		add_child(enemy)
+
+func sabotage_ammo() -> void:
+	var weapons: RefCounted = get_parent().launchers
+	for weapon: Dictionary in weapons.launchers.values():
+		if not weapon["ammo"].is_empty(): weapon["ammo"].pop_back()
+	weapons.changed.emit()
 
 func launch_acid(origin: Vector2, damage: float, volley: int) -> void:
 	if not active_wave: return

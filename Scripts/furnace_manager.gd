@@ -40,7 +40,7 @@ func place(cell: Vector2i, output_direction: int = 0) -> bool:
 
 func can_receive_state(data: Dictionary, kind: String) -> bool:
 	if FUEL_VALUES.has(kind): return int(data["fuel"]) < CAPACITY
-	return kind in ["copper_4", "iron_4", "gold_4"] and str(data.get("input", "")).is_empty() and str(data.get("output", "")).is_empty()
+	return kind in ["copper_4", "iron_4", "gold_4", "tungsten_4"] and str(data.get("input", "")).is_empty() and str(data.get("output", "")).is_empty()
 
 func can_receive(cell: Vector2i, kind: String) -> bool:
 	return machines.has(cell) and can_receive_state(machines[cell], kind)
@@ -96,7 +96,7 @@ func process_smelting(delta: float) -> void:
 			continue
 		if str(data.get("input", "")).is_empty(): continue
 		if not data.get("burning", false):
-			var cost: int = IRON_FUEL_COST if data["input"] == "iron_4" else FUEL_COST
+			var cost: int = IRON_FUEL_COST if data["input"] in ["iron_4","tungsten_4"] else FUEL_COST
 			if int(data["fuel"]) < cost: continue
 			data["fuel"] = int(data["fuel"]) - cost
 			data["burning"] = true

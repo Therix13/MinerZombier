@@ -210,6 +210,7 @@ func build_interface() -> void:
 	save_status.add_theme_font_size_override("font_size",14)
 	save_status.add_theme_color_override("font_color",Color("#bad4ab"))
 	pause_page.add_child(save_status)
+	save_status.hide()
 	quit_button = make_button("Guardar y Salir")
 	quit_button.pressed.connect(quit_game)
 	pause_page.add_child(quit_button)

@@ -34,13 +34,20 @@ const ANIMATION_TIME := 0.3
 const UNLOCK_FADE_SECONDS := 1.0
 const CATEGORIES := ["EXPANSION", "VETAS", "HERRAMIENTAS", "AUTOMATIZACIÓN", "DEFENSA"]
 const ITEM_CATEGORIES := {
-	"VETAS": ["coal", "copper", "iron", "gold"],
+	"VETAS": ["coal", "copper", "iron", "gold", "nitrate", "sulfur", "tungsten"],
 	"HERRAMIENTAS": ["drill", "compactor", "furnace", "saw"],
 	"AUTOMATIZACIÓN": ["straight", "corner_right", "corner_left", "junction", "filter"],
 }
-const RESOURCE_LABELS := {"gold": "ORO · NIVEL 1", "gold_2": "ORO · NIVEL 2", "gold_3": "ORO · NIVEL 3", "gold_4": "ORO · NIVEL 4", "gold_ingot": "LINGOTE DE ORO · NIVEL 1", "gold_ingot_2": "LINGOTE DE ORO · NIVEL 2", "gold_ingot_3": "LINGOTE DE ORO · NIVEL 3", "gold_ingot_4": "LINGOTE DE ORO · NIVEL 4","iron": "HIERRO · NIVEL 1", "iron_2": "HIERRO · NIVEL 2", "iron_3": "HIERRO · NIVEL 3", "iron_4": "HIERRO · NIVEL 4", "iron_ingot": "LINGOTE DE HIERRO · NIVEL 1", "iron_ingot_2": "LINGOTE DE HIERRO · NIVEL 2", "iron_ingot_3": "LINGOTE DE HIERRO · NIVEL 3", "iron_ingot_4": "LINGOTE DE HIERRO · NIVEL 4", "coal": "CARBÓN · NIVEL 1", "copper": "COBRE · NIVEL 1", "coal_2": "CARBÓN · NIVEL 2", "copper_2": "COBRE · NIVEL 2", "coal_3": "CARBÓN · NIVEL 3", "copper_3": "COBRE · NIVEL 3", "coal_4": "CARBÓN · NIVEL 4", "copper_4": "COBRE · NIVEL 4", "copper_ingot": "LINGOTE DE COBRE · NIVEL 1", "copper_ingot_2": "LINGOTE DE COBRE · NIVEL 2", "copper_ingot_3": "LINGOTE DE COBRE · NIVEL 3", "copper_ingot_4": "LINGOTE DE COBRE · NIVEL 4"}
+const RESOURCE_LABELS := {"nitrate": "Nitrato de potasio · Nv. 1", "nitrate_2": "Nitrato de potasio · Nv. 2", "nitrate_3": "Nitrato de potasio · Nv. 3", "nitrate_4": "Nitrato de potasio · Nv. 4", "sulfur": "Azufre · Nv. 1", "sulfur_2": "Azufre · Nv. 2", "sulfur_3": "Azufre · Nv. 3", "sulfur_4": "Azufre · Nv. 4", "tungsten": "Wolframio · Nv. 1", "tungsten_2": "Wolframio · Nv. 2", "tungsten_3": "Wolframio · Nv. 3", "tungsten_4": "Wolframio · Nv. 4", "tungsten_ingot": "Lingote de wolframio · Nv. 1", "tungsten_ingot_2": "Lingote de wolframio · Nv. 2", "tungsten_ingot_3": "Lingote de wolframio · Nv. 3", "tungsten_ingot_4": "Lingote de wolframio · Nv. 4", "powder": "Pólvora", "bullet": "Balas", "grenade": "Granadas", "rocket": "Cohetes", "battery": "Celdas eléctricas","gold": "ORO · NIVEL 1", "gold_2": "ORO · NIVEL 2", "gold_3": "ORO · NIVEL 3", "gold_4": "ORO · NIVEL 4", "gold_ingot": "LINGOTE DE ORO · NIVEL 1", "gold_ingot_2": "LINGOTE DE ORO · NIVEL 2", "gold_ingot_3": "LINGOTE DE ORO · NIVEL 3", "gold_ingot_4": "LINGOTE DE ORO · NIVEL 4","iron": "HIERRO · NIVEL 1", "iron_2": "HIERRO · NIVEL 2", "iron_3": "HIERRO · NIVEL 3", "iron_4": "HIERRO · NIVEL 4", "iron_ingot": "LINGOTE DE HIERRO · NIVEL 1", "iron_ingot_2": "LINGOTE DE HIERRO · NIVEL 2", "iron_ingot_3": "LINGOTE DE HIERRO · NIVEL 3", "iron_ingot_4": "LINGOTE DE HIERRO · NIVEL 4", "coal": "CARBÓN · NIVEL 1", "copper": "COBRE · NIVEL 1", "coal_2": "CARBÓN · NIVEL 2", "copper_2": "COBRE · NIVEL 2", "coal_3": "CARBÓN · NIVEL 3", "copper_3": "COBRE · NIVEL 3", "coal_4": "CARBÓN · NIVEL 4", "copper_4": "COBRE · NIVEL 4", "copper_ingot": "LINGOTE DE COBRE · NIVEL 1", "copper_ingot_2": "LINGOTE DE COBRE · NIVEL 2", "copper_ingot_3": "LINGOTE DE COBRE · NIVEL 3", "copper_ingot_4": "LINGOTE DE COBRE · NIVEL 4"}
 const CATEGORY_ART := {"EXPANSION": "expansion", "VETAS": "coal", "HERRAMIENTAS": "drill", "AUTOMATIZACIÓN": "junction", "DEFENSA": "launcher", "RECURSOS": "resources"}
 const UNLOCK_VIEW := {
+	"nitrate":["nitrate","Nitrato de potasio","Fabricación de pólvora"],
+	"sulfur":["sulfur","Azufre","Explosivos"],
+	"tungsten":["tungsten","Wolframio","Tecnología avanzada"],
+	"pistol":["pistol","Torreta de pistolas","Balas"],
+	"grenadier":["grenadier","Lanzagranadas","Daño de área"],
+	"rocketeer":["rocketeer","Lanzacohetes","Explosiones pesadas"],
+	"tesla":["tesla","Torreta Tesla","Control de masas"],
 	"expansion": ["expansion", "Expansión", "Amplía tu mina"],
 	"copper": ["copper", "Cobre", "Nueva veta"],
 	"iron": ["iron", "Hierro", "Nueva veta"],
@@ -262,7 +269,7 @@ func update_progression() -> void:
 
 func visible_shop_items(category: String = "") -> Array[String]:
 	var result: Array[String] = []
-	for item: String in ["coal", "copper", "iron", "gold", "straight", "corner_right", "corner_left", "junction", "filter", "drill", "compactor", "furnace", "saw"]:
+	for item: String in ["coal", "copper", "iron", "gold", "nitrate", "sulfur", "tungsten", "straight", "corner_right", "corner_left", "junction", "filter", "drill", "compactor", "furnace", "saw"]:
 		if not category.is_empty() and item not in ITEM_CATEGORIES.get(category, []): continue
 		if progression == null or progression.is_item_unlocked(item): result.append(item)
 	return result
@@ -959,6 +966,8 @@ func open_category(category: String) -> void:
 			add_item_button("VETA DE COBRE", economy.COPPER_VEIN_PRICE, "copper", copper_vein_requested)
 			add_item_button("VETA DE HIERRO", economy.IRON_VEIN_PRICE, "iron", coal_vein_requested)
 			add_item_button("VETA DE ORO", economy.GOLD_VEIN_PRICE, "gold", coal_vein_requested)
+			for material: String in preload("res://Scripts/content_catalog.gd").VEIN_PRICES:
+				add_item_button(preload("res://Scripts/content_catalog.gd").MATERIALS[material],preload("res://Scripts/content_catalog.gd").VEIN_PRICES[material],material,coal_vein_requested)
 		"HERRAMIENTAS":
 			add_item_button("TALADRO AUTOMÁTICO · 200", economy.DRILL_PRICE, "drill", drill_requested)
 			add_item_button("COMPACTADOR · 300", CompactorScript.PRICE, "compactor", compactor_requested)
@@ -985,6 +994,9 @@ func open_category(category: String) -> void:
 			platforms_button.disabled = platforms_button.disabled or not tutorial_allows_item("defense_platforms")
 			purchase_buttons["defense_platforms"] = platforms_button
 			add_item_button("LANZAPEPITAS NV. 1 · 500", economy.LAUNCHER_PRICE, "launcher", launcher_requested)
+			for weapon: String in preload("res://Scripts/content_catalog.gd").WEAPONS:
+				var stats: Dictionary = preload("res://Scripts/content_catalog.gd").WEAPONS[weapon]
+				add_item_button(stats["name"],stats["price"],weapon,launcher_requested)
 	if cycle != null: update_cycle()
 
 func add_item_button(text: String, price: int, item: String, request: Signal) -> void:
@@ -1170,6 +1182,12 @@ class ItemArt extends "res://Scripts/world_renderer.gd":
 		launchers = preload("res://Scripts/potato_launcher_manager.gd").new()
 
 	func _draw() -> void:
+		if preload("res://Scripts/content_catalog.gd").WEAPONS.has(kind):
+			preload("res://Scripts/content_art.gd").weapon(self,Vector2.ZERO,{"weapon":kind})
+			return
+		if preload("res://Scripts/content_catalog.gd").MATERIALS.has(kind):
+			preload("res://Scripts/content_art.gd").vein(self,Vector2.ZERO,kind,1,1)
+			return
 		match kind:
 			"saw": preload("res://Scripts/saw_manager.gd").draw_machine(self,Vector2.ZERO,{"direction":1})
 			"coal": draw_coal_vein(Vector2.ZERO, 1, 0, false)

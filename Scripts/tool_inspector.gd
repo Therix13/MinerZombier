@@ -53,7 +53,7 @@ func _ready() -> void:
 	column.add_child(status)
 	filter_selector = OptionButton.new()
 	filter_selector.custom_minimum_size.y = 38
-	for material: String in ["Carbón", "Cobre", "Hierro", "Oro"]: filter_selector.add_item(material)
+	for material: String in ["Carbón", "Cobre", "Hierro", "Oro", "Nitrato de potasio", "Azufre", "Wolframio", "Pólvora", "Balas", "Granadas", "Cohetes", "Celdas eléctricas"]: filter_selector.add_item(material)
 	filter_selector.item_selected.connect(func(index: int):
 		if kind == "belt": game.conveyors.set_filter(cell,game.conveyors.FILTER_MATERIALS[index])
 	)
@@ -161,6 +161,8 @@ func refresh() -> void:
 		"launcher":
 			var level: int = game.get("launchers").level_at(cell)
 			status.text = "Lanzapepitas · Nv. %d" % level
+			var weapon: String = game.launchers.launchers[cell].get("weapon","")
+			if not weapon.is_empty(): status.text = preload("res://Scripts/content_catalog.gd").WEAPONS[weapon]["name"] + "\nMunición: " + preload("res://Scripts/content_catalog.gd").LABELS[preload("res://Scripts/content_catalog.gd").WEAPONS[weapon]["ammo"]]
 			status.text += "\n%d / %d disparos · cada %.0f s" % [game.launchers.launchers[cell]["ammo"].size(),game.launchers.capacity_at(cell),game.launchers.interval_at(cell)]
 			if level == 1: status.text += " · Oxidado"
 			if not game.get("launchers").is_active_position(cell): status.text += " · Fuera de defensa"
