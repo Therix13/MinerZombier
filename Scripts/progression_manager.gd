@@ -63,6 +63,8 @@ func record_placed_vein(cell: Vector2i) -> void:
 		unlock_items(items)
 
 func restore_vein_milestones() -> void:
+	if created_resources.has("copper_ingot_3") or unlocked.has("straight"):
+		unlocked["filter"] = true
 	# Older saves did not track the first copper placement as a separate milestone.
 	if not mining.copper_veins.is_empty() or completed_veins.has("copper") or unlocked.has("iron") or unlocked.has("gold"):
 		unlocked["expansion"] = true

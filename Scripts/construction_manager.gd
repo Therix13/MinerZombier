@@ -12,6 +12,7 @@ const RECIPES := {
 	"corner_right": {"copper_ingot_3": 1},
 	"corner_left": {"copper_ingot_3": 1},
 	"junction": {"copper_ingot_3": 1},
+	"filter": {"copper_ingot_3": 1},
 	"compactor": {"iron_ingot_4": 1, "iron_ingot": 2},
 	"drill": {"copper_ingot_3": 2, "copper_ingot": 2},
 }
@@ -131,7 +132,10 @@ func draw_plan(center: Vector2, data: Dictionary) -> void:
 	var key: String = "%s:%d" % [item, direction]
 	if item == "furnace": key = "furnace:%d:0" % direction
 	elif item in ["straight", "corner_right", "corner_left", "junction"]: key = "belt:%s:%d" % [item,direction]
-	if item == "launcher_2":
+	if item == "filter":
+		preload("res://Scripts/filter_belt_art.gd").draw(self,center,direction)
+		draw_rect(rect,Color("#4d9bde88"))
+	elif item == "launcher_2":
 		game.get("renderer").draw_launcher_on(self, center, {"ammo": [], "level": 2}, true)
 		draw_rect(rect,Color("#4d9bde88"))
 	elif item == "saw":

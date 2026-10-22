@@ -320,7 +320,7 @@ func item_price(item: String) -> int:
 		"copper": return economy.COPPER_VEIN_PRICE
 		"iron": return economy.IRON_VEIN_PRICE
 		"gold": return economy.GOLD_VEIN_PRICE
-		"straight", "corner_right", "corner_left", "junction": return economy.CONVEYOR_PRICE
+		"straight", "corner_right", "corner_left", "junction", "filter": return economy.CONVEYOR_PRICE
 		"drill": return economy.DRILL_PRICE
 		"launcher": return economy.LAUNCHER_PRICE
 		"compactor": return game.get_node("Compactors").PRICE
@@ -331,7 +331,7 @@ func item_price(item: String) -> int:
 func select_item(item: String) -> bool:
 	var cycle: RefCounted = game.get("cycle")
 	var shop: Control = game.get("shop")
-	var action: String = "buy_conveyor" if item in ["straight", "corner_right", "corner_left", "junction"] else "buy_" + item
+	var action: String = "buy_conveyor" if item in ["straight", "corner_right", "corner_left", "junction", "filter"] else "buy_" + item
 	if get_tree().paused or cycle.defeated or not cycle.allows_action(action) or not shop.tutorial_allows_item(item) or not game.get("progression").is_item_unlocked(item): return false
 	var price: int = item_price(item)
 	if price < 0 or not game.get("economy").can_afford(price): return false
@@ -347,7 +347,7 @@ func select_item(item: String) -> bool:
 			game.set("placement_direction", 0)
 		"coal": game.set("placing_coal", true)
 		"copper": game.set("placing_copper", true)
-		"straight", "corner_right", "corner_left", "junction":
+		"straight", "corner_right", "corner_left", "junction", "filter":
 			game.set("placing_belt", true)
 			game.set("belt_shape", item)
 		"drill": game.set("placing_drill", true)
@@ -401,7 +401,7 @@ func can_place_item(cell: Vector2i, item: String) -> bool:
 	var valid: bool = false
 	match item:
 		"coal", "copper", "iron", "gold": valid = game.get("mining").can_place_vein(cell) and not game.get("launchers").launchers.has(cell)
-		"straight", "corner_right", "corner_left", "junction": valid = game.get("conveyors").can_place(cell)
+		"straight", "corner_right", "corner_left", "junction", "filter": valid = game.get("conveyors").can_place(cell)
 		"drill": valid = game.get("drills").can_place(cell) and not game.get("launchers").launchers.has(cell)
 		"launcher", "launcher_2": valid = game.get("launchers").can_place(cell)
 		"compactor": valid = game.get_node("Compactors").can_place(cell)
@@ -413,7 +413,7 @@ func build_selected(cell: Vector2i, item: String, direction: int) -> void:
 	var cycle: RefCounted = game.get("cycle")
 	match item:
 		"coal", "copper", "iron", "gold": game.get("mining").place_vein(cell, direction, item)
-		"straight", "corner_right", "corner_left", "junction": game.get("conveyors").place(cell, direction, item)
+		"straight", "corner_right", "corner_left", "junction", "filter": game.get("conveyors").place(cell, direction, item)
 		"drill": game.get("drills").place(cell, direction)
 		"launcher":
 			game.get("launchers").place(cell)
@@ -499,7 +499,8 @@ func _input(event: InputEvent) -> void:
 			clear_drag()
 			get_viewport().set_input_as_handled()
 			return
-		if game.get("held_object_type") in ["blueprint", "compactor", "furnace", "launcher", "saw"] and phase_allows():
+		var filter_belt: bool = game.get("held_object_type") == "belt" and game.conveyors.belt_shape(game.get("held_object_cell")) == "filter"
+		if (filter_belt or game.get("held_object_type") in ["blueprint", "compactor", "furnace", "launcher", "saw"]) and phase_allows():
 			var tool_kind: String = game.get("held_object_type")
 			var at: Vector2i = game.get("held_object_cell")
 			clear_drag()

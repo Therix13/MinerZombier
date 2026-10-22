@@ -429,6 +429,9 @@ func draw_sale_cell() -> void:
 		draw_rect(rect, Color("#ffe6a2"), false, 2.0)
 
 func draw_conveyor(center: Vector2, direction_index: int, preview: bool, shape: String = "straight") -> void:
+	if shape == "filter":
+		preload("res://Scripts/filter_belt_art.gd").draw(self,center,direction_index)
+		return
 	if not rasterizing and not preview and ArtAtlas.paint(self, "belt:%s:%d" % ["corner_right" if shape == "corner" else shape, direction_index], center): return
 	var rect := Rect2(center - Vector2.ONE * grid.TILE_SIZE * 0.5, Vector2.ONE * grid.TILE_SIZE).grow(-3.0)
 	var base := Color("#59432c")

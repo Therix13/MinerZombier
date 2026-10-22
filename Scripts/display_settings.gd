@@ -23,8 +23,6 @@ var pause_page: VBoxContainer
 var settings_page: VBoxContainer
 var continue_button: Button
 var settings_button: Button
-var save_button: Button
-var title_button: Button
 var save_status: Label
 var quit_button: Button
 var apply_button: Button
@@ -207,20 +205,12 @@ func build_interface() -> void:
 	settings_button = make_button("AJUSTES")
 	settings_button.pressed.connect(open_settings)
 	pause_page.add_child(settings_button)
-	save_button = make_button("GUARDAR Y SALIR")
-	save_button.pressed.connect(func():
-		var saves: Node = get_parent().get_node_or_null("SaveGame")
-		if saves != null: saves.return_to_start()
-	)
-	pause_page.add_child(save_button)
-	save_button.tooltip_text = "Guarda tu partida y el inicio de cada día, y vuelve al menú principal."
-	title_button = save_button
 	save_status = Label.new()
 	save_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	save_status.add_theme_font_size_override("font_size",14)
 	save_status.add_theme_color_override("font_color",Color("#bad4ab"))
 	pause_page.add_child(save_status)
-	quit_button = make_button("GUARDAR Y CERRAR EL JUEGO")
+	quit_button = make_button("Guardar y Salir")
 	quit_button.pressed.connect(quit_game)
 	pause_page.add_child(quit_button)
 	settings_page = VBoxContainer.new()

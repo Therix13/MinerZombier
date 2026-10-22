@@ -56,7 +56,7 @@ func run_checks() -> void:
 	game.display_settings.open_menu()
 	make_fixture()
 	check(saves.valid_snapshot(saves.snapshot()),"Every active factory and partial blueprint can be serialized")
-	await click(game.display_settings.save_button)
+	saves.return_to_start()
 	check(game.display_settings.save_status.text == "Partida guardada.","Save and exit writes the save and confirms success")
 	original = saves.read_save()
 	check(original["coins"] == 4321 and original["grid"]["width"] == 7,"Saved money and mine expansion match the game")
@@ -247,7 +247,7 @@ func make_fixture() -> void:
 	game.get_node("Construction").receive(Vector2i(18,2),"iron_ingot")
 	game.mining.items_for("coal_4")[Vector2i(15,4)] = 1
 	game.mining.items_for("gold_ingot_4")[Vector2i(18,4)] = 1
-	game.progression.unlocked = {"expansion":true,"copper":true,"iron":true,"furnace":true,"launcher":true,"launcher_2":true,"straight":true}
+	game.progression.unlocked = {"expansion":true,"copper":true,"iron":true,"furnace":true,"launcher":true,"launcher_2":true,"straight":true,"filter":true}
 	game.progression.created_resources = {"coal_4":true,"copper_ingot_3":true}
 	game.progression.completed_veins = {"coal":true,"copper":true}
 	game.zombie_manager.base_health = 73

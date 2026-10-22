@@ -5,12 +5,14 @@ signal changed
 signal sale_completed(kind: String)
 
 const DIRECTIONS := [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
-const MOVE_INTERVAL := 4.0
+const MOVE_INTERVAL := 2.0
 const STRAIGHT := "straight"
 const CORNER := "corner"
 const CORNER_RIGHT := "corner_right"
 const CORNER_LEFT := "corner_left"
 const JUNCTION := "junction"
+const FILTER := "filter"
+const FILTER_MATERIALS := ["coal", "copper", "iron", "gold"]
 
 var grid: RefCounted
 var mining: RefCounted
@@ -52,6 +54,7 @@ func place(cell: Vector2i, direction: int, shape: String = STRAIGHT) -> bool:
 	if not grid.owned_tiles.has(cell) or not can_place(cell):
 		return false
 	belts[cell] = {"direction": posmod(direction, 4), "shape": shape}
+	if shape == FILTER: belts[cell]["filter"] = "coal"
 	changed.emit()
 	return true
 
@@ -60,11 +63,12 @@ func move(source: Vector2i, destination: Vector2i, direction: int) -> bool:
 		return false
 	if source != destination and not can_place(destination):
 		return false
-	var shape: String = belt_shape(source)
+	var data: Dictionary = belt_data(source).duplicate(true)
 	var previous_entry: int = int(last_junction_entry.get(source, -1))
 	belts.erase(source)
 	last_junction_entry.erase(source)
-	belts[destination] = {"direction": posmod(direction, 4), "shape": shape}
+	data["direction"] = posmod(direction,4)
+	belts[destination] = data
 	if destination == source and previous_entry >= 0:
 		last_junction_entry[destination] = previous_entry
 	changed.emit()
@@ -84,7 +88,7 @@ func accepts_from(destination: Vector2i, source: Vector2i) -> bool:
 	var index: int = input_index(destination, source)
 	var shape: String = belt_shape(destination)
 	match shape:
-		STRAIGHT:
+		STRAIGHT, FILTER:
 			return index == 2
 		CORNER, CORNER_RIGHT:
 			return index == 3
@@ -93,6 +97,18 @@ func accepts_from(destination: Vector2i, source: Vector2i) -> bool:
 		JUNCTION:
 			return index == 1 or index == 2 or index == 3
 	return false
+
+func set_filter(cell: Vector2i, material: String) -> bool:
+	if belt_shape(cell) != FILTER or material not in FILTER_MATERIALS: return false
+	belts[cell]["filter"] = material
+	changed.emit()
+	return true
+
+func output_direction(cell: Vector2i, kind: String) -> int:
+	var direction: int = belt_direction(cell)
+	if belt_shape(cell) == FILTER and kind.get_slice("_",0) != belt_data(cell).get("filter","coal"):
+		return (direction + 1) % 4
+	return direction
 
 func advance(delta: float) -> void:
 	accumulator += delta
@@ -109,8 +125,8 @@ func tick() -> void:
 		var source: Vector2i = key
 		if mining.nuggets_at(source) == 0:
 			continue
-		var destination: Vector2i = source + DIRECTIONS[belt_direction(source)]
 		var kind: String = mining.nugget_type(source)
+		var destination: Vector2i = source + DIRECTIONS[output_direction(source,kind)]
 		if is_instance_valid(mining.construction) and mining.construction.can_receive(destination, kind):
 			construction_deliveries.append({"source": source, "destination": destination, "kind": kind})
 		elif mining.occupied_by_saw(destination) and mining.saws.can_receive(destination,kind):

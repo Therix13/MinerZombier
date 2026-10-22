@@ -423,7 +423,7 @@ func restore_snapshot(data: Dictionary) -> bool:
 	for kind: String in data["resources"]: replace_dictionary(game.mining.items_for(kind),data["resources"][kind])
 	replace_dictionary(game.conveyors.belts,data["belts"])
 	replace_dictionary(game.conveyors.last_junction_entry,data["junctions"])
-	game.conveyors.accumulator = data["belt_time"]
+	game.conveyors.accumulator = fmod(float(data["belt_time"]),game.conveyors.move_interval)
 	replace_dictionary(game.drills.drills,data["drills"])
 	game.drills.accumulator = data["drill_time"]
 	replace_dictionary(game.launchers.launchers,data["launchers"])
@@ -552,7 +552,8 @@ func valid_snapshot(data: Dictionary) -> bool:
 	for belt: Variant in data["belts"].values():
 		if belt is int:
 			if not number(belt,0,3): return false
-		elif not belt is Dictionary or not number(belt.get("direction"),0,3) or belt.get("shape") not in ["straight","corner","corner_right","corner_left","junction"]: return false
+		elif not belt is Dictionary or not number(belt.get("direction"),0,3) or belt.get("shape") not in ["straight","corner","corner_right","corner_left","junction","filter"]: return false
+		if belt is Dictionary and belt.get("shape") == "filter" and belt.get("filter","coal") not in game.conveyors.FILTER_MATERIALS: return false
 	for direction: Variant in data["drills"].values():
 		if not direction is int or not number(direction,0,3): return false
 	for entry: Variant in data["junctions"].values():

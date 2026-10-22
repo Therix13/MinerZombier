@@ -36,7 +36,7 @@ const CATEGORIES := ["EXPANSION", "VETAS", "HERRAMIENTAS", "AUTOMATIZACIÓN", "D
 const ITEM_CATEGORIES := {
 	"VETAS": ["coal", "copper", "iron", "gold"],
 	"HERRAMIENTAS": ["drill", "compactor", "furnace", "saw"],
-	"AUTOMATIZACIÓN": ["straight", "corner_right", "corner_left", "junction"],
+	"AUTOMATIZACIÓN": ["straight", "corner_right", "corner_left", "junction", "filter"],
 }
 const RESOURCE_LABELS := {"gold": "ORO · NIVEL 1", "gold_2": "ORO · NIVEL 2", "gold_3": "ORO · NIVEL 3", "gold_4": "ORO · NIVEL 4", "gold_ingot": "LINGOTE DE ORO · NIVEL 1", "gold_ingot_2": "LINGOTE DE ORO · NIVEL 2", "gold_ingot_3": "LINGOTE DE ORO · NIVEL 3", "gold_ingot_4": "LINGOTE DE ORO · NIVEL 4","iron": "HIERRO · NIVEL 1", "iron_2": "HIERRO · NIVEL 2", "iron_3": "HIERRO · NIVEL 3", "iron_4": "HIERRO · NIVEL 4", "iron_ingot": "LINGOTE DE HIERRO · NIVEL 1", "iron_ingot_2": "LINGOTE DE HIERRO · NIVEL 2", "iron_ingot_3": "LINGOTE DE HIERRO · NIVEL 3", "iron_ingot_4": "LINGOTE DE HIERRO · NIVEL 4", "coal": "CARBÓN · NIVEL 1", "copper": "COBRE · NIVEL 1", "coal_2": "CARBÓN · NIVEL 2", "copper_2": "COBRE · NIVEL 2", "coal_3": "CARBÓN · NIVEL 3", "copper_3": "COBRE · NIVEL 3", "coal_4": "CARBÓN · NIVEL 4", "copper_4": "COBRE · NIVEL 4", "copper_ingot": "LINGOTE DE COBRE · NIVEL 1", "copper_ingot_2": "LINGOTE DE COBRE · NIVEL 2", "copper_ingot_3": "LINGOTE DE COBRE · NIVEL 3", "copper_ingot_4": "LINGOTE DE COBRE · NIVEL 4"}
 const CATEGORY_ART := {"EXPANSION": "expansion", "VETAS": "coal", "HERRAMIENTAS": "drill", "AUTOMATIZACIÓN": "junction", "DEFENSA": "launcher", "RECURSOS": "resources"}
@@ -53,6 +53,7 @@ const UNLOCK_VIEW := {
 	"corner_right": ["corner_right", "Curva derecha", "Automatización"],
 	"corner_left": ["corner_left", "Curva izquierda", "Automatización"],
 	"junction": ["junction", "Unión en T", "Automatización"],
+	"filter": ["filter", "Filtrador", "Automatización"],
 	"launcher": ["launcher", "Lanzapepitas Nv. 1", "Oxidado · Sin materiales"],
 	"launcher_2": ["launcher_2", "Lanzapepitas Nv. 2", "Fusiona dos de Nv. 1"],
 }
@@ -261,7 +262,7 @@ func update_progression() -> void:
 
 func visible_shop_items(category: String = "") -> Array[String]:
 	var result: Array[String] = []
-	for item: String in ["coal", "copper", "iron", "gold", "straight", "corner_right", "corner_left", "junction", "drill", "compactor", "furnace", "saw"]:
+	for item: String in ["coal", "copper", "iron", "gold", "straight", "corner_right", "corner_left", "junction", "filter", "drill", "compactor", "furnace", "saw"]:
 		if not category.is_empty() and item not in ITEM_CATEGORIES.get(category, []): continue
 		if progression == null or progression.is_item_unlocked(item): result.append(item)
 	return result
@@ -686,7 +687,7 @@ func create_art_button(kind: String, description: String, price: int = -1) -> Bu
 		"expansion": "Ampliar base", "coal": "Carbón", "copper": "Cobre", "iron": "Hierro", "gold": "Oro",
 		"saw": "Sierra", "drill": "Taladro", "compactor": "Compactador", "furnace": "Horno", "straight": "Cinta recta",
 		"corner_right": "Cinta L derecha", "corner_left": "Cinta L izquierda",
-		"junction": "Cinta en T", "platform": "Plataformas", "launcher": "Lanzapepitas Nv. 1", "launcher_2": "Lanzapepitas Nv. 2",
+		"filter": "Filtrador", "junction": "Cinta en T", "platform": "Plataformas", "launcher": "Lanzapepitas Nv. 1", "launcher_2": "Lanzapepitas Nv. 2",
 		"ore:coal": "Carbón · Nv. 1", "ore:copper": "Cobre · Nv. 1",
 		"ore:coal_2": "Carbón · Nv. 2", "ore:copper_2": "Cobre · Nv. 2",
 		"ore:coal_3": "Carbón · Nv. 3", "ore:copper_3": "Cobre · Nv. 3",
@@ -968,6 +969,7 @@ func open_category(category: String) -> void:
 			add_item_button("CINTA EN L DERECHA · 50", economy.CONVEYOR_PRICE, "corner_right", corner_conveyor_requested)
 			add_item_button("CINTA EN L IZQUIERDA · 50", economy.CONVEYOR_PRICE, "corner_left", left_corner_conveyor_requested)
 			add_item_button("CINTA EN T · 50", economy.CONVEYOR_PRICE, "junction", junction_conveyor_requested)
+			add_item_button("FILTRADOR · 50", economy.CONVEYOR_PRICE, "filter", conveyor_requested)
 		"DEFENSA":
 			var left_cell: Vector2i = grid.defense_cell("left")
 			var right_cell: Vector2i = grid.defense_cell("right")
@@ -1016,6 +1018,7 @@ func refresh_item_buttons() -> void:
 		if construction != null and construction.has_recipe(item): button.tooltip_text += "\n" + construction.recipe_text(item)
 		if item == "compactor": button.tooltip_text += "\nAcumula 8 puntos para producir Nv. 4. Nv. 1/2/3/4: 1/2/4/8 puntos. Conserva el sobrante. Nv. 4: 1 s; otros: 4 s."
 		if item == "furnace": button.tooltip_text += "\nCarbón Nv. 1 / 2 / 3 / 4: aporta 1 / 3 / 8 / 20 de combustible. Capacidad: 40."
+		if item == "filter": button.tooltip_text += "\nClic para elegir material. Entrada trasera; material elegido al frente, resto a la derecha. Todos los niveles y lingotes. Avanza cada 2 segundos."
 		if item == "launcher": button.tooltip_text += "\nDispara solo en las plataformas de defensa. Munición: cualquier pepita. Nv. 1/2/3/4 carga 1/2/3/4 disparos. Debe caber la carga completa. Alcance: 300.\nMejora Nv. 2: se desbloquea al colocar dos Nv. 1 o superar la noche 2. Fusiona dos Nv. 1 para crear su plano. Sin materiales para Nv. 1."
 
 func unlock_defense_platforms() -> void:
@@ -1173,7 +1176,7 @@ class ItemArt extends "res://Scripts/world_renderer.gd":
 			"gold": draw_vein(Vector2.ZERO, "gold", {"level": 1, "direction": 1, "progress": 0})
 			"iron": draw_vein(Vector2.ZERO, "iron", {"level": 1, "direction": 1, "progress": 0})
 			"copper": draw_copper_vein(Vector2.ZERO, 1, 0, false)
-			"straight", "corner_right", "corner_left", "junction":
+			"straight", "corner_right", "corner_left", "junction", "filter":
 				draw_conveyor(Vector2.ZERO, 0, false, kind)
 			"drill": draw_drill(Vector2.ZERO, 0, false)
 			"launcher": draw_launcher(Vector2.ZERO, {"ammo": [], "level": 1, "angle": -PI * 0.5}, false)

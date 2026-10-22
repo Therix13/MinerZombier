@@ -26,8 +26,8 @@ func run_checks() -> void:
 	check(not FileAccess.file_exists(TEST_PATH) and saves.pending_days.size() == 3,"Three days remain in memory until the explicit save")
 	game.display_settings.open_menu()
 	await settle()
-	check(game.display_settings.save_button.text == "GUARDAR Y SALIR","Pause exposes the new Save and exit action")
-	await click(game.display_settings.save_button)
+	check(game.display_settings.quit_button.text == "Guardar y Salir","Pause exposes the new Save and exit action")
+	saves.return_to_start()
 	check(paused and not saves.playing and saves.start_screen.visible,"Save and exit pauses play and returns to the title")
 	check(saves.read_save()["coins"] == 999 and saves.read_save()["cycle"]["day_remaining"] == 123,"The latest slot preserves the exact mid-day state")
 	var id: String = saves.archive_id
@@ -51,7 +51,7 @@ func run_checks() -> void:
 	check(not game.cycle.is_night and game.cycle.day_remaining > 299 and game.cycle.day_remaining <= 300 and game.mining.coal_veins.size() == 1,"An archived day starts at 06:00 with its original mine")
 	check(saves.archive_id == id and saves.read_day(id,3)["coins"] == 333,"Loading an earlier day does not delete later archives")
 	game.economy.coins = 444
-	await click(game.display_settings.save_button)
+	saves.return_to_start()
 	check(saves.read_save()["coins"] == 444 and saves.read_save()["cycle"]["day"] == 2,"Saving after rewind replaces only the latest continuation")
 	check(saves.list_saves().size() == 4 and saves.read_day(id,2)["coins"] == 222,"Rewinding preserves the original morning and the complete day catalog")
 	await click(saves.start_screen.continue_button)

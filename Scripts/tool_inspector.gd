@@ -12,6 +12,7 @@ var last_contents: String = ""
 var withdraw_buttons: Dictionary = {}
 var withdrawal_blocked: bool = false
 var cancel_plan: Button
+var filter_selector: OptionButton
 
 func _ready() -> void:
 	game = get_parent() as Node2D
@@ -50,6 +51,14 @@ func _ready() -> void:
 	header.add_child(close)
 	status = game.get("shop").create_label("", 11, Color("#f0d5a4"))
 	column.add_child(status)
+	filter_selector = OptionButton.new()
+	filter_selector.custom_minimum_size.y = 38
+	for material: String in ["Carbón", "Cobre", "Hierro", "Oro"]: filter_selector.add_item(material)
+	filter_selector.item_selected.connect(func(index: int):
+		if kind == "belt": game.conveyors.set_filter(cell,game.conveyors.FILTER_MATERIALS[index])
+	)
+	column.add_child(filter_selector)
+	filter_selector.hide()
 	contents = GridContainer.new()
 	contents.columns = 2
 	contents.add_theme_constant_override("h_separation", 6)
@@ -82,8 +91,12 @@ func open_tool(tool_kind: String, at: Vector2i) -> void:
 	if get_tree().paused: return
 	kind = tool_kind
 	cell = at
+	if kind == "belt" and game.conveyors.belt_shape(cell) != "filter": return
 	if not exists(): return
 	heading.text = "CONSTRUCCIÓN" if kind == "blueprint" else "CONTENIDO"
+	if kind == "belt": heading.text = "FILTRADOR"
+	filter_selector.visible = kind == "belt"
+	contents.visible = kind != "belt"
 	cancel_plan.visible = kind == "blueprint"
 	last_contents = ""
 	withdrawal_blocked = false
@@ -114,6 +127,13 @@ func inventory() -> Dictionary:
 func refresh() -> void:
 	if not exists():
 		close_inspector()
+		return
+	if kind == "belt":
+		if game.conveyors.belt_shape(cell) != "filter":
+			close_inspector()
+			return
+		filter_selector.select(game.conveyors.FILTER_MATERIALS.find(game.conveyors.belt_data(cell).get("filter","coal")))
+		status.text = "Entrada: atrás.\nMaterial elegido: al frente.\nResto: a la derecha.\nPepitas y lingotes · Todos los niveles."
 		return
 	cancel_plan.disabled = game.get("cycle").is_night
 	var items: Dictionary = inventory()
