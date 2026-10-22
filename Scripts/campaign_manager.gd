@@ -330,7 +330,7 @@ func show_tab(tab: String) -> void:
 				page.add_child(row)
 				var preview := EnemyPreview.new()
 				preview.archetype = enemy
-				preview.custom_minimum_size = Vector2(85,110)
+				preview.custom_minimum_size = Vector2(120,140)
 				row.add_child(preview)
 				var descriptions := VBoxContainer.new()
 				descriptions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -369,7 +369,8 @@ class EnemyPreview extends Control:
 		clip_contents = true
 		model = preload("res://Scripts/zombie.gd").new()
 		model.configure(archetype)
-		model.position = Vector2(42,58)
+		model.position = Vector2(60,72)
+		model.scale = Vector2.ONE*1.9
 		add_child(model)
 		model.remove_from_group("zombies")
 		model.set_process(false)

@@ -56,7 +56,7 @@ El balance es una base inicial reproducible. Aún requiere pruebas humanas de ec
 
 ## Renovación visual y progresión por fusiones
 
-El mundo, recursos, maquinaria, torretas, enemigos, menús y escenas usan ahora una dirección 2D vectorial minimalista: pizarra azul, turquesa para actividad y cobre para calor/armamento. Los iconos SVG se rasterizan a 4× con mipmaps y filtrado lineal; el juego ya no utiliza el atlas de pixel art. Las formas, niveles y salidas distinguen funciones sin depender sólo del color. El terreno conserva su caché de dibujo.
+La presentación actual usa ilustración pintada: roca húmeda, acero gastado, cobre cálido e infección cian. Cinco láminas originales aportan escenarios, máquinas, minerales, componentes y seis siluetas de infectados reutilizadas por los dieciocho arquetipos. Los PNG conservan su resolución y transparencia, con mipmaps y filtrado lineal. Las señales de dirección, niveles e interfaz siguen siendo gráficos nítidos. El terreno mantiene su caché de dibujo. Véase `Art/README.md`.
 
 ### Excavación completa
 
@@ -103,6 +103,6 @@ Dos nuevas piezas de logística: **Distribuidor**, plano 150 y dos lingotes de c
 
 ### Historia
 
-Siete escenas de movimiento vectorial cuentan la historia del Sector 07, Mara e Ivo: inicio, industria, cuatro primeras derrotas de jefes y epílogo desde la noche 600. Las escenas de Carcelero, Rey de la Plaga, Madre de la Colmena y Ejecutor tienen siluetas y animaciones de derrota propias. Pausan el combate, aparecen y desaparecen en un segundo y se cierran con Continuar, Enter, Espacio o Escape. No otorgan recompensas repetibles. Los archivos descubiertos persisten y pueden reproducirse desde Historia. Son escenas 2D con texto, sin doblaje.
+La apertura anterior se sustituye por una secuencia de 32 segundos en cuatro planos pintados: descubrimiento de una colonia subterránea, fallo de contención del Protocolo Lázaro y contaminación de la ventilación, evacuación de Mara e Ivo y refugio en una mina con aire independiente, agua y generador. Se puede avanzar cada plano o saltar la introducción. Historia permite reproducirla completa. Industria, cuatro primeras derrotas de jefes y epílogo desde la noche 600 continúan esta historia con el mismo escenario cinematográfico. Las escenas de Carcelero, Rey de la Plaga, Madre de la Colmena y Ejecutor tienen siluetas y animaciones de derrota propias. Pausan el combate, aparecen y desaparecen en un segundo y se cierran con Continuar, Enter, Espacio o Escape. No otorgan recompensas repetibles. Los archivos descubiertos persisten y pueden reproducirse desde Historia. Son escenas 2D con texto, cámara en movimiento, partículas, etalonaje y animaciones de derrota; no son vídeos prerenderizados ni tienen doblaje. La apertura incorpora música ambiental original sintetizada. Los infectados tienen movimiento de marcha, impactos y disolución al morir; las torretas retroceso y fogonazos; sierras y compactadores piezas animadas. Los hornos usan halos aditivos para evitar multiplicar los pases de iluminación de toda la fábrica.
 
 Hay **55 logros**, incluidos los doce hitos de munición/armas y tres hitos de fusión de herramientas. Las compras y tecnologías ya obtenidas en partidas antiguas se conservan.

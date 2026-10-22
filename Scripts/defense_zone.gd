@@ -21,17 +21,18 @@ func set_night(enabled: bool) -> void:
 func _draw() -> void:
 	if grid == null: return
 	var center: float = grid.get_cell_rect(grid.sale_cell).get_center().x
-	draw_rect(Rect2(-8192,-8192,18000,18000),Color("#142333") if is_night else Color("#203746"))
-	var corridor := PackedVector2Array([Vector2(center-550,-1600),Vector2(center+550,-1600),Vector2(center+125,0),Vector2(center-125,0)])
-	draw_colored_polygon(corridor,Color("#203247") if is_night else Color("#304957"))
-	for side in [-1,1]:
-		draw_line(Vector2(center+side*550,-1600),Vector2(center+side*125,0),Color("#40576a"),2,true)
-		for y in range(-1200,0,120):
-			var x: float = center+side*(125-y*.265)
-			draw_circle(Vector2(x,y),2,Color("#6ee7ce"),true,-1,true)
-	draw_rect(Rect2(-8192,0,18000,grid.GRID_OFFSET_Y),Color("#34465b"))
-	for offset in [18,70,142]: draw_line(Vector2(-8192,offset),Vector2(9812,offset-30),Color("#3c5066"),2,true)
-	var brush := Scenery.Brush.new()
-	Scenery.entrance(brush,center,grid.GRID_OFFSET_Y)
+	draw_rect(Rect2(-8192,-8192,18000,18000),Color("#151d24"))
 	meshes.clear()
-	meshes.append(brush.flush(self))
+	meshes.append(Scenery.field(self,Rect2(-1024,-1792,3488,1792),2,Color(.6,.75,.87) if is_night else Color(.9,.93,.96)))
+	var path := PackedVector2Array([Vector2(center-550,-1600),Vector2(center+550,-1600),Vector2(center+125,0),Vector2(center-125,0)])
+	draw_colored_polygon(path,Color(.04,.07,.09,.18) if is_night else Color(.18,.14,.08,.12))
+	meshes.append(Scenery.field(self,Rect2(-1024,0,3488,grid.GRID_OFFSET_Y),3))
+	var art = preload("res://Scripts/painted_assets.gd")
+	var portal := Rect2(center-174,-12,348,232)
+	art.draw(self,art.environment(0),portal)
+	for side in [-1,1]:
+		for i in range(22):
+			var x: float = center+side*(174-i*1.7)
+			draw_line(Vector2(x,-12),Vector2(x,220),Color(.08,.11,.14,.55*(1-float(i)/22)),2)
+		var at := Vector2(center+side*80,126)
+		for r in range(6,45,5): draw_circle(at,r,Color(1,.62,.25,.018),true,-1,true)

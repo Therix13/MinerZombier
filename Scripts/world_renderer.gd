@@ -52,7 +52,7 @@ func _draw() -> void:
 		ground_rebuilds += 1
 	for cell in grid.ammo_tiles:
 		var connector_rect: Rect2 = grid.get_cell_rect(cell)
-		draw_rect(connector_rect, Color("#6d6a54"))
+		preload("res://Scripts/painted_assets.gd").draw(self,preload("res://Scripts/painted_assets.gd").environment(2),connector_rect,Color(.8,.8,.75))
 		draw_rect(connector_rect.grow(-1.0), Color("#d1ad66"), false, 2.0)
 		var connector_center: Vector2 = connector_rect.get_center()
 		draw_circle(connector_center, 3.0, Color("#d1ad66"))

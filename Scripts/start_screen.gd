@@ -209,13 +209,13 @@ class MineBackdrop extends Control:
 		resized.connect(queue_redraw)
 
 	func _draw() -> void:
-		draw_rect(Rect2(Vector2.ZERO,size),Color("#101c2c"))
-		var center: Vector2 = size*.5
-		for i in range(9):
-			var extent := Vector2(260+i*55,160+i*42)
-			var points := PackedVector2Array([center+Vector2(-extent.x,extent.y),center+Vector2(-extent.x,-extent.y*.5),center+Vector2(-extent.x*.5,-extent.y),center+Vector2(extent.x*.5,-extent.y),center+Vector2(extent.x,-extent.y*.5),center+extent])
-			draw_polyline(points,Color("#24394e"),1,true)
-		for side in [-1,1]:
-			var x: float = center.x+side*300
-			draw_line(Vector2(x,80),Vector2(x,size.y-80),Color("#40586d"),1,true)
-			draw_line(Vector2(x,center.y-50),Vector2(x,center.y+50),Color("#6ee7ce"),3,true)
+		var art = preload("res://Scripts/painted_assets.gd")
+		var image: Texture2D = art.scene(3)
+		var factor: float = maxf(size.x/image.get_width(),size.y/image.get_height())
+		var dimensions: Vector2 = image.get_size()*factor
+		art.draw(self,image,Rect2((size-dimensions)*.5,dimensions))
+		draw_rect(Rect2(Vector2.ZERO,size),Color(.015,.025,.04,.55))
+		for i in range(40):
+			var x: float = float(i)/40*size.x
+			var distance: float = absf(x-size.x*.5)/(size.x*.5)
+			draw_rect(Rect2(x,0,size.x/40+1,size.y),Color(.01,.02,.03,distance*.35))

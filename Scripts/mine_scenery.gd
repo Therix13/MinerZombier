@@ -1,6 +1,6 @@
 extends RefCounted
 
-# Flat vector terrain is batched into retained meshes; no noise or pixel textures.
+# Painted terrain is batched into retained meshes with shared atlas UVs.
 const TILE := 48
 static var texture: ImageTexture
 static var builds: int = 0
@@ -25,10 +25,32 @@ static func mesh_from(vertices: PackedVector3Array, colors: PackedColorArray, in
 
 static func field(canvas: Node2D, bounds: Rect2, kind: int, tint := Color.WHITE) -> ArrayMesh:
 	prepare()
-	var brush := Brush.new()
-	var colors := [Color("#121d2d"),Color("#29394d"),Color("#1c2d3b"),Color("#34465b")]
-	brush.draw_rect(bounds,colors[clampi(kind,0,3)] * tint)
-	return brush.flush(canvas)
+	var image: Texture2D = preload("res://Scripts/painted_assets.gd").texture(preload("res://Scripts/painted_assets.gd").WORLD)
+	var index: int = [1,2,3,1][clampi(kind,0,3)]
+	var image_size: Vector2 = image.get_size()
+	var part_size: Vector2 = image_size/2
+	var part_origin := Vector2(index%2,index/2)*part_size
+	var tile := Vector2(256,170.6667)
+	var vertices := PackedVector3Array()
+	var colors := PackedColorArray()
+	var indices := PackedInt32Array()
+	var uvs := PackedVector2Array()
+	var value := Color(.58,.64,.68) if kind == 0 else Color(.78,.78,.74)
+	for y in range(floori(bounds.position.y/tile.y),ceili(bounds.end.y/tile.y)):
+		for x in range(floori(bounds.position.x/tile.x),ceili(bounds.end.x/tile.x)):
+			var raw := Rect2(Vector2(x,y)*tile,tile)
+			var cell: Rect2 = raw.intersection(bounds)
+			var first: int = vertices.size()
+			for corner: Vector2 in [Vector2.ZERO,Vector2.RIGHT,Vector2.ONE,Vector2.DOWN]:
+				var point: Vector2 = cell.position+cell.size*corner
+				vertices.append(Vector3(point.x,point.y,0))
+				colors.append(value*tint)
+				var uv: Vector2 = (point-raw.position)/tile
+				uvs.append((part_origin+Vector2.ONE+(part_size-Vector2.ONE*2)*uv)/image_size)
+			indices.append_array(PackedInt32Array([first,first+1,first+2,first,first+2,first+3]))
+	var mesh: ArrayMesh = mesh_from(vertices,colors,indices,uvs)
+	canvas.draw_mesh(mesh,image)
+	return mesh
 
 class Brush extends RefCounted:
 	var vertices := PackedVector3Array()

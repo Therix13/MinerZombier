@@ -210,6 +210,7 @@ func take_damage(amount: float) -> void:
 		remove_from_group("zombies")
 		set_process(false)
 		if archetype == "swarm": minions_requested.emit(position,2)
+		spawn_death_pose()
 		defeated.emit()
 		queue_free()
 	else:
@@ -235,25 +236,11 @@ func show_hit(amount: float) -> void:
 
 # All enemies share one small atlas, including every dismemberment/flash state.
 # Bobbing changes the sprite transform, rather than tessellating circles each frame.
-static var body_atlas: ImageTexture
+static var body_atlas: Texture2D
 const BODY_SIZE := Vector2i(128, 192)
 
-static func get_body_atlas() -> ImageTexture:
-	if body_atlas != null: return body_atlas
-	var image := Image.create(BODY_SIZE.x*8,BODY_SIZE.y*16,false,Image.FORMAT_RGBA8)
-	for state in range(128):
-		var stride: int = [-2,0,2,0][int(state/32)]
-		var body := '<ellipse cx="16" cy="37" rx="12" ry="3" fill="#0d1725" opacity=".35"/><rect x="8" y="19" width="16" height="16" rx="6" fill="#547c7b"/>'
-		if state & 4: body += '<path d="M12 32v%d" stroke="#354b60" stroke-width="5" stroke-linecap="round"/>' % (10+stride)
-		if state & 8: body += '<path d="M20 32v%d" stroke="#354b60" stroke-width="5" stroke-linecap="round"/>' % (10-stride)
-		if state & 1: body += '<path d="M8 24l-3 9" stroke="#a3c6b0" stroke-width="5" stroke-linecap="round"/>'
-		if state & 2: body += '<path d="M24 24l3 9" stroke="#a3c6b0" stroke-width="5" stroke-linecap="round"/>'
-		body += '<rect x="8" y="7" width="16" height="15" rx="7" fill="%s"/><path d="M11 14h3m4 0h3" stroke="#e9f4d0" stroke-width="2" stroke-linecap="round"/><path d="M14 19h4" stroke="#354b60" stroke-width="1.5" stroke-linecap="round"/>' % ("#f2d8cd" if state & 16 else "#a3c6b0")
-		var part := Image.new()
-		part.load_svg_from_string('<svg xmlns="http://www.w3.org/2000/svg" width="128" height="192" viewBox="0 0 32 48">'+body+'</svg>')
-		image.blit_rect(part,Rect2i(Vector2i.ZERO,BODY_SIZE),Vector2i(state%8,state/8)*BODY_SIZE)
-	image.generate_mipmaps()
-	body_atlas = ImageTexture.create_from_image(image)
+static func get_body_atlas() -> Texture2D:
+	if body_atlas == null: body_atlas = preload("res://Scripts/painted_assets.gd").texture(preload("res://Scripts/painted_assets.gd").INFECTED)
 	return body_atlas
 
 func body_state() -> int:
@@ -265,83 +252,56 @@ func create_body_sprite() -> void:
 	body_sprite.name = "BodySprite"
 	body_sprite.show_behind_parent = true
 	body_sprite.texture = get_body_atlas()
-	body_sprite.modulate = Color("#ffc68a") if archetype == "runner" else (Color("#b6ef85") if behavior() in ["spitter","plague"] else Color.WHITE)
-	var palettes := {"crawler":"#9baf88","stalker":"#a7b5cc","dodger":"#e5c19c","healer":"#b5e4c9","swarm":"#d1b78b","sapper":"#c6abc9","berserker":"#d4a693","warden":"#b2c8d8","executor":"#d6b69c"}
-	if palettes.has(archetype): body_sprite.modulate = Color(palettes[archetype])
 	body_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	body_sprite.region_enabled = true
-	body_sprite.scale = Vector2.ONE * 0.25
+	body_sprite.region_rect = preload("res://Scripts/painted_assets.gd").enemy_region(archetype)
+	body_sprite.scale = Vector2.ONE*(48.0/body_sprite.region_rect.size.y)
+	var material := ShaderMaterial.new()
+	material.shader = preload("res://Shaders/infected_motion.gdshader")
+	var bounds: Rect2 = body_sprite.region_rect
+	var sheet_size: Vector2 = get_body_atlas().get_size()
+	material.set_shader_parameter("frame",Vector4(bounds.position.x/sheet_size.x,bounds.position.y/sheet_size.y,bounds.size.x/sheet_size.x,bounds.size.y/sheet_size.y))
+	body_sprite.material = material
 	add_child(body_sprite)
 
 func update_visual() -> void:
 	if body_sprite == null:
 		queue_redraw()
 		return
-	var state: int = body_state() + (0 if attacking else posmod(int(walking_time * 2),4) * 32)
+	var material: ShaderMaterial = body_sprite.material
+	material.set_shader_parameter("gait",walking_time)
+	material.set_shader_parameter("walking",0.15 if attacking or phase in ["windup","exposed"] else 1.0)
+	material.set_shader_parameter("hurt",minf(1.0,hit_flash*6))
+	material.set_shader_parameter("limb_mask",Vector4(1 if "left_arm" in limbs else 0,1 if "right_arm" in limbs else 0,1 if "left_leg" in limbs else 0,1 if "right_leg" in limbs else 0))
 	if archetype == "stalker": modulate.a = 0.45 if position.y < -180 else 1.0
-	if state != last_body_state:
-		body_sprite.region_rect = Rect2(Vector2(Vector2i(state % 8, state / 8) * BODY_SIZE),Vector2(BODY_SIZE))
-		last_body_state = state
-	body_sprite.position = Vector2(0,4 + (0.0 if attacking else sin(walking_time) * 1.5))
+	var breathing: float = sin(float(Time.get_ticks_msec())*.002+get_instance_id()%17)*.007
+	var size: float = 48.0/body_sprite.region_rect.size.y
+	body_sprite.scale = Vector2(size*(1-breathing),size*(1+breathing))
+	body_sprite.position = Vector2(sin(walking_time)*.7 if not attacking else 0,3+(sin(walking_time*2)*.7 if not attacking else sin(hit_flash*18)*1.6))
+	body_sprite.rotation = sin(walking_time)*.018 if not attacking else sin(hit_flash*14)*.04
+	last_body_state = body_state()
+	queue_redraw()
 
 func _draw() -> void:
 	draw_archetype()
-	if body_sprite != null: return
-	var state: int = body_state()
-	var bob: float = 0.0 if attacking else sin(walking_time) * 1.5
-	var source := Rect2(Vector2(Vector2i(state % 8, state / 8) * BODY_SIZE), Vector2(BODY_SIZE))
-	draw_texture_rect_region(get_body_atlas(), Rect2(-16, -20 + bob, 32, 48), source)
+	if body_sprite == null: preload("res://Scripts/painted_assets.gd").draw(self,preload("res://Scripts/painted_assets.gd").enemy(archetype),Rect2(-24,-24,48,48))
 
 func draw_archetype() -> void:
 	if focused:
-		var marker_y: float = -65.0 if archetype in ["brute","plague","warden","broodmother","executor"] else -44.0
-		draw_colored_polygon(PackedVector2Array([Vector2(-5,marker_y),Vector2(5,marker_y),Vector2(0,marker_y + 6)]),Color("#ffe08a"))
+		draw_arc(Vector2(0,20),19,0,TAU,48,Color("#f1c98c"),1.3,true)
 	if archetype in ["healer","shielder"]:
-		draw_arc(Vector2(0,8),25,0,TAU,16,Color("#94d7b0") if archetype == "healer" else Color("#92b6df"),1)
-	if archetype == "swarm": draw_circle(Vector2(0,7),9,Color("#b88155"))
-	if archetype == "healer":
-		draw_rect(Rect2(-13,4,6,13),Color("#355b4b"))
-		draw_line(Vector2(-10,7),Vector2(-10,13),Color("#c5e8cc"),2)
-		draw_line(Vector2(-13,10),Vector2(-7,10),Color("#c5e8cc"),2)
-	if archetype == "dodger": draw_line(Vector2(-8,-15),Vector2(8,-15),Color("#cf7755"),3)
-	if archetype == "sapper":
-		draw_rect(Rect2(-9,12,18,4),Color("#735348"))
-		draw_line(Vector2(8,7),Vector2(13,16),Color("#a7c6cc"),3)
-	if archetype == "shielder":
-		draw_rect(Rect2(4,4,13,18),Color("#607c90"))
-		draw_rect(Rect2(6,6,9,14),Color("#b4c4cc"),false,2)
-	if archetype in ["warden","executor"]:
-		draw_line(Vector2(-14,4),Vector2(-14,24),Color("#82664b"),3)
-		draw_colored_polygon(PackedVector2Array([Vector2(-15,3),Vector2(-24,0),Vector2(-24,11),Vector2(-15,9)]),Color("#9eaeb8"))
-	if archetype == "broodmother":
-		for point: Vector2 in [Vector2(-9,12),Vector2(11,6),Vector2(5,16)]:
-			draw_circle(point,4,Color("#78923f"))
-			draw_circle(point + Vector2(-1,-1),2,Color("#d5e477"))
-	if armor > 0:
-		draw_rect(Rect2(-10,1,20,14),Color("#596b7b"))
-		draw_rect(Rect2(-10,1,20,14),Color("#d1d8dc"),false,1.5)
-		draw_rect(Rect2(-11,-17,22,6),Color("#8597a3"))
-	if archetype == "runner": draw_line(Vector2(-10,3),Vector2(10,7),Color("#e59a45"),4)
-	if behavior() in ["spitter","plague"]:
-		draw_circle(Vector2(8,9),6,Color("#4a7628"))
-		draw_circle(Vector2(8,8),3,Color("#bde458"))
-	if behavior() == "bomber":
-		draw_rect(Rect2(-9,4,18,12),Color("#a64b32"))
-		draw_line(Vector2(-5,7),Vector2(5,13),Color("#ffe293"),2)
-	if behavior() == "plague":
-		for x in [-7,0,7]: draw_rect(Rect2(x - 2,-24,4,7),Color("#d5b566"))
-		if phase != "exposed" and not retreating: draw_arc(Vector2.ZERO,21,PI,TAU,16,Color("#7ac8b5"),2)
+		draw_arc(Vector2(0,20),24,0,TAU,48,Color(.3,.75,.8,.35),1,true)
 	if phase == "windup":
-		var pulse: float = 0.65 + 0.35 * sin(ability_timer * 12)
-		draw_circle(Vector2(0,23),20,Color(0.95,0.32,0.16,0.16 * pulse))
-		draw_arc(Vector2(0,23),20,0,TAU,24,Color(1,0.55,0.22,pulse),2)
-		draw_string(ThemeDB.fallback_font,Vector2(-15,-28),"¡CARGA!" if behavior() == "brute" else ("¡BOOM!" if behavior() == "bomber" else "ÁCIDO"),HORIZONTAL_ALIGNMENT_LEFT,-1,9,Color("#ffca72"))
-	if phase == "exposed": draw_arc(Vector2.ZERO,20,0,TAU,24,Color("#f1df78"),2)
-	if archetype in ["brute","plague","warden","broodmother","executor"] or health < max_health:
-		draw_rect(Rect2(-18,-42,36,3),Color("#352d28"))
-		draw_rect(Rect2(-18,-42,36 * health / max_health,3),Color("#d79b60"))
-	if archetype in ["brute","plague","warden","broodmother","executor"]:
-		draw_string(ThemeDB.fallback_font,Vector2(-26,-48),str(TYPES[archetype]["name"]),HORIZONTAL_ALIGNMENT_LEFT,-1,8,Color("#f5d198"))
+		var pulse: float = .5+.5*sin(ability_timer*12)
+		draw_circle(Vector2(0,20),21,Color(1,.35,.1,.08+.08*pulse),true,-1,true)
+		draw_arc(Vector2(0,20),21,0,TAU,48,Color(1,.65,.3,.6+.4*pulse),1.5,true)
+		draw_string(ThemeDB.fallback_font,Vector2(-17,-29),"¡CARGA!" if behavior() == "brute" else ("¡BOOM!" if behavior() == "bomber" else "ÁCIDO"),HORIZONTAL_ALIGNMENT_LEFT,-1,8,Color("#f3cf98"))
+	if phase == "exposed": draw_arc(Vector2(0,20),21,0,TAU,48,Color("#e6d5a1"),1.5,true)
+	if health < max_health or archetype in ["plague","warden","broodmother","executor"]:
+		draw_line(Vector2(-17,-29),Vector2(17,-29),Color("#172027"),3,true)
+		draw_line(Vector2(-17,-29),Vector2(-17+34*health/max_health,-29),Color("#da9f6c"),2,true)
+	if archetype in ["plague","warden","broodmother","executor"]:
+		draw_string(ThemeDB.fallback_font,Vector2(-27,-36),str(TYPES[archetype]["name"]),HORIZONTAL_ALIGNMENT_LEFT,-1,7,Color("#f1c98c"))
 
 class HitEffect extends Node2D:
 	var amount: float
@@ -380,3 +340,20 @@ class HitEffect extends Node2D:
 			var color := Color("#849c66") if limb.ends_with("arm") else Color("#556d43")
 			color.a = clampf((2.5 - age) * 2, 0, 1)
 			draw_rect(Rect2(Vector2(-3, -6), Vector2(6, 12)), color)
+
+func spawn_death_pose() -> void:
+	if body_sprite == null or not is_inside_tree(): return
+	var corpse := Sprite2D.new()
+	corpse.texture = body_sprite.texture
+	corpse.region_enabled = true
+	corpse.region_rect = body_sprite.region_rect
+	corpse.material = body_sprite.material.duplicate()
+	corpse.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	get_parent().add_child(corpse)
+	corpse.global_position = global_position+Vector2(0,4)
+	corpse.scale = body_sprite.scale*scale
+	var tween: Tween = corpse.create_tween().set_parallel(true)
+	tween.tween_property(corpse,"rotation",-.8,.65).set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(corpse,"scale:y",corpse.scale.y*.45,.7)
+	tween.tween_method(func(value: float): corpse.material.set_shader_parameter("dissolve",value),0.0,1.0,1.1)
+	tween.chain().tween_callback(corpse.queue_free)

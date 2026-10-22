@@ -651,8 +651,8 @@ func tutorial_allows_item(_item: String) -> bool:
 func create_style(background: String, border: String, border_size: int, radius: int) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	var requested := Color(background)
-	style.bg_color = requested if requested.h > 0.50 and requested.h < 0.7 else (Color("#26394d") if requested.v < 0.6 else Color("#3d6074"))
-	style.border_color = Color("#6ee7ce") if Color(border).v > .8 else Color("#40586d")
+	style.bg_color = Color("#202b30") if requested.v < .3 else (Color("#354146") if requested.v < .6 else Color("#4a5659"))
+	style.border_color = Color("#bd9b68") if Color(border).v > .8 else Color("#677171")
 	style.set_border_width_all(mini(1,border_size))
 	style.set_corner_radius_all(mini(10,radius))
 	style.anti_aliasing = true

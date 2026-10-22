@@ -147,6 +147,9 @@ func _ready() -> void:
 	var reload_hint := preload("res://Scripts/reload_hint.gd").new()
 	reload_hint.name = "ReloadHint"
 	ui_layer.add_child(reload_hint)
+	var atmosphere := preload("res://Scripts/world_atmosphere.gd").new()
+	atmosphere.name = "WorldAtmosphere"
+	add_child(atmosphere)
 
 func update_display_layout() -> void:
 	var factor: float = display_settings.interface_scale()

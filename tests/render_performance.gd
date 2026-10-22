@@ -28,8 +28,8 @@ func run_checks() -> void:
 	check(renderer.ground_rebuilds == rebuilds + 1, "Expanding the base invalidates terrain exactly once")
 	var art = preload("res://Scripts/content_art.gd")
 	for kind: String in game.mining.ORE_KINDS:
-		var texture: ImageTexture = art.resource_texture(kind)
-		check(texture.get_size() == Vector2(192,192) and texture.get_image().has_mipmaps() and texture.get_image().get_used_rect().size != Vector2i.ZERO,"Supersampled vector icon has visible geometry and mipmaps: " + kind)
+		var texture: Texture2D = art.resource_texture(kind)
+		check(texture.get_width() >= 256 and texture is AtlasTexture and texture.atlas.get_image().has_mipmaps() and texture.get_image().get_used_rect().size != Vector2i.ZERO,"Painted sprite has a visible atlas region and mipmaps: " + kind)
 	check(renderer.texture_filter == CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS,"World uses smooth filtering instead of pixel-art nearest-neighbor sampling")
 	var zombie_script: GDScript = load("res://Scripts/zombie.gd")
 	var enemy: Node2D = zombie_script.new()
@@ -51,13 +51,16 @@ func run_checks() -> void:
 		furnace.receive(Vector2i(16, row), "copper_4")
 		game.mining.items_for("copper")[Vector2i(14,row)] = 1
 	furnace.process_smelting(2)
+	game.shop.notice_item_ids.clear()
+	game.shop.unlock_notice_backdrop.hide()
+	paused = true
 	game.redraw_world()
 	await settle()
 	if DisplayServer.get_name() != "headless":
 		var calls: float = Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
 		check(calls < 250, "The representative factory stays below 250 draw calls (%d)" % calls)
 		root.get_texture().get_image().save_png("/workspace/.onboarding/display-test/optimized-factory.png")
-		# Compare cached art to the retained original vector drawing at the same state.
+		# Compare cached art to the direct drawing at the same state.
 		var cached: Image = root.get_texture().get_image()
 		renderer.rasterizing = true
 		furnace.rasterizing = true
@@ -74,13 +77,14 @@ func run_checks() -> void:
 				var b: Color = original.get_pixel(x,y)
 				if maxf(absf(a.r-b.r), maxf(absf(a.g-b.g), absf(a.b-b.b))) > 0.15: different += 1
 		var fraction: float = float(different) / (cached.get_width() * cached.get_height() / 4.0)
-		check(fraction < 0.02, "Cached artwork preserves the vector scene (%.3f%% differing pixels)" % (fraction * 100))
+		check(fraction < 0.02, "Cached artwork preserves the painted scene (%.3f%% differing pixels)" % (fraction * 100))
 		renderer.rasterizing = false
 		furnace.rasterizing = false
 		compactors.rasterizing = false
 		game.redraw_world()
 		furnace.queue_redraw()
 		compactors.queue_redraw()
+	paused = false
 	var original_visibility: Dictionary = {}
 	for child in game.get_children():
 		if child is CanvasItem and not child is Camera2D: original_visibility[child] = child.visible
@@ -91,7 +95,7 @@ func run_checks() -> void:
 	intro.present_frame()
 	await settle()
 	check(not renderer.visible and not furnace.visible and not rhythm.visible, "The cinematic excludes the covered game from rendering")
-	check(intro.film.barrier.actors.size() == intro.film.barrier.HORDE_SIZE, "The fence film retains its complete decorative horde")
+	check(intro.film.picture != null and intro.SHOTS.size() == 4, "The new film retains the complete four-shot painted opening")
 	if DisplayServer.get_name() != "headless":
 		var calls: float = Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
 		check(calls < 350, "The full cinematic stays below 350 draw calls (%d)" % calls)
