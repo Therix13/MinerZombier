@@ -135,6 +135,12 @@ func _ready() -> void:
 	campaign = preload("res://Scripts/campaign_manager.gd").new()
 	campaign.name = "Campaign"
 	add_child(campaign)
+	var tiers := preload("res://Scripts/tool_fusion.gd").new()
+	tiers.name = "ToolFusion"
+	add_child(tiers)
+	var story := preload("res://Scripts/story_director.gd").new()
+	story.name = "StoryDirector"
+	add_child(story)
 	var saves := SaveScript.new()
 	saves.name = "SaveGame"
 	add_child(saves)
@@ -181,6 +187,8 @@ func _process(delta: float) -> void:
 		redraw_world()
 
 func redraw_world() -> void:
+	var tier_canvas: Node = get_node_or_null("ToolFusion")
+	if tier_canvas != null: tier_canvas.queue_redraw()
 	renderer.placing_coal = placing_coal and not shop.shop_open
 	renderer.placing_copper = placing_copper and not shop.shop_open
 	renderer.placing_belt = placing_belt and not shop.shop_open
@@ -197,17 +205,7 @@ func redraw_world() -> void:
 	renderer.queue_redraw()
 
 func buy_expansion() -> void:
-	if not progression.is_item_unlocked("expansion"): return
-	if not cycle.allows_action("expand"):
-		return
-	if cycle.defeated:
-		return
-	if grid.cave_width >= 7 or not economy.spend(economy.EXPANSION_PRICE):
-		return
-	grid.expand()
-	cycle.refresh_tutorial()
-	redraw_world()
-	shop.close_shop()
+	if campaign != null and campaign.expand_gallery(): shop.close_shop()
 
 func buy_copper_vein() -> void:
 	get_node("WorldInteractions").select_item("copper")
@@ -438,7 +436,7 @@ func build_night_victory_popup() -> void:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(430.0, 215.0)
 	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = Color("#352516")
+	panel_style.bg_color = Color("#142233")
 	panel_style.border_color = Color("#c09352")
 	panel_style.set_border_width_all(4)
 	panel_style.set_corner_radius_all(12)
@@ -468,20 +466,20 @@ func build_night_victory_popup() -> void:
 	night_victory_continue_button.text = "CONTINUAR"
 	night_victory_continue_button.custom_minimum_size.y = 52.0
 	night_victory_continue_button.add_theme_font_size_override("font_size", 18)
-	night_victory_continue_button.add_theme_color_override("font_color", Color("#fff0d0"))
-	night_victory_continue_button.add_theme_color_override("font_hover_color", Color("#ffdf9c"))
+	night_victory_continue_button.add_theme_color_override("font_color", Color("#e2edf5"))
+	night_victory_continue_button.add_theme_color_override("font_hover_color", Color("#6ee7ce"))
 	var normal_style := StyleBoxFlat.new()
-	normal_style.bg_color = Color("#60401f")
-	normal_style.border_color = Color("#a87843")
+	normal_style.bg_color = Color("#26394d")
+	normal_style.border_color = Color("#476176")
 	normal_style.set_border_width_all(3)
 	normal_style.set_corner_radius_all(8)
 	night_victory_continue_button.add_theme_stylebox_override("normal", normal_style)
 	var hover_style := normal_style.duplicate() as StyleBoxFlat
-	hover_style.bg_color = Color("#80562a")
+	hover_style.bg_color = Color("#35566a")
 	hover_style.border_color = Color("#e0ad66")
 	night_victory_continue_button.add_theme_stylebox_override("hover", hover_style)
 	var pressed_style := normal_style.duplicate() as StyleBoxFlat
-	pressed_style.bg_color = Color("#352516")
+	pressed_style.bg_color = Color("#142233")
 	night_victory_continue_button.add_theme_stylebox_override("pressed", pressed_style)
 	night_victory_continue_button.pressed.connect(dismiss_night_victory_popup)
 	column.add_child(night_victory_continue_button)

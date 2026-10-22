@@ -44,16 +44,15 @@ func _draw() -> void:
 	if grid == null: return
 	var center: float = grid.get_cell_rect(grid.sale_cell).get_center().x
 	for index in range(21):
-		var phase: float = clampf((destruction - float(index % 5) * 0.07) * 1.5,0,1)
-		var at := Vector2(center - 280 + index * 28,FENCE_Y + phase * (50 + index % 3 * 12))
-		draw_set_transform(at,phase * (-1.1 if index % 2 else 1.2))
-		draw_rect(Rect2(-11,-23,22,38),Color("#5c412a"))
-		draw_rect(Rect2(-8,-21,16,34),Color("#a87a49"))
-		draw_line(Vector2(-8,-10),Vector2(8,-10),Color("#d5ad65"),3)
-		if destruction > 0.15: draw_line(Vector2(-4,-16),Vector2(5,4),Color("#352b25"),2)
+		var phase: float = clampf((destruction-float(index%5)*.07)*1.5,0,1)
+		var at := Vector2(center-280+index*28,FENCE_Y+phase*(50+index%3*12))
+		draw_set_transform(at,phase*(-1.1 if index%2 else 1.2))
+		draw_rect(Rect2(-11,-23,22,38),Color("#30475b"))
+		draw_line(Vector2(-8,-20),Vector2(-8,12),Color("#6ee7ce"),1,true)
+		if destruction > .15: draw_line(Vector2(-4,-16),Vector2(5,4),Color("#111b2b"),2,true)
 		draw_set_transform(Vector2.ZERO)
-	if destruction < 0.65:
-		for y in [-13,5]: draw_line(Vector2(center-293,FENCE_Y+y),Vector2(center+293,FENCE_Y+y),Color("#654e36"),4)
+	if destruction < .65:
+		for y in [-13,5]: draw_line(Vector2(center-293,FENCE_Y+y),Vector2(center+293,FENCE_Y+y),Color("#536b82"),3,true)
 
 class WaitingZombie extends "res://Scripts/zombie.gd":
 	func _ready() -> void:

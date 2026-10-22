@@ -43,7 +43,7 @@ func run_checks() -> void:
 	game.launchers.receive(game.grid.defense_cell("left"),"gold_4")
 	game.launchers.receive(game.grid.defense_cell("right"),"coal_4")
 	check(Scenery.texture != null and Scenery.builds == 1,"Terrain atlas is shared and generated only once")
-	check(Scenery.texture.get_size() == Vector2(384,192),"All 32 terrain variations fit a compact shared texture")
+	check(Scenery.texture.get_size() == Vector2(1,1),"Minimalist terrain uses a single neutral texel rather than pixel noise")
 	check(game.grid.sale_cell == Vector2i(15,-1) and game.grid.get_cell_rect(game.grid.sale_cell).get_center() == Vector2(744,196),"Mine portal keeps the existing sales cell and interaction geometry")
 	game.shop.accept_unlock_notice()
 	await capture("mine-gallery-day")

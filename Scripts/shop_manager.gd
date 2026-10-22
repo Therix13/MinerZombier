@@ -36,11 +36,21 @@ const CATEGORIES := ["EXPANSION", "VETAS", "HERRAMIENTAS", "AUTOMATIZACIÓN", "D
 const ITEM_CATEGORIES := {
 	"VETAS": ["coal", "copper", "iron", "gold", "nitrate", "sulfur", "tungsten"],
 	"HERRAMIENTAS": ["drill", "compactor", "furnace", "saw"],
-	"AUTOMATIZACIÓN": ["straight", "corner_right", "corner_left", "junction", "filter"],
+	"AUTOMATIZACIÓN": ["straight", "corner_right", "corner_left", "junction", "filter", "splitter", "ejector"],
 }
-const RESOURCE_LABELS := {"nitrate": "Nitrato de potasio · Nv. 1", "nitrate_2": "Nitrato de potasio · Nv. 2", "nitrate_3": "Nitrato de potasio · Nv. 3", "nitrate_4": "Nitrato de potasio · Nv. 4", "sulfur": "Azufre · Nv. 1", "sulfur_2": "Azufre · Nv. 2", "sulfur_3": "Azufre · Nv. 3", "sulfur_4": "Azufre · Nv. 4", "tungsten": "Wolframio · Nv. 1", "tungsten_2": "Wolframio · Nv. 2", "tungsten_3": "Wolframio · Nv. 3", "tungsten_4": "Wolframio · Nv. 4", "tungsten_ingot": "Lingote de wolframio · Nv. 1", "tungsten_ingot_2": "Lingote de wolframio · Nv. 2", "tungsten_ingot_3": "Lingote de wolframio · Nv. 3", "tungsten_ingot_4": "Lingote de wolframio · Nv. 4", "powder": "Pólvora", "bullet": "Balas", "grenade": "Granadas", "rocket": "Cohetes", "battery": "Celdas eléctricas","gold": "ORO · NIVEL 1", "gold_2": "ORO · NIVEL 2", "gold_3": "ORO · NIVEL 3", "gold_4": "ORO · NIVEL 4", "gold_ingot": "LINGOTE DE ORO · NIVEL 1", "gold_ingot_2": "LINGOTE DE ORO · NIVEL 2", "gold_ingot_3": "LINGOTE DE ORO · NIVEL 3", "gold_ingot_4": "LINGOTE DE ORO · NIVEL 4","iron": "HIERRO · NIVEL 1", "iron_2": "HIERRO · NIVEL 2", "iron_3": "HIERRO · NIVEL 3", "iron_4": "HIERRO · NIVEL 4", "iron_ingot": "LINGOTE DE HIERRO · NIVEL 1", "iron_ingot_2": "LINGOTE DE HIERRO · NIVEL 2", "iron_ingot_3": "LINGOTE DE HIERRO · NIVEL 3", "iron_ingot_4": "LINGOTE DE HIERRO · NIVEL 4", "coal": "CARBÓN · NIVEL 1", "copper": "COBRE · NIVEL 1", "coal_2": "CARBÓN · NIVEL 2", "copper_2": "COBRE · NIVEL 2", "coal_3": "CARBÓN · NIVEL 3", "copper_3": "COBRE · NIVEL 3", "coal_4": "CARBÓN · NIVEL 4", "copper_4": "COBRE · NIVEL 4", "copper_ingot": "LINGOTE DE COBRE · NIVEL 1", "copper_ingot_2": "LINGOTE DE COBRE · NIVEL 2", "copper_ingot_3": "LINGOTE DE COBRE · NIVEL 3", "copper_ingot_4": "LINGOTE DE COBRE · NIVEL 4"}
+const RESOURCE_LABELS := {"highcaliber":"Balas de alto calibre","nitrate": "Nitrato de potasio · Nv. 1", "nitrate_2": "Nitrato de potasio · Nv. 2", "nitrate_3": "Nitrato de potasio · Nv. 3", "nitrate_4": "Nitrato de potasio · Nv. 4", "sulfur": "Azufre · Nv. 1", "sulfur_2": "Azufre · Nv. 2", "sulfur_3": "Azufre · Nv. 3", "sulfur_4": "Azufre · Nv. 4", "tungsten": "Wolframio · Nv. 1", "tungsten_2": "Wolframio · Nv. 2", "tungsten_3": "Wolframio · Nv. 3", "tungsten_4": "Wolframio · Nv. 4", "tungsten_ingot": "Lingote de wolframio · Nv. 1", "tungsten_ingot_2": "Lingote de wolframio · Nv. 2", "tungsten_ingot_3": "Lingote de wolframio · Nv. 3", "tungsten_ingot_4": "Lingote de wolframio · Nv. 4", "powder": "Pólvora", "bullet": "Balas", "grenade": "Granadas", "rocket": "Cohetes", "battery": "Celdas eléctricas","gold": "ORO · NIVEL 1", "gold_2": "ORO · NIVEL 2", "gold_3": "ORO · NIVEL 3", "gold_4": "ORO · NIVEL 4", "gold_ingot": "LINGOTE DE ORO · NIVEL 1", "gold_ingot_2": "LINGOTE DE ORO · NIVEL 2", "gold_ingot_3": "LINGOTE DE ORO · NIVEL 3", "gold_ingot_4": "LINGOTE DE ORO · NIVEL 4","iron": "HIERRO · NIVEL 1", "iron_2": "HIERRO · NIVEL 2", "iron_3": "HIERRO · NIVEL 3", "iron_4": "HIERRO · NIVEL 4", "iron_ingot": "LINGOTE DE HIERRO · NIVEL 1", "iron_ingot_2": "LINGOTE DE HIERRO · NIVEL 2", "iron_ingot_3": "LINGOTE DE HIERRO · NIVEL 3", "iron_ingot_4": "LINGOTE DE HIERRO · NIVEL 4", "coal": "CARBÓN · NIVEL 1", "copper": "COBRE · NIVEL 1", "coal_2": "CARBÓN · NIVEL 2", "copper_2": "COBRE · NIVEL 2", "coal_3": "CARBÓN · NIVEL 3", "copper_3": "COBRE · NIVEL 3", "coal_4": "CARBÓN · NIVEL 4", "copper_4": "COBRE · NIVEL 4", "copper_ingot": "LINGOTE DE COBRE · NIVEL 1", "copper_ingot_2": "LINGOTE DE COBRE · NIVEL 2", "copper_ingot_3": "LINGOTE DE COBRE · NIVEL 3", "copper_ingot_4": "LINGOTE DE COBRE · NIVEL 4"}
 const CATEGORY_ART := {"EXPANSION": "expansion", "VETAS": "coal", "HERRAMIENTAS": "drill", "AUTOMATIZACIÓN": "junction", "DEFENSA": "launcher", "RECURSOS": "resources"}
 const UNLOCK_VIEW := {
+	"splitter":["splitter","Distribuidor","Alterna salidas laterales"],
+	"ejector":["ejector","Expulsor","Descarga sobre casillas libres"],
+	"highcaliber":["ore:highcaliber","Alto calibre","Hierro fundido Nv. 2"],
+	"powder":["ore:powder","Pólvora","Nitrato + azufre Nv. 4"],
+	"bullet":["ore:bullet","Balas","Cobre fundido Nv. 2"],
+	"grenade":["ore:grenade","Granadas","Hierro fundido Nv. 3"],
+	"rocket":["ore:rocket","Cohetes","Oro fundido Nv. 3"],
+	"battery":["ore:battery","Celdas eléctricas","Wolframio fundido Nv. 2"],
+	"ak47":["ak47","AK-47","Alto calibre · Ráfaga sostenida"],
+	"minigun":["minigun","Minigun","Alto calibre · Supresión"],
 	"nitrate":["nitrate","Nitrato de potasio","Fabricación de pólvora"],
 	"sulfur":["sulfur","Azufre","Explosivos"],
 	"tungsten":["tungsten","Wolframio","Tecnología avanzada"],
@@ -269,7 +279,7 @@ func update_progression() -> void:
 
 func visible_shop_items(category: String = "") -> Array[String]:
 	var result: Array[String] = []
-	for item: String in ["coal", "copper", "iron", "gold", "nitrate", "sulfur", "tungsten", "straight", "corner_right", "corner_left", "junction", "filter", "drill", "compactor", "furnace", "saw"]:
+	for item: String in ["coal", "copper", "iron", "gold", "nitrate", "sulfur", "tungsten", "straight", "corner_right", "corner_left", "junction", "filter", "splitter", "ejector", "drill", "compactor", "furnace", "saw"]:
 		if not category.is_empty() and item not in ITEM_CATEGORIES.get(category, []): continue
 		if progression == null or progression.is_item_unlocked(item): result.append(item)
 	return result
@@ -295,7 +305,7 @@ func build_unlock_notice() -> void:
 	unlock_notice.name = "NewUnlockNotice"
 	unlock_notice.custom_minimum_size = Vector2(480, 0)
 	unlock_notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := create_style("#192d26", "#d5b078", 2, 16)
+	var style := create_style("#192b3d", "#6ee7ce", 2, 16)
 	style.content_margin_left = 24
 	style.content_margin_right = 24
 	style.content_margin_top = 22
@@ -314,9 +324,9 @@ func build_unlock_notice() -> void:
 	column.add_child(header)
 	var emblem := PanelContainer.new()
 	emblem.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	emblem.add_theme_stylebox_override("panel",create_style("#24443c","#547d6a",1,12))
+	emblem.add_theme_stylebox_override("panel",create_style("#253c4b","#446175",1,12))
 	header.add_child(emblem)
-	var emblem_icon := create_label("✦", 30, Color("#ffe1a2"))
+	var emblem_icon := create_label("✦", 30, Color("#b7fff0"))
 	emblem_icon.custom_minimum_size = Vector2(40,40)
 	emblem_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	emblem_icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -327,7 +337,7 @@ func build_unlock_notice() -> void:
 	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	titles.add_theme_constant_override("separation",3)
 	header.add_child(titles)
-	unlock_notice_label = create_label("Nuevos desbloqueos",22,Color("#ffe1a2"))
+	unlock_notice_label = create_label("Nuevos desbloqueos",22,Color("#b7fff0"))
 	unlock_notice_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	titles.add_child(unlock_notice_label)
 	var subtitle := create_label("Nuevas opciones para tu mina",13,Color("#a8c4b2"))
@@ -347,8 +357,8 @@ func build_unlock_notice() -> void:
 	unlock_notice_accept.name = "AcceptUnlockNotice"
 	unlock_notice_accept.text = "Aceptar"
 	unlock_notice_accept.custom_minimum_size.y = 44
-	unlock_notice_accept.add_theme_stylebox_override("normal",create_style("#684721","#d6b374",2,8))
-	unlock_notice_accept.add_theme_stylebox_override("hover",create_style("#805c30","#ffe1a2",2,8))
+	unlock_notice_accept.add_theme_stylebox_override("normal",create_style("#2b485c","#6ee7ce",2,8))
+	unlock_notice_accept.add_theme_stylebox_override("hover",create_style("#365e70","#b7fff0",2,8))
 	unlock_notice_accept.pressed.connect(accept_unlock_notice.bind(true))
 	column.add_child(unlock_notice_accept)
 	unlock_notice.hide()
@@ -398,7 +408,7 @@ func rebuild_notice_cards() -> void:
 		card.custom_minimum_size = Vector2(210,76)
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var style := create_style("#263d30","#486448",1,10)
+		var style := create_style("#253c4b","#446175",1,10)
 		for side in ["left","right","top","bottom"]: style.set("content_margin_"+side,10)
 		card.add_theme_stylebox_override("panel",style)
 		var row := HBoxContainer.new()
@@ -450,7 +460,7 @@ func build_cycle_panel() -> void:
 	panel.position = Vector2(20, 91)
 	panel.size = Vector2(302, 0)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	var style := create_style("#192920", "#435744", 1, 12)
+	var style := create_style("#192b3d", "#40586d", 1, 12)
 	style.border_width_left = 3
 	style.border_color = Color("#c9a469")
 	style.shadow_color = Color(0, 0, 0, 0.22)
@@ -498,11 +508,11 @@ func build_cycle_panel() -> void:
 	cycle_shift_key = PanelContainer.new()
 	cycle_shift_key.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cycle_shift_key.custom_minimum_size = Vector2(84, 38)
-	shift_key_style = create_style("#344535", "#d5b078", 2, 7)
+	shift_key_style = create_style("#344535", "#6ee7ce", 2, 7)
 	shift_key_style.border_width_bottom = 4
 	cycle_shift_key.add_theme_stylebox_override("panel", shift_key_style)
 	cycle_shift_hint.add_child(cycle_shift_key)
-	var key_label := create_label("⇧ SHIFT", 16, Color("#ffe1a2"))
+	var key_label := create_label("⇧ SHIFT", 16, Color("#b7fff0"))
 	key_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	key_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	key_label.autowrap_mode = TextServer.AUTOWRAP_OFF
@@ -519,9 +529,9 @@ func build_cycle_panel() -> void:
 	cycle_action.add_theme_font_size_override("font_size", 14)
 	cycle_action.add_theme_color_override("font_color", Color("#222c20"))
 	cycle_action.add_theme_color_override("font_hover_color", Color("#222c20"))
-	cycle_action.add_theme_stylebox_override("normal", create_style("#d5b078", "#e6ca98", 1, 7))
+	cycle_action.add_theme_stylebox_override("normal", create_style("#6ee7ce", "#e6ca98", 1, 7))
 	cycle_action.add_theme_stylebox_override("hover", create_style("#ebc991", "#f6dfb5", 1, 7))
-	cycle_action.add_theme_stylebox_override("disabled", create_style("#263a2d", "#3b5240", 1, 7))
+	cycle_action.add_theme_stylebox_override("disabled", create_style("#233445", "#40536a", 1, 7))
 	cycle_action.pressed.connect(_on_cycle_action)
 	column.add_child(cycle_action)
 
@@ -640,10 +650,12 @@ func tutorial_allows_item(_item: String) -> bool:
 
 func create_style(background: String, border: String, border_size: int, radius: int) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(background)
-	style.border_color = Color(border)
-	style.set_border_width_all(border_size)
-	style.set_corner_radius_all(radius)
+	var requested := Color(background)
+	style.bg_color = requested if requested.h > 0.50 and requested.h < 0.7 else (Color("#26394d") if requested.v < 0.6 else Color("#3d6074"))
+	style.border_color = Color("#6ee7ce") if Color(border).v > .8 else Color("#40586d")
+	style.set_border_width_all(mini(1,border_size))
+	style.set_corner_radius_all(mini(10,radius))
+	style.anti_aliasing = true
 	return style
 
 func create_button(value: String) -> Button:
@@ -651,12 +663,12 @@ func create_button(value: String) -> Button:
 	button.text = value
 	button.custom_minimum_size.y = 52
 	button.add_theme_font_size_override("font_size", 17)
-	button.add_theme_color_override("font_color", Color("#fff0d0"))
-	button.add_theme_color_override("font_hover_color", Color("#ffdf9c"))
-	button.add_theme_stylebox_override("normal", create_style("#60401f", "#a87843", 3, 8))
-	button.add_theme_stylebox_override("hover", create_style("#80562a", "#e0ad66", 3, 8))
-	button.add_theme_stylebox_override("pressed", create_style("#352516", "#a87843", 3, 8))
-	button.add_theme_stylebox_override("disabled", create_style("#352719", "#59442f", 2, 8))
+	button.add_theme_color_override("font_color", Color("#e2edf5"))
+	button.add_theme_color_override("font_hover_color", Color("#6ee7ce"))
+	button.add_theme_stylebox_override("normal", create_style("#26394d", "#476176", 3, 8))
+	button.add_theme_stylebox_override("hover", create_style("#35566a", "#e0ad66", 3, 8))
+	button.add_theme_stylebox_override("pressed", create_style("#142233", "#476176", 3, 8))
+	button.add_theme_stylebox_override("disabled", create_style("#1b2939", "#34465b", 2, 8))
 	return button
 
 # Catalog tiles show the same models that are drawn on the playing field.
@@ -707,7 +719,7 @@ func create_art_button(kind: String, description: String, price: int = -1) -> Bu
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(label)
-	var cost := create_label("◆ %d" % price, 15, Color("#ffdf9c"))
+	var cost := create_label("◆ %d" % price, 15, Color("#6ee7ce"))
 	cost.autowrap_mode = TextServer.AUTOWRAP_OFF
 	cost.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	cost.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -723,7 +735,7 @@ func create_item_preview(kind: String, minimum: Vector2 = Vector2(48, 48)) -> Co
 	preview.custom_minimum_size = minimum
 	return preview
 
-func create_goal_label(value: String, font_size: int = 17, color: Color = Color("#f0e0c8")) -> RichTextLabel:
+func create_goal_label(value: String, font_size: int = 17, color: Color = Color("#d6e5f3")) -> RichTextLabel:
 	var label := RichTextLabel.new()
 	label.fit_content = true
 	label.scroll_active = false
@@ -733,7 +745,7 @@ func create_goal_label(value: String, font_size: int = 17, color: Color = Color(
 	label.text = value
 	return label
 
-func create_label(value: String, font_size: int = 17, color: Color = Color("#f0e0c8")) -> Label:
+func create_label(value: String, font_size: int = 17, color: Color = Color("#d6e5f3")) -> Label:
 	var label := Label.new()
 	label.text = value
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -761,7 +773,7 @@ func build_interface() -> void:
 	money_box.offset_left = money_box.offset_right - MONEY_BOX_WIDTH
 	money_box.offset_top = 20.0
 	money_box.offset_bottom = 20.0 + TOGGLE_SIZE
-	money_box.add_theme_stylebox_override("panel", create_style("#654321", "#b8864b", 4, 12))
+	money_box.add_theme_stylebox_override("panel", create_style("#253a4c", "#476176", 4, 12))
 	add_child(money_box)
 
 	var money_margin := MarginContainer.new()
@@ -776,7 +788,7 @@ func build_interface() -> void:
 	var coin_icon := PanelContainer.new()
 	coin_icon.custom_minimum_size = Vector2(34, 34)
 	coin_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	coin_icon.add_theme_stylebox_override("panel", create_style("#d69a32", "#ffdb72", 3, 17))
+	coin_icon.add_theme_stylebox_override("panel", create_style("#c5a96c", "#ead3a0", 3, 17))
 	money_row.add_child(coin_icon)
 	var coin_symbol := create_label("◆", 18, Color("#fff0a1"))
 	coin_symbol.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -784,7 +796,8 @@ func build_interface() -> void:
 	coin_symbol.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	coin_icon.add_child(coin_symbol)
 	coin_symbol.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	money_label = create_label("", 23, Color("#f3ca85"))
+	money_label = create_label("", 23, Color("#e2edf5"))
+	money_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	money_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	money_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	money_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -801,7 +814,7 @@ func build_interface() -> void:
 	shop_panel.offset_top = 0.0
 	shop_panel.offset_bottom = 0.0
 	shop_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	shop_panel.add_theme_stylebox_override("panel", create_style("#352516", "#a87843", 5, 0))
+	shop_panel.add_theme_stylebox_override("panel", create_style("#142233", "#476176", 5, 0))
 	add_child(shop_panel)
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
@@ -812,7 +825,7 @@ func build_interface() -> void:
 	margin.add_child(content)
 	var header := HBoxContainer.new()
 	content.add_child(header)
-	shop_title = create_label("TIENDA", 27, Color("#f3ca85"))
+	shop_title = create_label("TIENDA", 27, Color("#e2edf5"))
 	shop_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(shop_title)
 	var close_button := create_button("X")
@@ -872,7 +885,7 @@ func set_view_mode(defense_enabled: bool) -> void:
 	view_icon.queue_redraw()
 
 func update_money(amount: int) -> void:
-	money_label.text = "∞ DEV" if economy.developer_mode else str(amount)
+	money_label.text = "∞ DEV" if economy.developer_mode else ("%.1f M" % (amount/1000000.0) if amount >= 1000000 else ("%.1f k" % (amount/1000.0) if amount >= 100000 else str(amount)))
 	if economy.developer_mode and cycle != null and not cycle.tutorial_skipped:
 		var interactions: Node = get_parent().get_parent().get_node_or_null("WorldInteractions")
 		if interactions != null: interactions.cancel_active()
@@ -951,14 +964,10 @@ func open_category(category: String) -> void:
 				resource_buttons[kind] = button
 				catalog_grid().add_child(button)
 		"EXPANSION":
-			var button := create_art_button("expansion", "Ampliar a 7 × 5", economy.EXPANSION_PRICE)
-			if grid.cave_width >= 7:
-				button.get_meta("price_label").text = "✓"
-				button.tooltip_text = "Base ampliada a 7 × 5"
-				button.disabled = true
-			else:
-				button.disabled = not economy.can_afford(economy.EXPANSION_PRICE)
-				button.pressed.connect(request_item.bind("expansion", expansion_requested))
+			var stage: Dictionary = preload("res://Scripts/content_catalog.gd").next_expansion(grid.cave_width)
+			var button := create_art_button("expansion", "Mapa completo" if stage.is_empty() else "Ampliar a %d × %d" % [stage["size"].x,stage["size"].y],0 if stage.is_empty() else stage["price"])
+			button.disabled = stage.is_empty() or not economy.can_afford(stage["price"])
+			if not stage.is_empty(): button.pressed.connect(request_item.bind("expansion", expansion_requested))
 			purchase_buttons["expansion"] = button
 			catalog_grid().add_child(button)
 		"VETAS":
@@ -978,6 +987,8 @@ func open_category(category: String) -> void:
 			add_item_button("CINTA EN L DERECHA · 50", economy.CONVEYOR_PRICE, "corner_right", corner_conveyor_requested)
 			add_item_button("CINTA EN L IZQUIERDA · 50", economy.CONVEYOR_PRICE, "corner_left", left_corner_conveyor_requested)
 			add_item_button("CINTA EN T · 50", economy.CONVEYOR_PRICE, "junction", junction_conveyor_requested)
+			add_item_button("DISTRIBUIDOR",150,"splitter",conveyor_requested)
+			add_item_button("EXPULSOR",250,"ejector",conveyor_requested)
 			add_item_button("FILTRADOR · 50", economy.CONVEYOR_PRICE, "filter", conveyor_requested)
 		"DEFENSA":
 			var left_cell: Vector2i = grid.defense_cell("left")
@@ -1026,6 +1037,7 @@ func refresh_item_buttons() -> void:
 		var unlocked: bool = progression == null or progression.is_item_unlocked(item)
 		button.disabled = not unlocked or not economy.can_afford(item_buttons[item]["price"]) or not tutorial_allows_item(item) or (cycle != null and cycle.defeated)
 		button.tooltip_text = item_buttons[item].get("name", item)
+		if item in ["drill","compactor","saw","furnace","straight","corner_right","corner_left","junction","filter","splitter","ejector"]: button.tooltip_text += "\nFusiona 2 herramientas iguales y vacías del mismo nivel. Máximo: Nv. 4."
 		var construction: Node = get_parent().get_parent().get_node_or_null("Construction")
 		if construction != null and construction.has_recipe(item): button.tooltip_text += "\n" + construction.recipe_text(item)
 		if item == "compactor": button.tooltip_text += "\nAcumula 8 puntos para producir Nv. 4. Nv. 1/2/3/4: 1/2/4/8 puntos. Conserva el sobrante. Nv. 4: 1 s; otros: 4 s."
@@ -1119,14 +1131,14 @@ class ViewIcon extends Control:
 		var factor: float = minf(size.x, size.y) / 40.0
 		draw_set_transform(size * 0.5, 0, Vector2.ONE * factor)
 		if mine:
-			draw_line(Vector2(-8, 10), Vector2(7, -8), Color("#d1ad66"), 4, true)
-			draw_polyline(PackedVector2Array([Vector2(-10, -3), Vector2(-4, -10), Vector2(5, -11), Vector2(12, -5)]), Color("#e8d6ac"), 4, true)
+			draw_line(Vector2(-8, 10), Vector2(7, -8), Color("#91b8c9"), 4, true)
+			draw_polyline(PackedVector2Array([Vector2(-10, -3), Vector2(-4, -10), Vector2(5, -11), Vector2(12, -5)]), Color("#d6e5f3"), 4, true)
 		else:
 			var shield := PackedVector2Array([Vector2(-10, -11), Vector2(10, -11), Vector2(9, 2), Vector2(5, 8), Vector2(0, 12), Vector2(-5, 8), Vector2(-9, 2), Vector2(-10, -11)])
-			draw_colored_polygon(shield, Color("#6f895b"))
-			draw_polyline(shield, Color("#f2cf86"), 2, true)
-			draw_line(Vector2(0, -7), Vector2(0, 6), Color("#f2cf86"), 2, true)
-			draw_line(Vector2(-5, -1), Vector2(5, -1), Color("#f2cf86"), 2, true)
+			draw_colored_polygon(shield, Color("#253449"))
+			draw_polyline(shield, Color("#6ee7ce"), 2, true)
+			draw_line(Vector2(0, -7), Vector2(0, 6), Color("#6ee7ce"), 2, true)
+			draw_line(Vector2(-5, -1), Vector2(5, -1), Color("#6ee7ce"), 2, true)
 
 class ItemPreview extends Control:
 	var kind := "coal"
@@ -1194,7 +1206,7 @@ class ItemArt extends "res://Scripts/world_renderer.gd":
 			"gold": draw_vein(Vector2.ZERO, "gold", {"level": 1, "direction": 1, "progress": 0})
 			"iron": draw_vein(Vector2.ZERO, "iron", {"level": 1, "direction": 1, "progress": 0})
 			"copper": draw_copper_vein(Vector2.ZERO, 1, 0, false)
-			"straight", "corner_right", "corner_left", "junction", "filter":
+			"straight", "corner_right", "corner_left", "junction", "filter", "splitter", "ejector":
 				draw_conveyor(Vector2.ZERO, 0, false, kind)
 			"drill": draw_drill(Vector2.ZERO, 0, false)
 			"launcher": draw_launcher(Vector2.ZERO, {"ammo": [], "level": 1, "angle": -PI * 0.5}, false)
@@ -1208,7 +1220,7 @@ class ItemArt extends "res://Scripts/world_renderer.gd":
 				for y in range(5):
 					for x in range(7):
 						var owned: bool = x >= 2 and x <= 4 and y >= 1 and y <= 3
-						draw_rect(Rect2(-24 + x * 7, -17 + y * 7, 6, 6), Color("#7b946f") if owned else Color("#d1ad66"))
+						draw_rect(Rect2(-24 + x * 7, -17 + y * 7, 6, 6), Color("#7b946f") if owned else Color("#91b8c9"))
 			_:
 				if kind.begins_with("ore:"):
 					draw_nugget(Vector2.ZERO, kind.trim_prefix("ore:"), 1)

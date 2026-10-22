@@ -78,7 +78,7 @@ func process_cutting(delta: float) -> void:
 	for cell: Vector2i in machines:
 		var data: Dictionary = machines[cell]
 		if not str(data["input"]).is_empty():
-			data["elapsed"] = minf(PROCESS_TIME,float(data["elapsed"]) + maxf(delta,0))
+			data["elapsed"] = minf(PROCESS_TIME,float(data["elapsed"]) + maxf(delta,0) * game.get_node("ToolFusion").speed(cell))
 			queue_redraw()
 			if float(data["elapsed"]) < PROCESS_TIME: continue
 			data["output"] = lower_tier(data["input"])
@@ -155,30 +155,4 @@ func _draw() -> void:
 		draw_machine(self,game.get("drag_world_position"),data)
 
 static func draw_machine(canvas: Node2D, center: Vector2, data: Dictionary) -> void:
-	if blade_texture == null:
-		var image := Image.new()
-		var points: String = ""
-		for i in range(48):
-			var angle: float = i * TAU / 48
-			var radius: float = 29 if i % 3 == 0 else 24
-			points += "%f,%f " % [32 + cos(angle)*radius,32 + sin(angle)*radius]
-		image.load_svg_from_string('<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 64 64"><polygon points="%s" fill="#a9bbc3" stroke="#344650" stroke-width="2"/><circle cx="32" cy="32" r="17" fill="#718792"/><circle cx="32" cy="32" r="5" fill="#e0bd73"/></svg>' % points)
-		blade_texture = ImageTexture.create_from_image(image)
-	canvas.draw_rect(Rect2(center - Vector2(21,21),Vector2(42,42)),Color("#263139"))
-	canvas.draw_rect(Rect2(center - Vector2(21,21),Vector2(42,42)),Color("#bd965f"),false,2)
-	var active: bool = not str(data.get("input","")).is_empty()
-	var angle: float = float(data.get("elapsed",0)) * 8 if active else 0
-	canvas.draw_set_transform(center,angle)
-	canvas.draw_texture_rect(blade_texture,Rect2(-17,-17,34,34),false)
-	canvas.draw_set_transform(Vector2.ZERO)
-	var outward: Vector2 = Vector2(DIRECTIONS[posmod(int(data.get("direction",1)),4)])
-	var side := Vector2(-outward.y,outward.x)
-	for sign_value in [-1,1]:
-		var arrow: Vector2 = (outward + side * sign_value).normalized()
-		var flank := Vector2(-arrow.y,arrow.x)
-		var tip: Vector2 = center + arrow * 27
-		canvas.draw_line(center + arrow * 13,tip - arrow * 5,Color("#ffe084"),3)
-		canvas.draw_colored_polygon(PackedVector2Array([tip,tip-arrow*9+flank*5,tip-arrow*9-flank*5]),Color("#ffe084"))
-	if active:
-		canvas.draw_rect(Rect2(center+Vector2(-16,17),Vector2(32,3)),Color("#273239"))
-		canvas.draw_rect(Rect2(center+Vector2(-16,17),Vector2(32*float(data.get("elapsed",0))/PROCESS_TIME,3)),Color("#eed083"))
+	preload("res://Scripts/content_art.gd").machine(canvas,center,"saw",int(data.get("direction",0)),float(data.get("elapsed",0))*8)

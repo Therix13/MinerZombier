@@ -1,6 +1,5 @@
 extends Node2D
 
-const ArtAtlas = preload("res://Scripts/art_atlas.gd")
 var rasterizing: bool = false
 
 signal smelted(cell: Vector2i)
@@ -101,7 +100,7 @@ func process_smelting(delta: float) -> void:
 			data["fuel"] = int(data["fuel"]) - cost
 			data["burning"] = true
 			changed.emit()
-		data["elapsed"] = minf(PROCESS_TIME, float(data.get("elapsed", 0.0)) + maxf(delta, 0.0))
+		data["elapsed"] = minf(PROCESS_TIME, float(data.get("elapsed", 0.0)) + maxf(delta, 0.0) * game.get_node("ToolFusion").speed(cell))
 		queue_redraw()
 		if float(data["elapsed"]) < PROCESS_TIME: continue
 		data["output"] = str(data["input"]).get_slice("_", 0) + "_ingot"
@@ -157,26 +156,5 @@ func _draw() -> void:
 		draw_machine(game.get("drag_world_position"), data)
 
 func draw_machine(center: Vector2, data: Dictionary) -> void:
-	var cached: bool = not rasterizing and ArtAtlas.paint(self, "furnace:%d:%d" % [int(data.get("direction", 0)), 1 if int(data["fuel"]) > 0 else 0], center)
-	if not cached:
-		draw_rect(Rect2(center - Vector2(21, 21), Vector2(42, 42)), Color("#392d28"))
-		for y in range(4):
-			for x in range(3):
-				draw_rect(Rect2(center + Vector2(-19 + x * 13, -19 + y * 10), Vector2(12, 9)), Color("#94714e") if (x + y) % 2 == 0 else Color("#78604b"))
-		draw_rect(Rect2(center + Vector2(-13, -7), Vector2(26, 22)), Color("#292c2d"))
-		draw_rect(Rect2(center + Vector2(-10, -4), Vector2(20, 14)), Color("#d98a38") if int(data["fuel"]) > 0 else Color("#13171a"))
-		for x in [-7, 0, 7]: draw_line(center + Vector2(x, -4), center + Vector2(x, 11), Color("#3b3830"), 2)
-	draw_rect(Rect2(center + Vector2(-13, 17), Vector2(26, 2)), Color("#272b2c"))
-	draw_rect(Rect2(center + Vector2(-13, 17), Vector2(26.0 * float(data["fuel"]) / CAPACITY, 2)), Color("#efba61"))
-
-	# Smelting progress is separate from the thin fuel gauge below the fire.
-	if data.get("burning", false) or not str(data.get("output", "")).is_empty():
-		var progress: float = clampf(float(data.get("elapsed", 0.0)) / PROCESS_TIME, 0.0, 1.0)
-		draw_rect(Rect2(center + Vector2(-16, -17), Vector2(32, 4)), Color("#292c2d"))
-		draw_rect(Rect2(center + Vector2(-16, -17), Vector2(32 * progress, 4)), Color("#f6bc5c"))
-	if cached: return
-	var outward: Vector2 = Vector2(DIRECTIONS[posmod(int(data.get("direction", 0)), 4)])
-	var side := Vector2(-outward.y, outward.x)
-	var tip: Vector2 = center + outward * 22
-	draw_line(center + outward * 14, tip - outward * 3, Color("#f7d57b"), 3)
-	draw_colored_polygon(PackedVector2Array([tip, tip - outward * 8 + side * 5, tip - outward * 8 - side * 5]), Color("#f7d57b"))
+	preload("res://Scripts/content_art.gd").machine(self,center,"furnace",int(data.get("direction",0)),float(data.get("elapsed",0))*3)
+	draw_line(center+Vector2(-13,18),center+Vector2(-13+26.0*float(data.get("fuel",0))/CAPACITY,18),Color("#efaa84"),2,true)

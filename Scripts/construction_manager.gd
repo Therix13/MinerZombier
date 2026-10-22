@@ -3,8 +3,11 @@ extends Node2D
 signal changed
 signal completed(cell: Vector2i)
 
-const ArtAtlas = preload("res://Scripts/art_atlas.gd")
 const RECIPES := {
+	"splitter":{"copper_ingot_3":2},
+	"ejector":{"iron_ingot_2":1},
+	"ak47":{"iron_ingot_3":2,"copper_ingot_3":1},
+	"minigun":{"iron_ingot_4":2,"copper_ingot_4":1},
 	"pistol":{"iron_ingot_2":1,"copper_ingot_3":1},
 	"grenadier":{"iron_ingot_3":1,"copper_ingot_3":2},
 	"rocketeer":{"gold_ingot_3":1,"iron_ingot_4":1},
@@ -125,34 +128,16 @@ func _draw() -> void:
 	if dragging and plans.has(held): draw_plan(game.get("drag_world_position"),plans[held])
 
 func draw_plan(center: Vector2, data: Dictionary) -> void:
-	var rect := Rect2(center - Vector2(22,22),Vector2(44,44))
-	draw_rect(rect, Color("#224b7099"))
-	draw_rect(rect, Color("#8ed7fa"), false, 1.5)
-	for offset in [-10, 0, 10]:
-		draw_line(center + Vector2(-20, offset), center + Vector2(20, offset), Color("#84cbf33a"), 1)
-		draw_line(center + Vector2(offset, -20), center + Vector2(offset, 20), Color("#84cbf33a"), 1)
 	var item: String = data["item"]
-	var direction: int = int(data["direction"])
-	var key: String = "%s:%d" % [item, direction]
-	if item == "furnace": key = "furnace:%d:0" % direction
-	elif item in ["straight", "corner_right", "corner_left", "junction"]: key = "belt:%s:%d" % [item,direction]
-	if preload("res://Scripts/content_catalog.gd").WEAPONS.has(item):
-		preload("res://Scripts/content_art.gd").weapon(self,center,{"weapon":item,"ammo":[]})
-		draw_rect(rect,Color("#4d9bde88"))
-	elif item == "filter":
-		preload("res://Scripts/filter_belt_art.gd").draw(self,center,direction)
-		draw_rect(rect,Color("#4d9bde88"))
-	elif item == "launcher_2":
-		game.get("renderer").draw_launcher_on(self, center, {"ammo": [], "level": 2}, true)
-		draw_rect(rect,Color("#4d9bde88"))
-	elif item == "saw":
-		preload("res://Scripts/saw_manager.gd").draw_machine(self,center,{"direction":direction})
-		draw_rect(rect,Color("#4d9bde88"))
-	elif ArtAtlas.prepare() and ArtAtlas.regions.has(key):
-		draw_texture_rect_region(ArtAtlas.texture, Rect2(center - Vector2(28,28), Vector2(56,56)), ArtAtlas.regions[key], Color(0.55,0.8,1,0.65))
+	var art = preload("res://Scripts/content_art.gd")
+	if preload("res://Scripts/content_catalog.gd").WEAPONS.has(item): art.weapon(self,center,{"weapon":item})
+	elif item == "launcher_2": art.weapon(self,center,{"level":2})
+	else: art.machine(self,center,item,int(data["direction"]))
+	draw_rect(Rect2(center-Vector2(22,22),Vector2(44,44)),Color("#6ba8e866"))
+	draw_rect(Rect2(center-Vector2(22,22),Vector2(44,44)),Color("#a1cfff"),false,1,true)
 	var total: int = 0
 	var delivered: int = 0
 	for material: String in RECIPES[item]:
-		total += int(RECIPES[item][material])
-		delivered += int(data["delivered"].get(material, 0))
-	draw_string(ThemeDB.fallback_font, center + Vector2(-12, 19), "%d/%d" % [delivered, total], HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#c4edff"))
+		total += RECIPES[item][material]
+		delivered += int(data["delivered"].get(material,0))
+	draw_string(ThemeDB.fallback_font,center+Vector2(-10,18),"%d/%d" % [delivered,total],HORIZONTAL_ALIGNMENT_LEFT,-1,10,Color("#f1f7ff"))

@@ -28,8 +28,10 @@ func apply_cave_size() -> void:
 		owned_tiles[cell] = true
 
 func expand() -> void:
-	cave_width = 7
-	cave_height = 5
+	var stage: Dictionary = preload("res://Scripts/content_catalog.gd").next_expansion(cave_width)
+	if stage.is_empty(): return
+	cave_width = stage["size"].x
+	cave_height = stage["size"].y
 	apply_cave_size()
 
 func get_cell_rect(cell: Vector2i) -> Rect2:

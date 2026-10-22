@@ -15,7 +15,7 @@ class PhaseIcon extends Control:
 		var center := size * 0.5
 		if night:
 			draw_circle(center,10,Color("#d1e2e6"))
-			draw_circle(center + Vector2(5,-4),9,Color("#192d26"))
+			draw_circle(center + Vector2(5,-4),9,Color("#192b3d"))
 		else:
 			draw_circle(center,6,Color("#efc368"))
 			for i in range(8):
@@ -42,7 +42,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var panel := PanelContainer.new()
 	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var style: StyleBoxFlat = game.shop.create_style("#192d26","#8f7952",1,8)
+	var style: StyleBoxFlat = game.shop.create_style("#192b3d","#8f7952",1,8)
 	style.content_margin_left = 9
 	style.content_margin_right = 9
 	style.content_margin_top = 5

@@ -4,6 +4,7 @@ signal changed
 signal items_unlocked(items: Array[String])
 
 const ConstructionScript = preload("res://Scripts/construction_manager.gd")
+const Catalog = preload("res://Scripts/content_catalog.gd")
 const BASE_ITEMS := ["coal", "defense_platforms", "launcher"]
 const NEXT_VEIN := {"coal":"copper", "copper":"iron", "iron":"gold","gold":"tungsten","nitrate":"sulfur"}
 
@@ -31,7 +32,7 @@ func dispose() -> void:
 	mining = null
 
 func is_item_unlocked(item: String) -> bool:
-	return item in BASE_ITEMS or unlocked.has(item) or (developer_mode and (item == "expansion" or item in NEXT_VEIN.values() or ConstructionScript.RECIPES.has(item)))
+	return item in BASE_ITEMS or unlocked.has(item) or (developer_mode and (item == "expansion" or item in NEXT_VEIN.values() or ConstructionScript.RECIPES.has(item) or item in Catalog.AMMO))
 
 func has_launcher_pair(weapons: Dictionary) -> bool:
 	var count: int = 0
@@ -63,6 +64,11 @@ func record_placed_vein(cell: Vector2i) -> void:
 		unlock_items(items)
 
 func restore_vein_milestones() -> void:
+	for item: String in Catalog.UNLOCKS:
+		var ready: bool = true
+		for ingredient: String in Catalog.UNLOCKS[item]["requires"]:
+			if not created_resources.has(ingredient): ready = false
+		if ready: unlocked[item] = true
 	if created_resources.has("copper_ingot_3") or unlocked.has("straight"):
 		unlocked["filter"] = true
 	# Older saves did not track the first copper placement as a separate milestone.
@@ -90,7 +96,13 @@ func record_resource(kind: String) -> void:
 		var items: Array[String] = ["sulfur"]
 		unlock_items(items)
 	var available: Array[String] = []
+	for item: String in Catalog.UNLOCKS:
+		var ready: bool = true
+		for ingredient: String in Catalog.UNLOCKS[item]["requires"]:
+			if not created_resources.has(ingredient): ready = false
+		if ready: available.append(item)
 	for item: String in ConstructionScript.RECIPES:
+		if Catalog.UNLOCKS.has(item): continue
 		if item == "launcher_2": continue # Only obtained by fusing two level-one weapons.
 		if unlocked.has(item): continue
 		var recipe: Dictionary = ConstructionScript.RECIPES[item]

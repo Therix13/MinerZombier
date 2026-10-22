@@ -19,7 +19,7 @@ func _ready() -> void:
 	cycle = game.get("cycle")
 	game.get("renderer").tutorial = cycle
 	z_index = 1000
-	click_mouse.bg_color = Color("#192920")
+	click_mouse.bg_color = Color("#192b3d")
 	click_mouse.border_color = Color("#f0c777")
 	click_mouse.set_border_width_all(1)
 	click_mouse.set_corner_radius_all(7)

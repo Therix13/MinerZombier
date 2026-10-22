@@ -61,4 +61,5 @@ func tick() -> void:
 		var cell: Vector2i = key
 		var target: Vector2i = cell + DIRECTIONS[int(drills[cell])]
 		if mining.vein_at(target) != "":
-			mining.mine(target)
+			var tiers: Node = mining.furnaces.get_parent().get_node_or_null("ToolFusion") if mining.furnaces != null else null
+			for hit in range(1 if tiers == null else tiers.level_at(cell)): mining.mine(target)

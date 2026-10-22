@@ -22,6 +22,7 @@ func _ready() -> void:
 	game.zombie_manager.enemy_killed.connect(record_kill)
 	game.zombie_manager.wave_started.connect(func(): state["health_at_dusk"] = game.zombie_manager.base_health)
 	build_ui()
+	game.progression.changed.connect(check_achievements)
 
 func total(kind: String) -> int:
 	var result: int = 0
@@ -53,7 +54,7 @@ func output_cell(kind: String, count: int) -> Vector2i:
 	return Vector2i(-999,-999)
 
 func can_craft(kind: String) -> bool:
-	return Catalog.CRAFTS.has(kind) and game.progression.is_item_unlocked("nitrate") and available(Catalog.CRAFTS[kind]["cost"]) and state["job"].is_empty() and not game.cycle.defeated and output_cell(kind,Catalog.CRAFTS[kind]["yield"]).x != -999
+	return Catalog.CRAFTS.has(kind) and game.progression.is_item_unlocked(kind) and available(Catalog.CRAFTS[kind]["cost"]) and state["job"].is_empty() and not game.cycle.defeated and output_cell(kind,Catalog.CRAFTS[kind]["yield"]).x != -999
 
 func craft(kind: String) -> bool:
 	if not can_craft(kind): return false
@@ -99,6 +100,10 @@ func achievements() -> Array[Dictionary]:
 		for count in [1,100,1000]: result.append({"id":kind + "_%d" % count,"name":"Fabrica %d · %s" % [count,Catalog.LABELS[kind]],"current":state["crafted"].get(kind,0),"target":count})
 	for metric: String in ["bosses","flawless"]:
 		for count in [1,10,100]: result.append({"id":metric + "_%d" % count,"name":("Vence %d jefes" if metric == "bosses" else "Supera %d noches sin daño") % count,"current":state[metric],"target":count})
+	for item: String in Catalog.UNLOCKS:
+		result.append({"id":"unlock_" + item,"name":Catalog.UNLOCKS[item]["hint"],"current":1 if game.progression.is_item_unlocked(item) else 0,"target":1})
+	for level in [2,3,4]:
+		result.append({"id":"tool_%d" % level,"name":"Fusiona dos máquinas iguales del mismo nivel → Nv. %d" % level,"current":int(state.get("tool_tier",1)),"target":level})
 	return result
 
 func check_achievements() -> void:
@@ -117,12 +122,14 @@ func repair() -> bool:
 	return true
 
 func expand_gallery() -> bool:
-	if game.cycle.is_night or game.cycle.defeated or game.grid.cave_width < 7 or game.grid.cave_width >= 15: return false
-	var price: int = 7500 if game.grid.cave_width == 7 else 30000
-	if not game.economy.spend(price): return false
-	game.grid.cave_width += 4
-	game.grid.cave_height += 2
+	if game.cycle.defeated or not game.progression.is_item_unlocked("expansion"): return false
+	var stage: Dictionary = Catalog.next_expansion(game.grid.cave_width)
+	if stage.is_empty() or not game.economy.spend(stage["price"]): return false
+	game.grid.cave_width = stage["size"].x
+	game.grid.cave_height = stage["size"].y
 	game.grid.apply_cave_size()
+	game.camera_controller.update_zoom_limits()
+	game.cycle.refresh_tutorial()
 	game.redraw_world()
 	return true
 
@@ -195,12 +202,12 @@ func build_ui() -> void:
 	header.add_child(close)
 	var tabs := HBoxContainer.new()
 	column.add_child(tabs)
-	for tab: String in ["Campaña","Taller","Logros","Bestiario"]:
+	for tab: String in ["Campaña","Taller","Logros","Bestiario","Historia"]:
 		var button: Button = game.shop.create_button(tab)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.pressed.connect(show_tab.bind(tab))
 		tabs.add_child(button)
-	status_label = game.shop.create_label("",14,Color("#a9c7b8"))
+	status_label = game.shop.create_label("",14,Color("#9fb5c7"))
 	column.add_child(status_label)
 	var scroll := ScrollContainer.new()
 	scroll.custom_minimum_size = Vector2(720,390)
@@ -239,7 +246,7 @@ func update_status() -> void:
 	status_label.text = "Día %d · %d monedas · %d zombis eliminados · %d/%d logros" % [game.cycle.day,game.economy.coins,state["kills"],state["achievements"].size(),achievements().size()]
 	if not state["job"].is_empty(): status_label.text += "\nFabricando %s · %.1f/%.0f s. Cierra esta ventana para avanzar." % [Catalog.LABELS[state["job"]["kind"]],state["job"]["elapsed"],Catalog.CRAFTS[state["job"]["kind"]]["time"]]
 
-func text(value: String, size: int = 16, color := Color("#c9d6cc")) -> void:
+func text(value: String, size: int = 16, color := Color("#c9d9e7")) -> void:
 	var label: Label = game.shop.create_label(value,size,color)
 	label.custom_minimum_size.x = 660
 	page.add_child(label)
@@ -263,17 +270,19 @@ func show_tab(tab: String) -> void:
 	match tab:
 		"Campaña":
 			var chapter: Dictionary = Catalog.chapter(game.cycle.day)
-			text(chapter["name"],26,Color("#ffe0a0"))
+			text(chapter["name"],26,Color("#e2edf5"))
 			text(chapter["goal"])
 			if state["best_night"] >= Catalog.CAMPAIGN_NIGHTS: text("Ruta completada · Puedes continuar en supervivencia infinita.",20,Color("#f2d49b"))
 			text("Ruta de 900 noches · unos 105 h a velocidad normal, sin contar preparación inicial ni combates prolongados. La duración real depende de tu ritmo.",14)
 			text("Cada 5 noches: jefe. Desde noche 21, cada 7: niebla (−15 % de alcance); cada 6: enemigos con blindaje adicional. Cada 9: furia (+20 % de velocidad). A partir de las noches 81 y 601 aparecen jefes adicionales. Prioriza sanadores y saboteadores.",14)
-			for entry: Dictionary in Catalog.CHAPTERS: text("Día %d · %s" % [entry["start"],entry["name"]],16,Color("#f0ce93") if game.cycle.day >= entry["start"] else Color("#849589"))
+			for entry: Dictionary in Catalog.CHAPTERS: text("Día %d · %s" % [entry["start"],entry["name"]],16,Color("#e2edf5") if game.cycle.day >= entry["start"] else Color("#849589"))
 			action("Reparar 30 de integridad · %d monedas" % (80 + game.cycle.day * 15),repair,not game.cycle.is_night and game.zombie_manager.base_health < 100)
-			action("Ampliar galería · %d monedas" % (7500 if game.grid.cave_width == 7 else 30000),expand_gallery,game.grid.cave_width in [7,11] and not game.cycle.is_night)
+			var stage: Dictionary = Catalog.next_expansion(game.grid.cave_width)
+			if not stage.is_empty(): action("Ampliar a %d × %d · %d monedas" % [stage["size"].x,stage["size"].y,stage["price"]],expand_gallery,game.progression.is_item_unlocked("expansion"))
+			else: text("Excavación completa · 1200 casillas")
 			action("Dos plataformas adicionales · %d monedas" % (5000 * game.grid.defense_tiles.size()),add_platforms,game.grid.defense_tiles.size() in [2,4] and not game.cycle.is_night)
 			var rank: int = state.get("arsenal_rank",0)
-			text("Arsenal industrial · Mejora %d/3" % rank,20,Color("#ffe0a0"))
+			text("Arsenal industrial · Mejora %d/3" % rank,20,Color("#e2edf5"))
 			text("Cada mejora: +20 % de daño, +25 % de capacidad y −10 % de intervalo en las armas industriales.",14)
 			if rank < 3:
 				var upgrade: Dictionary = Catalog.INDUSTRIAL_UPGRADES[rank]
@@ -281,8 +290,17 @@ func show_tab(tab: String) -> void:
 				for ingredient: String in upgrade["cost"]: requirements += "%d × %s  " % [upgrade["cost"][ingredient],game.shop.RESOURCE_LABELS.get(ingredient,Catalog.label(ingredient))]
 				text(requirements,14)
 				action("Mejorar arsenal",upgrade_arsenal,state["best_night"] >= upgrade["night"] and available(upgrade["cost"]) and not game.cycle.is_night)
+		"Historia":
+			var director: Node = game.get_node("StoryDirector")
+			for id: String in director.SCENES:
+				var unlocked: bool = director.seen().has(id)
+				text(director.SCENES[id]["chapter"] + (" · Recuperado" if unlocked else " · Señal perdida"),18)
+				if unlocked:
+					text(director.SCENES[id]["text"],15)
+					action("Reproducir escena",func(): close_panel(); director.play(id))
+				else: text("Descubre este archivo al avanzar o derrotar a su jefe.",14)
 		"Taller":
-			text("Munición industrial",24,Color("#ffe0a0"))
+			text("Munición industrial",24,Color("#e2edf5"))
 			text("Usa materiales sueltos de la mina. El producto aparece en una casilla libre o se apila. Las cintas pueden cargar las armas; cada arma usa su propia munición.",14)
 			for kind: String in Catalog.CRAFTS:
 				var recipe: Dictionary = Catalog.CRAFTS[kind]
@@ -297,8 +315,9 @@ func show_tab(tab: String) -> void:
 				var label: Label = game.shop.create_label(description,14)
 				label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 				row.add_child(label)
-				action("Fabricar " + Catalog.LABELS[kind],craft.bind(kind),can_craft(kind))
-				action(("✓ Repetición activa · " if state["repeat_recipe"] == kind else "Repetir automáticamente · ") + Catalog.LABELS[kind],func(): state["repeat_recipe"] = "" if state["repeat_recipe"] == kind else kind,game.progression.is_item_unlocked("nitrate"))
+				text(Catalog.UNLOCKS[kind]["hint"],14)
+				action(("Fabricar " if game.progression.is_item_unlocked(kind) else "Bloqueado · ") + Catalog.LABELS[kind],craft.bind(kind),can_craft(kind))
+				action(("✓ Repetición activa · " if state["repeat_recipe"] == kind else "Repetir automáticamente · ") + Catalog.LABELS[kind],func(): state["repeat_recipe"] = "" if state["repeat_recipe"] == kind else kind,game.progression.is_item_unlocked(kind))
 		"Logros":
 			for entry: Dictionary in achievements():
 				text(("★ " if state["achievements"].has(entry["id"]) else "○ ") + entry["name"] + " · %d/%d" % [mini(entry["current"],entry["target"]),entry["target"]],16,Color("#f2d49b") if state["achievements"].has(entry["id"]) else Color("#9ab2a7"))
@@ -316,13 +335,17 @@ func show_tab(tab: String) -> void:
 				var descriptions := VBoxContainer.new()
 				descriptions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 				row.add_child(descriptions)
-				descriptions.add_child(game.shop.create_label(stats["name"],20,Color("#f0ce93")))
+				descriptions.add_child(game.shop.create_label(stats["name"],20,Color("#e2edf5")))
 				var detail: Label = game.shop.create_label("Vida %.1f · Blindaje %.1f · Velocidad %.0f\n%s" % [stats["health"],stats["armor"],stats["speed"],mechanics.get(enemy,"Mantén las armas cargadas y controla su avance.")],14)
 				detail.custom_minimum_size.x = 570
 				descriptions.add_child(detail)
 
 static func valid_state(data: Variant) -> bool:
 	if not data is Dictionary: return false
+	if not data.get("tool_tier",1) is int or data.get("tool_tier",1) not in [1,2,3,4]: return false
+	if not data.get("story_seen",{}) is Dictionary: return false
+	for id: Variant in data.get("story_seen",{}):
+		if not preload("res://Scripts/story_director.gd").SCENES.has(id) or not data["story_seen"][id] is bool: return false
 	if not data.get("arsenal_rank",0) is int or data.get("arsenal_rank",0) not in [0,1,2,3]: return false
 	for key: String in ["kills","bosses","flawless","best_night","elapsed_play","health_at_dusk"]:
 		if not (data.get(key) is int or data.get(key) is float) or not is_finite(float(data[key])) or data[key] < 0 or data[key] > 1e12: return false

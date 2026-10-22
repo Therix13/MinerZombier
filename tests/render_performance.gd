@@ -26,12 +26,11 @@ func run_checks() -> void:
 	game.redraw_world()
 	await settle()
 	check(renderer.ground_rebuilds == rebuilds + 1, "Expanding the base invalidates terrain exactly once")
-	var atlas: GDScript = load("res://Scripts/art_atlas.gd")
-	check(atlas.prepare() and atlas.KEYS.size() == 109 and atlas.regions.size() == 109, "All 109 artwork states share one prepared atlas")
-	var atlas_image: Image = atlas.texture.get_image()
-	for key: String in atlas.KEYS:
-		var region: Rect2 = atlas.regions[key]
-		check(atlas_image.get_region(Rect2i(region)).get_used_rect().size != Vector2i.ZERO, "Cached artwork contains visible pixels: " + key)
+	var art = preload("res://Scripts/content_art.gd")
+	for kind: String in game.mining.ORE_KINDS:
+		var texture: ImageTexture = art.resource_texture(kind)
+		check(texture.get_size() == Vector2(192,192) and texture.get_image().has_mipmaps() and texture.get_image().get_used_rect().size != Vector2i.ZERO,"Supersampled vector icon has visible geometry and mipmaps: " + kind)
+	check(renderer.texture_filter == CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS,"World uses smooth filtering instead of pixel-art nearest-neighbor sampling")
 	var zombie_script: GDScript = load("res://Scripts/zombie.gd")
 	var enemy: Node2D = zombie_script.new()
 	check(enemy.get_body_atlas() == zombie_script.get_body_atlas(), "All enemies reuse one body atlas")

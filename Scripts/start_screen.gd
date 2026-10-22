@@ -29,7 +29,7 @@ func _ready() -> void:
 	screen.add_child(center)
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(440,0)
-	var style: StyleBoxFlat = session.game.shop.create_style("#192d26", "#d4ac68", 2, 18)
+	var style: StyleBoxFlat = session.game.shop.create_style("#192b3d", "#d4ac68", 2, 18)
 	style.content_margin_left = 32
 	style.content_margin_right = 32
 	style.content_margin_top = 28
@@ -47,8 +47,8 @@ func _ready() -> void:
 	column.add_child(art_row)
 	for kind: String in ["ore:coal_3","ore:copper_ingot_3","launcher"]:
 		art_row.add_child(session.game.shop.create_item_preview(kind,Vector2(58,58)))
-	add_text(column,"MINER ZOMBIER",34,Color("#ffe0a1"))
-	add_text(column,"Extrae · Fusiona · Resiste",15,Color("#aac7b2"))
+	add_text(column,"MINER ZOMBIER",34,Color("#e2edf5"))
+	add_text(column,"Extrae · Fusiona · Resiste",15,Color("#9fb5c7"))
 	var line := HSeparator.new()
 	column.add_child(line)
 	main_page = VBoxContainer.new()
@@ -57,7 +57,7 @@ func _ready() -> void:
 	continue_button = button("CARGAR PARTIDA")
 	continue_button.pressed.connect(show_load_page)
 	main_page.add_child(continue_button)
-	summary = add_text(main_page,"",13,Color("#aac7b2"))
+	summary = add_text(main_page,"",13,Color("#9fb5c7"))
 	new_button = button("NUEVA PARTIDA")
 	new_button.pressed.connect(request_new_game)
 	main_page.add_child(new_button)
@@ -67,8 +67,8 @@ func _ready() -> void:
 	load_page = VBoxContainer.new()
 	load_page.add_theme_constant_override("separation",10)
 	column.add_child(load_page)
-	add_text(load_page,"ARCHIVOS DE PARTIDA",21,Color("#ffe0a1"))
-	add_text(load_page,"Continúa tu partida o vuelve al inicio de un día.",13,Color("#aac7b2"))
+	add_text(load_page,"ARCHIVOS DE PARTIDA",21,Color("#e2edf5"))
+	add_text(load_page,"Continúa tu partida o vuelve al inicio de un día.",13,Color("#9fb5c7"))
 	file_scroll = ScrollContainer.new()
 	file_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	load_page.add_child(file_scroll)
@@ -83,7 +83,7 @@ func _ready() -> void:
 	confirmation = VBoxContainer.new()
 	confirmation.add_theme_constant_override("separation",12)
 	column.add_child(confirmation)
-	add_text(confirmation,"¿Empezar de nuevo?",22,Color("#ffe0a1"))
+	add_text(confirmation,"¿Empezar de nuevo?",22,Color("#e2edf5"))
 	add_text(confirmation,"Al guardar, se iniciará un nuevo archivo de días.",14,Color("#e0c4a3"))
 	var confirm := button("CREAR NUEVA PARTIDA")
 	confirm.pressed.connect(func(): session.begin("new"))
@@ -163,11 +163,11 @@ func show_load_page() -> void:
 		texts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		texts.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		content.add_child(texts)
-		var title: Label = add_text(texts,"Último guardado · Día %d" % entry["day"] if action == "continue" else "Día %d · Inicio del día" % entry["day"],17,Color("#ffe0a1"))
+		var title: Label = add_text(texts,"Último guardado · Día %d" % entry["day"] if action == "continue" else "Día %d · Inicio del día" % entry["day"],17,Color("#e2edf5"))
 		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		title.autowrap_mode = TextServer.AUTOWRAP_OFF
 		var detail: String = "%d monedas · %s" % [entry["coins"],("Noche" if entry["night"] else "Partida en curso") if action == "continue" else "06:00"]
-		var subtitle: Label = add_text(texts,detail,13,Color("#aac7b2"))
+		var subtitle: Label = add_text(texts,detail,13,Color("#9fb5c7"))
 		subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		subtitle.autowrap_mode = TextServer.AUTOWRAP_OFF
 		file_list.add_child(card)
@@ -209,26 +209,13 @@ class MineBackdrop extends Control:
 		resized.connect(queue_redraw)
 
 	func _draw() -> void:
-		draw_rect(Rect2(Vector2.ZERO,size),Color("#101e24"))
-		var horizon: float = size.y * 0.42
-		var center_x: float = size.x * 0.5
-		draw_circle(Vector2(size.x*0.82,horizon*0.35),38,Color("#697d71"))
-		draw_circle(Vector2(size.x*0.82+13,horizon*0.35-8),34,Color("#101e24"))
-		for index in range(12):
-			var x: float = float(index) * size.x / 11
-			var height: float = 60 + float(index%4)*22
-			draw_colored_polygon(PackedVector2Array([Vector2(x-75,horizon+15),Vector2(x,horizon-height),Vector2(x+75,horizon+15)]),Color("#1d342e"))
-		draw_rect(Rect2(0,horizon,size.x,size.y-horizon),Color("#172a25"))
-		var tile: float = 52
-		for y in range(int((size.y-horizon)/tile)+1):
-			for x in range(int(size.x/tile)+1):
-				var rect := Rect2(float(x)*tile,horizon+float(y)*tile,tile-1,tile-1)
-				draw_rect(rect,Color("#233b30") if absi(int(float(x)*tile-center_x)) < 265 else Color("#192b29"))
-				if x%4 == 0 and y%3 == 1:
-					draw_circle(rect.position+Vector2(17,19),4,Color("#435244"))
-		# A quiet mine entrance and copper rails frame the menu without animating the world.
-		for x: float in [center_x-295,center_x+295]:
-			draw_rect(Rect2(x-4,horizon-6,8,size.y-horizon+6),Color("#8f6c3d"))
-			for y in range(int((size.y-horizon)/tile)+1):
-				draw_rect(Rect2(x-17,horizon+float(y)*tile+22,34,7),Color("#6f5535"))
-		draw_rect(Rect2(0,0,size.x,5),Color("#b58a4e"))
+		draw_rect(Rect2(Vector2.ZERO,size),Color("#101c2c"))
+		var center: Vector2 = size*.5
+		for i in range(9):
+			var extent := Vector2(260+i*55,160+i*42)
+			var points := PackedVector2Array([center+Vector2(-extent.x,extent.y),center+Vector2(-extent.x,-extent.y*.5),center+Vector2(-extent.x*.5,-extent.y),center+Vector2(extent.x*.5,-extent.y),center+Vector2(extent.x,-extent.y*.5),center+extent])
+			draw_polyline(points,Color("#24394e"),1,true)
+		for side in [-1,1]:
+			var x: float = center.x+side*300
+			draw_line(Vector2(x,80),Vector2(x,size.y-80),Color("#40586d"),1,true)
+			draw_line(Vector2(x,center.y-50),Vector2(x,center.y+50),Color("#6ee7ce"),3,true)

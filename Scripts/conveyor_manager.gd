@@ -12,7 +12,7 @@ const CORNER_RIGHT := "corner_right"
 const CORNER_LEFT := "corner_left"
 const JUNCTION := "junction"
 const FILTER := "filter"
-const FILTER_MATERIALS := ["coal", "copper", "iron", "gold", "nitrate", "sulfur", "tungsten", "powder", "bullet", "grenade", "rocket", "battery"]
+const FILTER_MATERIALS := ["coal", "copper", "iron", "gold", "nitrate", "sulfur", "tungsten", "powder", "bullet", "highcaliber", "grenade", "rocket", "battery"]
 
 var grid: RefCounted
 var mining: RefCounted
@@ -88,7 +88,7 @@ func accepts_from(destination: Vector2i, source: Vector2i) -> bool:
 	var index: int = input_index(destination, source)
 	var shape: String = belt_shape(destination)
 	match shape:
-		STRAIGHT, FILTER:
+		STRAIGHT, FILTER, "splitter", "ejector":
 			return index == 2
 		CORNER, CORNER_RIGHT:
 			return index == 3
@@ -106,23 +106,36 @@ func set_filter(cell: Vector2i, material: String) -> bool:
 
 func output_direction(cell: Vector2i, kind: String) -> int:
 	var direction: int = belt_direction(cell)
+	if belt_shape(cell) == "splitter": return posmod(direction + (1 if int(belt_data(cell).get("turn",0)) % 2 == 0 else 3),4)
 	if belt_shape(cell) == FILTER and kind.get_slice("_",0) != belt_data(cell).get("filter","coal"):
 		return (direction + 1) % 4
 	return direction
 
 func advance(delta: float) -> void:
 	accumulator += delta
-	if accumulator < move_interval:
-		return
-	accumulator = fmod(accumulator, move_interval)
-	tick()
+	if accumulator < 0.25: return
+	var steps: int = mini(32,floori(accumulator / 0.25))
+	accumulator = fmod(accumulator,0.25)
+	for step in range(steps):
+		var ready: Dictionary = {}
+		for cell: Vector2i in belts:
+			var data: Dictionary = belt_data(cell)
+			var tiers: Node = mining.furnaces.get_parent().get_node_or_null("ToolFusion") if mining.furnaces != null else null
+			var speed: float = 1.0 if tiers == null else tiers.speed(cell)
+			data["clock"] = float(data.get("clock",0)) + 0.25
+			if data["clock"] >= move_interval / speed:
+				data["clock"] = fmod(data["clock"],move_interval / speed)
+				ready[cell] = true
+			belts[cell] = data
+		if not ready.is_empty(): tick(ready)
 
-func tick() -> void:
+func tick(ready: Dictionary = {}) -> void:
 	var requests: Dictionary = {}
 	var sales: Array[Dictionary] = []
 	var construction_deliveries: Array[Dictionary] = []
 	for key in belts:
 		var source: Vector2i = key
+		if not ready.is_empty() and not ready.has(source): continue
 		if mining.nuggets_at(source) == 0:
 			continue
 		var kind: String = mining.nugget_type(source)
@@ -144,7 +157,7 @@ func tick() -> void:
 			requests[destination].append({"source": source, "kind": kind})
 		elif destination == grid.sale_cell:
 			sales.append({"source": source, "kind": kind})
-		elif belts.has(destination) and mining.can_move_nugget(destination) and accepts_from(destination, source):
+		elif mining.can_move_nugget(destination) and ((belt_shape(source) == "ejector" and grid.is_valid_cell(destination) and not belts.has(destination)) or (belts.has(destination) and accepts_from(destination, source))):
 			if not requests.has(destination):
 				requests[destination] = []
 			requests[destination].append({"source": source, "kind": kind})
@@ -183,9 +196,11 @@ func tick() -> void:
 		return
 	for transfer in transfers:
 		mining.remove_one_nugget(transfer["source"], transfer["kind"])
+		if belt_shape(transfer["source"]) == "splitter": belts[transfer["source"]]["turn"] = (int(belt_data(transfer["source"]).get("turn",0)) + 1) % 2
 		transported.emit(transfer["source"], transfer.get("destination", grid.sale_cell), transfer["kind"])
 	for transfer in sales:
 		mining.remove_one_nugget(transfer["source"], transfer["kind"])
+		if belt_shape(transfer["source"]) == "splitter": belts[transfer["source"]]["turn"] = (int(belt_data(transfer["source"]).get("turn",0)) + 1) % 2
 		transported.emit(transfer["source"], transfer.get("destination", grid.sale_cell), transfer["kind"])
 		sale_completed.emit(transfer["kind"])
 	for transfer in transfers:

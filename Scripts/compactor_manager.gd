@@ -1,6 +1,5 @@
 extends Node2D
 
-const ArtAtlas = preload("res://Scripts/art_atlas.gd")
 var rasterizing: bool = false
 
 signal changed
@@ -127,7 +126,7 @@ func process_outputs(delta: float = 0.0) -> void:
 		if int(data["points"]) < REQUIRED_POINTS: continue
 		var duration: float = process_time(data)
 		var previous_time: float = float(data["elapsed"])
-		data["elapsed"] = minf(duration,previous_time + maxf(delta,0.0))
+		data["elapsed"] = minf(duration,previous_time + maxf(delta,0.0) * game.get_node("ToolFusion").speed(cell))
 		if data["elapsed"] != previous_time: queue_redraw()
 		if float(data["elapsed"]) < duration: continue
 		var destination: Vector2i = cell + DIRECTIONS[int(data["direction"])]
@@ -204,27 +203,4 @@ func _draw() -> void:
 		draw_machine(game.get("drag_world_position"), data)
 
 func draw_machine(center: Vector2, data: Dictionary) -> void:
-	var cached: bool = not rasterizing and ArtAtlas.paint(self, "compactor:%d" % int(data["direction"]), center)
-	if not cached:
-		var rect := Rect2(center - Vector2(21, 21), Vector2(42, 42))
-		draw_rect(rect, Color("#292b2d"))
-		draw_rect(rect.grow(-3), Color("#697377"))
-		draw_rect(rect, Color("#d1ad6b"), false, 2)
-		draw_rect(Rect2(center + Vector2(-12, -14), Vector2(24, 5)), Color("#c2a064"))
-		draw_rect(Rect2(center + Vector2(-12, 6), Vector2(24, 5)), Color("#c2a064"))
-		draw_line(center + Vector2(-16, -9), center + Vector2(-16, 10), Color("#333c40"), 4)
-		draw_line(center + Vector2(16, -9), center + Vector2(16, 10), Color("#333c40"), 4)
-	var points: int = int(data.get("points",0))
-	draw_rect(Rect2(center + Vector2(-10,12),Vector2(20,8)),Color("#697377"))
-	for index in range(REQUIRED_POINTS):
-		draw_circle(center + Vector2(-14 + index * 4,16),1.3,Color("#eac978") if index < points else Color("#303638"))
-	if points > 0:
-		draw_circle(center + Vector2(0,-1),5,Color("#c77c48") if str(data["kind"]).begins_with("copper") else Color("#29292d"))
-	if points >= REQUIRED_POINTS:
-		draw_rect(Rect2(center + Vector2(-12,-3),Vector2(24,4)),Color("#303638"))
-		draw_rect(Rect2(center + Vector2(-12,-3),Vector2(24 * clampf(float(data["elapsed"]) / process_time(data),0,1),4)),Color("#eac978"))
-	if cached: return
-	var output := Vector2(DIRECTIONS[int(data["direction"])])
-	var tip := center + output * 21
-	var side := Vector2(-output.y, output.x)
-	draw_colored_polygon(PackedVector2Array([tip, tip - output * 7 + side * 4, tip - output * 7 - side * 4]), Color("#ffe084"))
+	preload("res://Scripts/content_art.gd").machine(self,center,"compactor",int(data.get("direction",0)),float(data.get("elapsed",0))*3)

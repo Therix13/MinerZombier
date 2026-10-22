@@ -20,7 +20,7 @@ func _ready() -> void:
 	card = PanelContainer.new()
 	card.position = Vector2(20,138)
 	card.custom_minimum_size.x = 270
-	var style: StyleBoxFlat = game.shop.create_style("#192d26","#d6ae67",2,10)
+	var style: StyleBoxFlat = game.shop.create_style("#192b3d","#d6ae67",2,10)
 	style.content_margin_left = 12
 	style.content_margin_right = 12
 	style.content_margin_top = 10

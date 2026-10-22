@@ -217,15 +217,10 @@ func _draw() -> void:
 		return
 	var center_x: float = grid.get_cell_rect(grid.sale_cell).get_center().x
 	var center_y: float = grid.GRID_OFFSET_Y - 81.0
-	var outer := Rect2(Vector2(center_x - 65.0, center_y), Vector2(130.0, 18.0))
-	draw_rect(outer, Color("#33271e"))
-	draw_rect(outer.grow(-3.0), Color("#803b36"))
-	var fill_width: float = 124.0 * base_health / BASE_MAX_HEALTH
-	if fill_width > 0.0:
-		draw_rect(Rect2(outer.position + Vector2(3.0, 3.0), Vector2(fill_width, 12.0)), Color("#8cb46e"))
-	draw_rect(outer, Color("#c49a5e"), false, 2.0)
-	var label: String = str(int(base_health)) + " / " + str(int(BASE_MAX_HEALTH))
-	draw_string(ThemeDB.fallback_font, Vector2(center_x - 24.0, center_y - 5.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#e8d6b1"))
+	draw_line(Vector2(center_x-60,center_y+7),Vector2(center_x+60,center_y+7),Color("#142233"),5,true)
+	if base_health > 0: draw_line(Vector2(center_x-60,center_y+7),Vector2(center_x-60+120*base_health/BASE_MAX_HEALTH,center_y+7),Color("#6ee7ce"),5,true)
+	var label: String = "%d / %d" % [int(base_health),int(BASE_MAX_HEALTH)]
+	draw_string(ThemeDB.fallback_font,Vector2(center_x-24,center_y-5),label,HORIZONTAL_ALIGNMENT_LEFT,-1,11,Color("#d6e5f3"))
 
 	for shot: Dictionary in acid_shots:
 		var t: float = clampf(float(shot["age"]) / float(shot["duration"]),0,1)

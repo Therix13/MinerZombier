@@ -26,6 +26,8 @@ func stores() -> Dictionary:
 	result["saw"] = game.get_node("Saws").machines
 	result["furnace"] = game.get_node("Furnaces").machines
 	for material: String in game.mining.extra_veins: result[material + "_vein"] = game.mining.extra_veins[material]
+	var tiers: Node = game.get_node_or_null("ToolFusion")
+	if tiers != null: result["tool_tier"] = tiers.levels
 	result.merge(game.get("mining").nugget_stores())
 	return result
 
@@ -90,6 +92,7 @@ func can_drop(kind: String, source: Vector2i, destination: Vector2i) -> bool:
 	if not phase_allows() or (not grid.owned_tiles.has(source) and not grid.defense_tiles.has(source)) or not has_kind(source, kind) or not game.get("cycle").allows_interaction(kind, source, destination, true):
 		return false
 	if destination == grid.sale_cell: return kind == "nugget" or can_sell(kind, source)
+	if game.get_node("ToolFusion").can_fuse(kind,source,destination): return not game.cycle.is_night
 	if kind == "blueprint": return game.get_node("Construction").can_move(source,destination)
 	if kind == "launcher" and game.get("launchers").can_fuse(source,destination):
 		return not game.get("cycle").is_night
@@ -170,12 +173,14 @@ func sell(kind: String, source: Vector2i) -> bool:
 		for material: String in game.mining.extra_veins: data.erase(material + "_vein")
 	else:
 		data.erase(kind)
+	data.erase("tool_tier")
 	if kind == "belt": data.erase("entry")
 	apply_cells({source: data})
 	game.get("economy").add(refund)
 	return true
 
 func swaps_contents(kind: String, source: Vector2i, destination: Vector2i) -> bool:
+	if game.get_node("ToolFusion").can_fuse(kind,source,destination): return false
 	if kind == "launcher" and game.get("launchers").can_fuse(source,destination): return false
 	if kind == "vein" and game.get("mining").can_fuse_veins(source, destination): return false
 	if kind == "nugget" and game.get("mining").occupied_by_machine(destination): return false
@@ -209,6 +214,7 @@ func apply_cells(cells: Dictionary) -> void:
 func drop(kind: String, source: Vector2i, destination: Vector2i, direction: int = -1) -> bool:
 	if not can_drop(kind, source, destination):
 		return false
+	if game.get_node("ToolFusion").can_fuse(kind,source,destination): return game.get_node("ToolFusion").fuse(kind,source,destination)
 	if kind == "blueprint": return game.get_node("Construction").move_plan(source,destination,direction)
 	if destination == grid.sale_cell and kind != "nugget": return sell(kind, source)
 	var mining: RefCounted = game.get("mining")
@@ -326,12 +332,14 @@ func item_price(item: String) -> int:
 	var economy: RefCounted = game.get("economy")
 	if preload("res://Scripts/content_catalog.gd").VEIN_PRICES.has(item): return preload("res://Scripts/content_catalog.gd").VEIN_PRICES[item]
 	if preload("res://Scripts/content_catalog.gd").WEAPONS.has(item): return preload("res://Scripts/content_catalog.gd").WEAPONS[item]["price"]
+	if item == "splitter": return 150
+	if item == "ejector": return 250
 	match item:
 		"coal": return economy.COAL_VEIN_PRICE
 		"copper": return economy.COPPER_VEIN_PRICE
 		"iron": return economy.IRON_VEIN_PRICE
 		"gold": return economy.GOLD_VEIN_PRICE
-		"straight", "corner_right", "corner_left", "junction", "filter": return economy.CONVEYOR_PRICE
+		"straight", "corner_right", "corner_left", "junction", "filter", "splitter", "ejector": return economy.CONVEYOR_PRICE
 		"drill": return economy.DRILL_PRICE
 		"launcher": return economy.LAUNCHER_PRICE
 		"compactor": return game.get_node("Compactors").PRICE
@@ -342,7 +350,7 @@ func item_price(item: String) -> int:
 func select_item(item: String) -> bool:
 	var cycle: RefCounted = game.get("cycle")
 	var shop: Control = game.get("shop")
-	var action: String = "buy_conveyor" if item in ["straight", "corner_right", "corner_left", "junction", "filter"] else "buy_" + item
+	var action: String = "buy_conveyor" if item in ["straight", "corner_right", "corner_left", "junction", "filter", "splitter", "ejector"] else "buy_" + item
 	if get_tree().paused or cycle.defeated or not cycle.allows_action(action) or not shop.tutorial_allows_item(item) or not game.get("progression").is_item_unlocked(item): return false
 	var price: int = item_price(item)
 	if price < 0 or not game.get("economy").can_afford(price): return false
@@ -359,7 +367,7 @@ func select_item(item: String) -> bool:
 			game.set("placement_direction", 0)
 		"coal": game.set("placing_coal", true)
 		"copper": game.set("placing_copper", true)
-		"straight", "corner_right", "corner_left", "junction", "filter":
+		"straight", "corner_right", "corner_left", "junction", "filter", "splitter", "ejector":
 			game.set("placing_belt", true)
 			game.set("belt_shape", item)
 		"drill": game.set("placing_drill", true)
@@ -413,9 +421,9 @@ func can_place_item(cell: Vector2i, item: String) -> bool:
 	var valid: bool = false
 	match item:
 		"coal", "copper", "iron", "gold", "nitrate", "sulfur", "tungsten": valid = game.get("mining").can_place_vein(cell) and not game.get("launchers").launchers.has(cell)
-		"straight", "corner_right", "corner_left", "junction", "filter": valid = game.get("conveyors").can_place(cell)
+		"straight", "corner_right", "corner_left", "junction", "filter", "splitter", "ejector": valid = game.get("conveyors").can_place(cell)
 		"drill": valid = game.get("drills").can_place(cell) and not game.get("launchers").launchers.has(cell)
-		"pistol", "grenadier", "rocketeer", "tesla", "launcher", "launcher_2": valid = game.get("launchers").can_place(cell)
+		"pistol", "ak47", "minigun", "grenadier", "rocketeer", "tesla", "launcher", "launcher_2": valid = game.get("launchers").can_place(cell)
 		"compactor": valid = game.get_node("Compactors").can_place(cell)
 		"saw": valid = game.get_node("Saws").can_place(cell)
 		"furnace": valid = game.get_node("Furnaces").can_place(cell)
@@ -425,14 +433,14 @@ func build_selected(cell: Vector2i, item: String, direction: int) -> void:
 	var cycle: RefCounted = game.get("cycle")
 	match item:
 		"coal", "copper", "iron", "gold", "nitrate", "sulfur", "tungsten": game.get("mining").place_vein(cell, direction, item)
-		"straight", "corner_right", "corner_left", "junction", "filter": game.get("conveyors").place(cell, direction, item)
+		"straight", "corner_right", "corner_left", "junction", "filter", "splitter", "ejector": game.get("conveyors").place(cell, direction, item)
 		"drill": game.get("drills").place(cell, direction)
 		"launcher":
 			game.get("launchers").place(cell)
 			cycle.use_free_launcher()
 			game.set("placing_free_launcher", false)
 		"launcher_2": game.get("launchers").place(cell,2)
-		"pistol", "grenadier", "rocketeer", "tesla":
+		"pistol", "ak47", "minigun", "grenadier", "rocketeer", "tesla":
 			game.launchers.place(cell,2)
 			game.launchers.launchers[cell]["weapon"] = item
 		"compactor": game.get_node("Compactors").place(cell, direction)

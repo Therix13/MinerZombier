@@ -236,50 +236,23 @@ func show_hit(amount: float) -> void:
 # All enemies share one small atlas, including every dismemberment/flash state.
 # Bobbing changes the sprite transform, rather than tessellating circles each frame.
 static var body_atlas: ImageTexture
-const BODY_SIZE := Vector2i(64, 96)
-
-static func paint_rect(image: Image, origin: Vector2i, rect: Rect2i, color: Color) -> void:
-	image.fill_rect(Rect2i(origin + rect.position * 2, rect.size * 2), color)
-
-static func paint_circle(image: Image, origin: Vector2i, center: Vector2, radius: float, color: Color) -> void:
-	var at: Vector2 = Vector2(origin) + center * 2
-	var r: float = radius * 2
-	for y in range(floori(at.y - r), ceili(at.y + r)):
-		for x in range(floori(at.x - r), ceili(at.x + r)):
-			if Vector2(x + 0.5, y + 0.5).distance_squared_to(at) <= r * r:
-				image.set_pixel(x, y, color)
+const BODY_SIZE := Vector2i(128, 192)
 
 static func get_body_atlas() -> ImageTexture:
 	if body_atlas != null: return body_atlas
-	var image := Image.create(BODY_SIZE.x * 8, BODY_SIZE.y * 16, false, Image.FORMAT_RGBA8)
+	var image := Image.create(BODY_SIZE.x*8,BODY_SIZE.y*16,false,Image.FORMAT_RGBA8)
 	for state in range(128):
-		var origin := Vector2i(state % 8, state / 8) * BODY_SIZE + Vector2i(32, 40)
-		var stride: int = [-2,0,2,0][int(state / 32)]
-		var arms := Color("#a9b86c") if state % 32 >= 16 else Color("#849c66")
-		paint_circle(image, origin, Vector2(1, 11), 13, Color(0, 0, 0, 0.21))
-		if state & 4: paint_rect(image, origin, Rect2i(-7, 14 + stride, 5, 9), Color("#556d43"))
-		if state & 8: paint_rect(image, origin, Rect2i(2, 14 - stride, 5, 9), Color("#556d43"))
-		paint_rect(image, origin, Rect2i(-8, 1, 16, 16), Color("#394b35"))
-		if state & 1: paint_rect(image, origin, Rect2i(-11, 6, 6, 13), arms)
-		if state & 2: paint_rect(image, origin, Rect2i(5, 6, 6, 13), arms)
-		paint_circle(image, origin, Vector2(0, -6), 11, Color("#202e24"))
-		paint_circle(image, origin, Vector2(0, -7), 9, Color("#8aab6a"))
-		paint_rect(image, origin, Rect2i(-6, -9, 4, 3), Color("#ecde83"))
-		paint_rect(image, origin, Rect2i(2, -9, 4, 3), Color("#ecde83"))
-		paint_rect(image, origin, Rect2i(-3, -2, 6, 2), Color("#384b36"))
-		# Pixel shading, torn workwear, boots and facial asymmetry keep silhouettes readable.
-		paint_rect(image,origin,Rect2i(-7,2,3,11),Color("#586551"))
-		paint_rect(image,origin,Rect2i(3,3,4,10),Color("#253b35"))
-		paint_rect(image,origin,Rect2i(-2,3,2,11),Color("#a99c77"))
-		paint_rect(image,origin,Rect2i(-7,10,5,3),Color("#695042"))
-		paint_rect(image,origin,Rect2i(-7,-15,10,3),Color("#3e4c3b"))
-		paint_rect(image,origin,Rect2i(-7,-7,3,5),Color("#607f51"))
-		paint_rect(image,origin,Rect2i(5,-6,3,5),Color("#698252"))
-		paint_rect(image,origin,Rect2i(-4,-1,9,3),Color("#293a30"))
-		paint_rect(image,origin,Rect2i(-2,-1,2,2),Color("#ddd0a4"))
-		paint_rect(image,origin,Rect2i(2,-1,2,2),Color("#ddd0a4"))
-		if state & 4: paint_rect(image,origin,Rect2i(-8,21 + stride,7,3),Color("#273537"))
-		if state & 8: paint_rect(image,origin,Rect2i(1,21 - stride,7,3),Color("#273537"))
+		var stride: int = [-2,0,2,0][int(state/32)]
+		var body := '<ellipse cx="16" cy="37" rx="12" ry="3" fill="#0d1725" opacity=".35"/><rect x="8" y="19" width="16" height="16" rx="6" fill="#547c7b"/>'
+		if state & 4: body += '<path d="M12 32v%d" stroke="#354b60" stroke-width="5" stroke-linecap="round"/>' % (10+stride)
+		if state & 8: body += '<path d="M20 32v%d" stroke="#354b60" stroke-width="5" stroke-linecap="round"/>' % (10-stride)
+		if state & 1: body += '<path d="M8 24l-3 9" stroke="#a3c6b0" stroke-width="5" stroke-linecap="round"/>'
+		if state & 2: body += '<path d="M24 24l3 9" stroke="#a3c6b0" stroke-width="5" stroke-linecap="round"/>'
+		body += '<rect x="8" y="7" width="16" height="15" rx="7" fill="%s"/><path d="M11 14h3m4 0h3" stroke="#e9f4d0" stroke-width="2" stroke-linecap="round"/><path d="M14 19h4" stroke="#354b60" stroke-width="1.5" stroke-linecap="round"/>' % ("#f2d8cd" if state & 16 else "#a3c6b0")
+		var part := Image.new()
+		part.load_svg_from_string('<svg xmlns="http://www.w3.org/2000/svg" width="128" height="192" viewBox="0 0 32 48">'+body+'</svg>')
+		image.blit_rect(part,Rect2i(Vector2i.ZERO,BODY_SIZE),Vector2i(state%8,state/8)*BODY_SIZE)
+	image.generate_mipmaps()
 	body_atlas = ImageTexture.create_from_image(image)
 	return body_atlas
 
@@ -295,9 +268,9 @@ func create_body_sprite() -> void:
 	body_sprite.modulate = Color("#ffc68a") if archetype == "runner" else (Color("#b6ef85") if behavior() in ["spitter","plague"] else Color.WHITE)
 	var palettes := {"crawler":"#9baf88","stalker":"#a7b5cc","dodger":"#e5c19c","healer":"#b5e4c9","swarm":"#d1b78b","sapper":"#c6abc9","berserker":"#d4a693","warden":"#b2c8d8","executor":"#d6b69c"}
 	if palettes.has(archetype): body_sprite.modulate = Color(palettes[archetype])
-	body_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	body_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	body_sprite.region_enabled = true
-	body_sprite.scale = Vector2.ONE * 0.5
+	body_sprite.scale = Vector2.ONE * 0.25
 	add_child(body_sprite)
 
 func update_visual() -> void:

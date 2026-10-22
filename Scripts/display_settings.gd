@@ -187,7 +187,7 @@ func build_interface() -> void:
 	overlay.add_child(center)
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(520, 0)
-	panel.add_theme_stylebox_override("panel", make_style("#352516", "#a87843"))
+	panel.add_theme_stylebox_override("panel", make_style("#142233", "#476176"))
 	center.add_child(panel)
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
@@ -237,14 +237,14 @@ func build_interface() -> void:
 	vsync_checkbox.button_pressed = vsync_enabled
 	vsync_checkbox.custom_minimum_size.y = 32
 	vsync_checkbox.add_theme_font_size_override("font_size", 17)
-	vsync_checkbox.add_theme_color_override("font_color", Color("#f3dfb8"))
+	vsync_checkbox.add_theme_color_override("font_color", Color("#e2edf5"))
 	settings_page.add_child(vsync_checkbox)
 	auto_click_checkbox = CheckBox.new()
 	auto_click_checkbox.text = "Clic automático sobre vetas"
 	auto_click_checkbox.button_pressed = auto_click_enabled
 	auto_click_checkbox.custom_minimum_size.y = 42
 	auto_click_checkbox.add_theme_font_size_override("font_size", 19)
-	auto_click_checkbox.add_theme_color_override("font_color", Color("#f3dfb8"))
+	auto_click_checkbox.add_theme_color_override("font_color", Color("#e2edf5"))
 	auto_click_checkbox.toggled.connect(set_auto_click)
 	settings_page.add_child(auto_click_checkbox)
 	add_label(settings_page, "Mina al dejar el ratón encima de una veta.", 16)
@@ -276,7 +276,7 @@ func build_auto_click_prompt() -> void:
 	auto_click_prompt.add_child(center)
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size.x = 520
-	panel.add_theme_stylebox_override("panel", make_style("#352516", "#a87843"))
+	panel.add_theme_stylebox_override("panel", make_style("#142233", "#476176"))
 	center.add_child(panel)
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
@@ -301,7 +301,7 @@ func add_label(parent: Node, text: String, font_size: int) -> Label:
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_color", Color("#f3dfb8"))
+	label.add_theme_color_override("font_color", Color("#e2edf5"))
 	parent.add_child(label)
 	return label
 
@@ -309,7 +309,8 @@ func make_style(background: String, border: String) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(background)
 	style.border_color = Color(border)
-	style.set_border_width_all(3)
+	style.set_border_width_all(1)
+	style.anti_aliasing = true
 	style.set_corner_radius_all(10)
 	style.content_margin_left = 10
 	style.content_margin_right = 10
@@ -320,9 +321,9 @@ func make_button(text: String) -> Button:
 	button.text = text
 	button.custom_minimum_size.y = 46
 	button.add_theme_font_size_override("font_size", 19)
-	button.add_theme_stylebox_override("normal", make_style("#60401f", "#a87843"))
-	button.add_theme_stylebox_override("hover", make_style("#80562a", "#e0ad66"))
-	button.add_theme_stylebox_override("pressed", make_style("#352516", "#a87843"))
+	button.add_theme_stylebox_override("normal", make_style("#26394d", "#476176"))
+	button.add_theme_stylebox_override("hover", make_style("#35566a", "#e0ad66"))
+	button.add_theme_stylebox_override("pressed", make_style("#142233", "#476176"))
 	return button
 
 func open_menu() -> void:

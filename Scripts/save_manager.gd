@@ -188,7 +188,7 @@ func snapshot(include_checkpoint: bool = true) -> Dictionary:
 		"grid": {"width": game.grid.cave_width, "height": game.grid.cave_height, "platforms": not game.grid.defense_tiles.is_empty(), "defense_slots": game.grid.defense_tiles.size()},
 		"veins": veins, "resources": game.mining.nugget_stores().duplicate(true),
 		"belts": game.conveyors.belts.duplicate(true), "junctions": game.conveyors.last_junction_entry.duplicate(true),
-		"belt_time": game.conveyors.accumulator, "drills": game.drills.drills.duplicate(true), "drill_time": game.drills.accumulator,
+		"belt_time": game.conveyors.accumulator, "drills": game.drills.drills.duplicate(true), "drill_time": game.drills.accumulator, "tool_levels":game.get_node("ToolFusion").levels.duplicate(),
 		"launchers": game.launchers.launchers.duplicate(true),
 		"compactors": game.get_node("Compactors").machines.duplicate(true),
 		"furnaces": game.get_node("Furnaces").machines.duplicate(true),
@@ -438,6 +438,7 @@ func restore_snapshot(data: Dictionary) -> bool:
 	replace_dictionary(game.conveyors.belts,data["belts"])
 	replace_dictionary(game.conveyors.last_junction_entry,data["junctions"])
 	game.conveyors.accumulator = fmod(float(data["belt_time"]),game.conveyors.move_interval)
+	replace_dictionary(game.get_node("ToolFusion").levels,data.get("tool_levels",{}))
 	replace_dictionary(game.drills.drills,data["drills"])
 	game.drills.accumulator = data["drill_time"]
 	replace_dictionary(game.launchers.launchers,data["launchers"])
@@ -551,9 +552,14 @@ func valid_snapshot(data: Dictionary) -> bool:
 	if not data.get("tutorial_revision",1) is int or data.get("tutorial_revision",1) not in [1,2,TUTORIAL_REVISION]: return false
 	if data.get("version") != VERSION or not number(data.get("saved_at"),0,1e12) or not number(data.get("coins"),0,1e12) or not data.get("developer_mode") is bool: return false
 	if not dictionary_keys(data,["grid","veins","resources","belts","junctions","drills","launchers","compactors","furnaces","saws","blueprints","progression","cycle","wave","camera"]): return false
+	if not cells(data.get("tool_levels",{})): return false
+	for cell: Vector2i in data.get("tool_levels",{}):
+		if not data["belts"].has(cell) and not data["drills"].has(cell) and not data["furnaces"].has(cell) and not data["compactors"].has(cell) and not data["saws"].has(cell): return false
+	for tier: Variant in data.get("tool_levels",{}).values():
+		if not tier is int or tier < 1 or tier > 4: return false
 	var map: Dictionary = data["grid"]
 	if not map.get("width") is int or not map.get("height") is int: return false
-	if Vector2i(map.get("width",0),map.get("height",0)) not in [Vector2i(3,3),Vector2i(7,5),Vector2i(11,7),Vector2i(15,9)] or not map.get("platforms") is bool: return false
+	if Vector2i(map.get("width",0),map.get("height",0)) not in [Vector2i(3,3),Vector2i(7,5),Vector2i(11,7),Vector2i(15,9),Vector2i(19,14),Vector2i(23,21),Vector2i(27,30),Vector2i(30,40)] or not map.get("platforms") is bool: return false
 	if map.get("defense_slots",2 if map["platforms"] else 0) not in [0,2,4,6]: return false
 	for material: String in game.mining.VEIN_KINDS:
 		if not cells(data["veins"].get(material,{})): return false
@@ -568,7 +574,8 @@ func valid_snapshot(data: Dictionary) -> bool:
 	for belt: Variant in data["belts"].values():
 		if belt is int:
 			if not number(belt,0,3): return false
-		elif not belt is Dictionary or not number(belt.get("direction"),0,3) or belt.get("shape") not in ["straight","corner","corner_right","corner_left","junction","filter"]: return false
+		elif not belt is Dictionary or not number(belt.get("direction"),0,3) or belt.get("shape") not in ["straight","corner","corner_right","corner_left","junction","filter","splitter","ejector"]: return false
+		if belt is Dictionary and (not number(belt.get("clock",0.0),0,2) or not belt.get("turn",0) is int or belt.get("turn",0) not in [0,1]): return false
 		if belt is Dictionary and belt.get("shape") == "filter" and belt.get("filter","coal") not in game.conveyors.FILTER_MATERIALS: return false
 	for direction: Variant in data["drills"].values():
 		if not direction is int or not number(direction,0,3): return false

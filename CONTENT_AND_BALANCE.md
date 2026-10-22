@@ -28,12 +28,12 @@ Los planos también requieren sus lingotes. Cada arma industrial utiliza exclusi
 ## Progresión y economía
 
 - Siete etapas de campaña, con hitos en los días 1, 6, 21, 81, 181, 361 y 601.
-- Galerías ampliables a 11 × 7 y 15 × 9 por 7.500 y 30.000 monedas después de la primera expansión.
+- Siete ampliaciones sucesivas hasta cubrir las 1.200 casillas; precios y tamaños detallados abajo.
 - Hasta seis plataformas; las parejas adicionales cuestan 10.000 y 20.000 monedas.
 - Reparación de 30 puntos de integridad durante el día, limitada al máximo de 100. Precio: 80 + 15 por día.
 - Recompensa por noche: 100 + 40 por día, con límite de 15.000. Se paga antes del checkpoint de amanecer; cargar una victoria no vuelve a pagarla.
 - Tres mejoras del arsenal tras las noches 25, 100 y 250, con costes de 25.000/100.000/500.000 y lingotes industriales. Cada rango añade un 20 % de daño y un 25 % de capacidad sobre la base, y resta un 10 % del intervalo base.
-- 37 logros con seguimiento real de bajas, fabricación, jefes, noches superadas y noches sin daño. No conceden dinero repetible.
+- 55 logros con seguimiento real de bajas, fabricación, jefes, noches superadas y noches sin daño. No conceden dinero repetible.
 
 ## Combate
 
@@ -53,3 +53,56 @@ Se mantienen 24 zombis en la primera oleada, ocho adicionales por día hasta 160
 - Se conservan las pruebas de hornos, munición mineral, hordas, filtradores, guardado por día, sonidos y presupuesto de renderizado.
 
 El balance es una base inicial reproducible. Aún requiere pruebas humanas de economía, aprendizaje, dificultad y variedad durante sesiones largas. La duración calculada de la ruta no demuestra 100 horas de contenido único. Las comprobaciones gráficas usan renderizado por software; no certifican 120 FPS en el equipo del jugador.
+
+## Renovación visual y progresión por fusiones
+
+El mundo, recursos, maquinaria, torretas, enemigos, menús y escenas usan ahora una dirección 2D vectorial minimalista: pizarra azul, turquesa para actividad y cobre para calor/armamento. Los iconos SVG se rasterizan a 4× con mipmaps y filtrado lineal; el juego ya no utiliza el atlas de pixel art. Las formas, niveles y salidas distinguen funciones sin depender sólo del color. El terreno conserva su caché de dibujo.
+
+### Excavación completa
+
+| Galería resultante | Precio de esta ampliación |
+|---|---:|
+| 7 × 5 | 500 |
+| 11 × 7 | 7.500 |
+| 15 × 9 | 30.000 |
+| 19 × 14 | 90.000 |
+| 23 × 21 | 240.000 |
+| 27 × 30 | 600.000 |
+| 30 × 40 | 1.500.000 |
+
+Se desbloquean al colocar cobre. Cada compra conserva las celdas y objetos anteriores. La última abarca las 1.200 casillas del mapa y no admite más cobros. La tienda y el arsenal comparten el mismo precio y operación; las ampliaciones se pueden comprar durante la noche. La curva usa el valor creciente de metales y lingotes, requiere reinvertir y no limita el tamaño por día. Es un balance inicial que necesita pruebas humanas prolongadas.
+
+### Recetas y armas desbloqueables
+
+Los requisitos se acumulan: no hay que mantener los ingredientes en el suelo. Hace falta **haber creado todos** los objetos indicados; descubrir nitrato ya no concede todo el arsenal. Los logros muestran cada fusión y resultado antes de conseguirlo. Las recetas permanecen visibles, bloqueadas y con su requisito en Taller.
+
+| Desbloqueo | Objetos que hay que crear |
+|---|---|
+| Pólvora | Nitrato Nv. 4 y azufre Nv. 4 |
+| Balas | Lingote de cobre Nv. 2 |
+| Alto calibre | Lingote de hierro Nv. 2 |
+| Granadas | Lingote de hierro Nv. 3 |
+| Cohetes | Lingote de oro Nv. 3 |
+| Celdas eléctricas | Lingote de wolframio Nv. 2 |
+| Pistolas | Balas y lingote de hierro Nv. 2 |
+| AK-47 | Alto calibre y lingote de hierro Nv. 3 |
+| Minigun | Alto calibre y lingote de hierro Nv. 4 |
+| Lanzagranadas | Granadas y lingote de cobre Nv. 3 |
+| Lanzacohetes | Cohetes y lingote de hierro Nv. 4 |
+| Tesla | Celdas y lingote de wolframio Nv. 3 |
+
+Un lote de alto calibre consume dos pólvoras y un lingote de hierro Nv. 2 y produce 16 balas en 4 segundos. AK-47: plano 4.200, dos lingotes de hierro Nv. 3 y uno de cobre Nv. 3, cargador 30, intervalo 0,4 s, daño 2, alcance 350. Minigun: plano 12.000, dos lingotes de hierro Nv. 4 y uno de cobre Nv. 4, cargador 80, intervalo 0,16 s, daño 1,4, alcance 330. Ambas consumen sólo alto calibre: la minigun aporta más daño por segundo a cambio de gastar más munición y perder alcance. Las mejoras globales del arsenal también las afectan.
+
+### Herramientas hasta nivel 4
+
+Arrastra dos taladros, hornos, compactadores, sierras o cintas del mismo tipo y nivel para fusionarlos. Las cintas deben tener la misma forma; se conserva la configuración de destino. Las máquinas deben estar vacías, sin combustible ni producción pendiente; las fusiones no destruyen ni duplican materiales. El movimiento conserva el nivel. Cada Nv. 4 representa ocho herramientas de Nv. 1.
+
+Hornos, sierras, compactadores y cintas multiplican su velocidad por 1 / 1,5 / 2,25 / 3,375 según nivel. El taladro aplica 1 / 2 / 3 / 4 golpes por ciclo. Los consumos y cantidades producidas se mantienen. Las cintas Nv. 1 conservan sus dos segundos. Los niveles se muestran con marcas turquesas y se guardan; los archivos anteriores cargan sus herramientas como Nv. 1.
+
+Dos nuevas piezas de logística: **Distribuidor**, plano 150 y dos lingotes de cobre Nv. 3, alterna salidas laterales después de cada entrega exitosa; **Expulsor**, plano 250 y un lingote de hierro Nv. 2, descarga al frente sobre suelo libre. También se fusionan hasta Nv. 4.
+
+### Historia
+
+Siete escenas de movimiento vectorial cuentan la historia del Sector 07, Mara e Ivo: inicio, industria, cuatro primeras derrotas de jefes y epílogo desde la noche 600. Las escenas de Carcelero, Rey de la Plaga, Madre de la Colmena y Ejecutor tienen siluetas y animaciones de derrota propias. Pausan el combate, aparecen y desaparecen en un segundo y se cierran con Continuar, Enter, Espacio o Escape. No otorgan recompensas repetibles. Los archivos descubiertos persisten y pueden reproducirse desde Historia. Son escenas 2D con texto, sin doblaje.
+
+Hay **55 logros**, incluidos los doce hitos de munición/armas y tres hitos de fusión de herramientas. Las compras y tecnologías ya obtenidas en partidas antiguas se conservan.

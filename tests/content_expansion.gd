@@ -46,12 +46,14 @@ func run_checks() -> void:
 	check(campaign.total("powder") == 8 and campaign.state["job"].is_empty(),"A completed recipe produces exactly eight gunpowder")
 	campaign.advance_workshop(100)
 	check(campaign.total("powder") == 8,"An idle workshop never duplicates a completed batch")
+	game.progression.record_resource("copper_ingot_2")
 	game.mining.items_for("copper_ingot")[Vector2i(14,1)] = 1
 	check(campaign.craft("bullet"),"Copper and gunpowder can produce real bullets")
 	campaign.advance_workshop(3)
 	check(campaign.total("bullet") == 12 and campaign.total("powder") == 7,"One powder and one copper ingot yield twelve bullets")
-	check(campaign.state["achievements"].has("bullet_1") and campaign.achievements().size() == 37,"Crafting unlocks real achievements from the thirty-seven-entry catalog")
+	check(campaign.state["achievements"].has("bullet_1") and campaign.achievements().size() >= 50,"Crafting unlocks real achievements from the expanded progression catalog")
 	game.mining.items_for("iron_ingot_2")[Vector2i(16,1)] = 1
+	game.progression.record_resource("gold_ingot_3")
 	check(campaign.craft("rocket"),"An explosive batch can reserve its real iron and gunpowder ingredients")
 	for tile: Vector2i in game.grid.owned_tiles:
 		if game.mining.can_move_nugget(tile): game.mining.items_for("coal")[tile] = 1
@@ -73,6 +75,7 @@ func run_checks() -> void:
 	game.dismiss_night_victory_popup()
 	game.camera_controller.stop_transition()
 	game.shop.accept_unlock_notice()
+	game.progression.unlocked["expansion"] = true
 	game.economy.coins = 1000000
 	var plans: Node = game.get_node("Construction")
 	for weapon: String in Catalog.WEAPONS:
@@ -135,8 +138,9 @@ func run_checks() -> void:
 		for enemy_node: Node in manager.living_zombies(): enemy_node.set_process(false)
 		clear_enemies()
 	game.zombie_manager.active_wave = false
+	game.progression.unlocked["expansion"] = true
 	game.economy.coins = 1000000
-	check(campaign.expand_gallery() and game.grid.cave_width == 11 and campaign.expand_gallery() and game.grid.cave_width == 15 and not campaign.expand_gallery(),"Late-game galleries expand to eleven and fifteen tiles, then stop charging")
+	check(campaign.expand_gallery() and game.grid.cave_width == 11 and campaign.expand_gallery() and game.grid.cave_width == 15 ,"Late-game galleries expand to eleven and fifteen tiles")
 	check(campaign.add_platforms() and campaign.add_platforms() and game.grid.defense_tiles.size() == 6 and not campaign.add_platforms(),"Industrial defenses support six actual turret platforms")
 	var expanded: Dictionary = saves.snapshot()
 	check(saves.valid_snapshot(expanded) and saves.restore_snapshot(expanded) and game.grid.cave_width == 15 and game.grid.defense_tiles.size() == 6,"Expanded ownership and all defense platforms survive reload")

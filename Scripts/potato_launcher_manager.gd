@@ -98,7 +98,7 @@ func is_active_position(cell: Vector2i) -> bool:
 	return grid.is_defense_position(cell) and grid.defense_tiles.has(cell)
 
 func ammo_units(kind: String) -> int:
-	if kind in ["bullet","grenade","rocket","battery"]: return 1
+	if kind in ["bullet","highcaliber","grenade","rocket","battery"]: return 1
 	if kind.get_slice("_",0) not in ["coal","copper","iron","gold"]: return 0
 	if kind not in mining.ORE_KINDS or "_ingot" in kind: return 0
 	return mining.ore_level(kind)

@@ -165,7 +165,7 @@ func feedback(kind: String, cell: Vector2i) -> void:
 
 func on_weapon_fired(cell: Vector2i) -> void:
 	var weapon: String = game.launchers.launchers.get(cell,{}).get("weapon","")
-	var sound: String = "pistol" if weapon == "pistol" else ("explosion" if weapon in ["grenadier","rocketeer"] else ("electric" if weapon == "tesla" else "shot"))
+	var sound: String = "pistol" if weapon in ["pistol","ak47","minigun"] else ("explosion" if weapon in ["grenadier","rocketeer"] else ("electric" if weapon == "tesla" else "shot"))
 	if impacts.size() < 64: impacts.append({"cell":cell,"age":0.0,"kind":"shot"})
 	request_sound(sound)
 
@@ -252,7 +252,7 @@ func _draw() -> void:
 		var center: Vector2 = grid.get_cell_rect(cell).get_center()
 		var angle: float = clock / BEAT * TAU
 		var push: Vector2 = DIRECTIONS[direction] * (1 + sin(angle) * 1.5)
-		draw_arc(center + push, 7, angle, angle + PI * 1.4, 12, Color("#e9ca7b"), 2)
+		draw_arc(center + push, 7, angle, angle + PI * 1.4, 12, Color("#6ee7ce"), 2)
 	for cell: Vector2i in game.get("conveyors").belts:
 		if hidden_for_drag(cell): continue
 		var center: Vector2 = grid.get_cell_rect(cell).get_center()
@@ -261,28 +261,28 @@ func _draw() -> void:
 		for i in range(3):
 			var offset: float = fmod(clock / BEAT * 5 + i * 10, 30) - 15
 			var pos := center + direction * offset
-			draw_line(pos + side * 12, pos + side * 15, Color("#d3ad6d"), 1.5)
+			draw_line(pos + side * 12, pos + side * 15, Color("#789eb2"), 1.5)
 	for cell: Vector2i in game.get_node("Compactors").machines:
 		if hidden_for_drag(cell): continue
 		var data: Dictionary = game.get_node("Compactors").machines[cell]
 		if not game.get_node("Compactors").is_compacting(data): continue
 		var center: Vector2 = grid.get_cell_rect(cell).get_center()
 		var gap: float = 6 - 3 * cos(clock / BEAT * TAU * (4.0 / game.get_node("Compactors").process_time(data)))
-		for sign_value in [-1, 1]: draw_rect(Rect2(center + Vector2(-12, gap * sign_value - 1), Vector2(24, 3)), Color("#e2bd70"))
+		for sign_value in [-1, 1]: draw_rect(Rect2(center + Vector2(-12, gap * sign_value - 1), Vector2(24, 3)), Color("#6ee7ce"))
 	for cell: Vector2i in game.get_node("Furnaces").machines:
 		if hidden_for_drag(cell): continue
 		if not game.get_node("Furnaces").machines[cell].get("burning", false): continue
 		var center: Vector2 = grid.get_cell_rect(cell).get_center()
 		for i in range(3):
 			var height: float = 4 + 4 * (0.5 + 0.5 * sin(clock * 17 + i * 2))
-			draw_line(center + Vector2(-7 + 7 * i, 9), center + Vector2(-7 + 7 * i, 9 - height), Color("#ffd17b"), 2)
+			draw_line(center + Vector2(-7 + 7 * i, 9), center + Vector2(-7 + 7 * i, 9 - height), Color("#efaa84"), 2)
 		for i in range(2):
 			var phase: float = fmod(clock * 0.8 + i * 0.5, 1)
 			draw_circle(center + Vector2(sin(clock + i) * 3, -23 - phase * 10), 1 + phase, Color(0.45, 0.38, 0.3, (1 - phase) * 0.4))
 	for impact: Dictionary in impacts:
 		var center: Vector2 = grid.get_cell_rect(impact["cell"]).get_center()
 		var progress: float = float(impact["age"]) / 0.35
-		var color := Color(1, 0.79, 0.39, 1 - progress)
+		var color := Color(0.43, 0.9, 0.81, 1 - progress)
 		if impact["kind"] == "transfer":
 			draw_circle(center.lerp(grid.get_cell_rect(impact["to"]).get_center(), progress), 2, color)
 		else:

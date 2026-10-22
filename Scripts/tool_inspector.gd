@@ -30,7 +30,7 @@ func _ready() -> void:
 	panel.custom_minimum_size.x = 232
 	panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	panel.size_flags_vertical = Control.SIZE_SHRINK_END
-	panel.add_theme_stylebox_override("panel", game.get("shop").create_style("#805733", "#392818", 5, 12))
+	panel.add_theme_stylebox_override("panel", game.get("shop").create_style("#192b3d", "#40586d", 1, 10))
 	corner.add_child(panel)
 	var margin := MarginContainer.new()
 	for side in ["left", "top", "right", "bottom"]: margin.add_theme_constant_override("margin_" + side, 12)
@@ -41,8 +41,8 @@ func _ready() -> void:
 	var header := HBoxContainer.new()
 	column.add_child(header)
 	heading = game.get("shop").create_label("CONTENIDO", 16)
-	heading.add_theme_color_override("font_outline_color", Color("#352516"))
-	heading.add_theme_constant_override("outline_size", 3)
+	heading.add_theme_color_override("font_outline_color", Color("#142233"))
+	heading.add_theme_constant_override("outline_size", 0)
 	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(heading)
 	var close: Button = game.get("shop").create_button("×")
@@ -53,7 +53,7 @@ func _ready() -> void:
 	column.add_child(status)
 	filter_selector = OptionButton.new()
 	filter_selector.custom_minimum_size.y = 38
-	for material: String in ["Carbón", "Cobre", "Hierro", "Oro", "Nitrato de potasio", "Azufre", "Wolframio", "Pólvora", "Balas", "Granadas", "Cohetes", "Celdas eléctricas"]: filter_selector.add_item(material)
+	for material: String in ["Carbón", "Cobre", "Hierro", "Oro", "Nitrato de potasio", "Azufre", "Wolframio", "Pólvora", "Balas", "Alto calibre", "Granadas", "Cohetes", "Celdas eléctricas"]: filter_selector.add_item(material)
 	filter_selector.item_selected.connect(func(index: int):
 		if kind == "belt": game.conveyors.set_filter(cell,game.conveyors.FILTER_MATERIALS[index])
 	)
@@ -145,7 +145,7 @@ func refresh() -> void:
 			for material: String in game.get_node("Construction").RECIPES[plan["item"]]:
 				items[material] = int(plan["delivered"].get(material, 0))
 		"furnace":
-			status.text = "Horno · Nv. 1"
+			status.text = "Horno · Nv. %d" % game.get_node("ToolFusion").level_at(cell)
 			var data: Dictionary = game.get_node("Furnaces").machines[cell]
 			if not str(data.get("input", "")).is_empty():
 				status.text += " · %.1f / 4 s" % float(data.get("elapsed", 0.0)) if data.get("burning", false) else " · Sin combustible"
@@ -168,6 +168,8 @@ func refresh() -> void:
 			if not game.get("launchers").is_active_position(cell): status.text += " · Fuera de defensa"
 			if level == 1: status.text += "\nFusiona dos Nv. 1 (máx. 7 disparos entre ambos)."
 		"drill": status.text = ""
+	if kind in ["furnace","compactor","saw"]:
+		status.text += "\nNv. %d · ×%.2f velocidad\nFusiona 2 iguales y vacías → siguiente nivel (máx. 4)." % [game.get_node("ToolFusion").level_at(cell),game.get_node("ToolFusion").speed(cell)]
 	if withdrawal_blocked: status.text += " · Sin espacio libre."
 	var signature: String = var_to_str(items)
 	if signature == last_contents: return
@@ -187,14 +189,14 @@ func refresh() -> void:
 		contents.add_child(heat)
 	for item: String in items:
 		var button := make_slot()
-		button.tooltip_text = game.get("shop").RESOURCE_LABELS.get(item, item) + "\nRetirar una unidad."
+		button.tooltip_text = game.get("shop").RESOURCE_LABELS.get(item, preload("res://Scripts/content_catalog.gd").label(item)) + "\nRetirar una unidad."
 		var art: Control = game.get("shop").create_item_preview("ore:" + item)
 		var count_label: Label = fill_slot(button, art, str(items[item]))
 		if kind == "blueprint":
 			var plan: Dictionary = game.get_node("Construction").plans[cell]
 			button.disabled = true
 			count_label.text = "%d / %d" % [items[item], game.get_node("Construction").RECIPES[plan["item"]][item]]
-			button.tooltip_text = game.get("shop").RESOURCE_LABELS.get(item, item)
+			button.tooltip_text = game.get("shop").RESOURCE_LABELS.get(item, preload("res://Scripts/content_catalog.gd").label(item))
 		else: button.pressed.connect(withdraw.bind(item))
 		contents.add_child(button)
 		withdraw_buttons[item] = button
@@ -233,7 +235,7 @@ func fill_slot(slot: Button, art: Control, value: String) -> Label:
 	count.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	count.add_theme_color_override("font_outline_color", Color("#18130f"))
-	count.add_theme_constant_override("outline_size", 3)
+	count.add_theme_constant_override("outline_size", 0)
 	column.add_child(count)
 	return count
 
@@ -276,11 +278,7 @@ func _process(_delta: float) -> void:
 
 class WoodPanel extends PanelContainer:
 	func _draw() -> void:
-		draw_rect(Rect2(5, 46, size.x - 10, 5), Color("#ae7e48"))
-		for x in [12.0, size.x - 12.0]:
-			for y in [12.0, size.y - 12.0]:
-				draw_circle(Vector2(x, y), 4, Color("#483b2b"))
-				draw_circle(Vector2(x - 1, y - 1), 3, Color("#a9a593"))
+		draw_line(Vector2(12,44),Vector2(size.x-12,44),Color("#40586d"),1,true)
 
 class SlotSymbol extends Control:
 	var flame: bool = false
